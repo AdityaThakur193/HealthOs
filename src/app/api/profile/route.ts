@@ -177,13 +177,17 @@ async function seedDemoData(userId: string, userWeightKg: number, dietPreference
   }
 }
 
-/**
- * GET /api/profile
- */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const email = searchParams.get("email");
+
+    if (!email) {
+      return Response.json({ notInitialized: true }, { status: 200 });
+    }
+
     await connectDB();
-    const profile = await UserProfile.findOne().lean();
+    const profile = await UserProfile.findOne({ email: email.toLowerCase() }).lean();
 
     if (!profile) {
       return Response.json({ notInitialized: true }, { status: 200 });
@@ -192,7 +196,9 @@ export async function GET() {
     return Response.json({ profile });
   } catch (error) {
     console.warn("⚠️ MongoDB connection failed. Falling back to local file DB.");
-    const profile = await getLocalProfile();
+    const { searchParams } = new URL(request.url);
+    const email = searchParams.get("email");
+    const profile = await getLocalProfile(email || undefined);
     if (!profile) {
       return Response.json({ notInitialized: true }, { status: 200 });
     }

@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ChipSelect from "@/components/ChipSelect";
 import StepIndicator from "@/components/StepIndicator";
 
-export default function Onboarding() {
+function OnboardingContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const emailParam = searchParams.get("email");
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -40,8 +42,11 @@ export default function Onboarding() {
   // Load existing profile if any
   useEffect(() => {
     async function loadProfile() {
+      const targetEmail = emailParam || localStorage.getItem("healthos_email");
+      if (!targetEmail) return;
+
       try {
-        const res = await fetch("/api/profile");
+        const res = await fetch(`/api/profile?email=${encodeURIComponent(targetEmail)}`);
         const data = await res.json();
         if (data.profile) {
           const p = data.profile;
@@ -63,13 +68,15 @@ export default function Onboarding() {
           setMedicalConditions(p.medicalConditions || []);
           setSleepTarget(p.sleepTarget || 8);
           setCollegeSchedule(p.collegeSchedule || "");
+        } else if (emailParam) {
+          setEmail(emailParam);
         }
       } catch (err) {
         console.error("Failed to load profile", err);
       }
     }
     loadProfile();
-  }, []);
+  }, [emailParam]);
 
   const totalSteps = 6;
 
@@ -124,7 +131,8 @@ export default function Onboarding() {
 
       if (res.ok && data.profile) {
         localStorage.setItem("healthos_userId", data.profile._id);
-        router.push("/"); // route to daily command center (Pillar 4)
+        localStorage.setItem("healthos_email", data.profile.email.toLowerCase());
+        router.push("/");
       } else {
         setError(data.error || "Something went wrong saving your profile.");
       }
@@ -615,5 +623,18 @@ export default function Onboarding() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function Onboarding() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white">
+        <div className="w-8 h-8 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-4" />
+        <p className="text-zinc-500 text-xs font-semibold tracking-wider uppercase">Loading Onboarding Wizard...</p>
+      </div>
+    }>
+      <OnboardingContent />
+    </Suspense>
   );
 }

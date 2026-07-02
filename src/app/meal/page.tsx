@@ -31,10 +31,16 @@ export default function MealCapture() {
   useEffect(() => {
     async function checkProfileAndLoadHistory() {
       try {
-        const profileRes = await fetch("/api/profile");
+        const email = localStorage.getItem("healthos_email");
+        if (!email) {
+          router.push("/login");
+          return;
+        }
+
+        const profileRes = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
         const profileData = await profileRes.json();
         if (profileData.notInitialized) {
-          router.push("/onboarding");
+          router.push(`/onboarding?email=${encodeURIComponent(email)}`);
           return;
         }
 

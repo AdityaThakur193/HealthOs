@@ -111,11 +111,17 @@ export default function Dashboard() {
   useEffect(() => {
     async function initDashboard() {
       try {
-        const res = await fetch("/api/profile");
+        const email = localStorage.getItem("healthos_email");
+        if (!email) {
+          router.push("/login");
+          return;
+        }
+
+        const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
         const data = await res.json();
 
         if (data.notInitialized) {
-          router.push("/onboarding");
+          router.push(`/onboarding?email=${encodeURIComponent(email)}`);
           return;
         }
 

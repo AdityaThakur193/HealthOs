@@ -35,9 +35,9 @@ function saveDB(db: LocalDB) {
 export async function getLocalProfile(email?: string) {
   const db = initDB();
   if (email) {
-    return db.profiles.find((p) => p.email === email) || null;
+    return db.profiles.find((p) => p.email.toLowerCase() === email.toLowerCase()) || null;
   }
-  return db.profiles[0] || null;
+  return null;
 }
 
 export async function getLocalProfileById(id: string) {
