@@ -39,6 +39,15 @@ function OnboardingContent() {
   const [allergyInput, setAllergyInput] = useState("");
   const [conditionInput, setConditionInput] = useState("");
   const [seedDemo, setSeedDemo] = useState(false);
+  const [hasManuallyAdjustedTarget, setHasManuallyAdjustedTarget] = useState(false);
+
+  // Auto-calculate suggested ideal target weight when height changes (guilt-free, effort-reducing)
+  useEffect(() => {
+    if (!hasManuallyAdjustedTarget && heightCm > 100) {
+      const ideal = Math.round(22 * (heightCm / 100) * (heightCm / 100));
+      setTargetWeightKg(ideal);
+    }
+  }, [heightCm, hasManuallyAdjustedTarget]);
 
   // Load existing profile if any
   useEffect(() => {
@@ -58,6 +67,7 @@ function OnboardingContent() {
           setHeightCm(p.heightCm || 175);
           setWeightKg(p.weightKg || 70);
           setTargetWeightKg(p.targetWeightKg || 65);
+          if (p.targetWeightKg) setHasManuallyAdjustedTarget(true);
           setGoal(p.goal || "lose_fat");
           setActivityLevel(p.activityLevel || "moderate");
           setGymExperience(p.gymExperience || "beginner");
@@ -278,7 +288,10 @@ function OnboardingContent() {
                   max="160"
                   step="0.5"
                   value={targetWeightKg}
-                  onChange={(e) => setTargetWeightKg(parseFloat(e.target.value))}
+                  onChange={(e) => {
+                    setTargetWeightKg(parseFloat(e.target.value));
+                    setHasManuallyAdjustedTarget(true);
+                  }}
                   className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-brand-500"
                 />
 
@@ -292,7 +305,10 @@ function OnboardingContent() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setTargetWeightKg(Math.round(22 * (heightCm / 100) * (heightCm / 100)))}
+                      onClick={() => {
+                        setTargetWeightKg(Math.round(22 * (heightCm / 100) * (heightCm / 100)));
+                        setHasManuallyAdjustedTarget(true);
+                      }}
                       className="px-2.5 py-1 bg-cyan-950/40 hover:bg-cyan-950/60 border border-cyan-800/30 rounded-lg text-[9px] font-extrabold text-cyan-400 transition-all uppercase tracking-wider"
                     >
                       Use Ideal ({Math.round(22 * (heightCm / 100) * (heightCm / 100))}kg)

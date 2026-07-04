@@ -55,8 +55,8 @@ const tabs = [
 export default function BottomNav() {
   const pathname = usePathname();
 
-  // Don't show nav on onboarding or login
-  if (pathname === "/onboarding" || pathname === "/login") return null;
+  // Don't show nav on onboarding, login, or review
+  if (pathname === "/onboarding" || pathname === "/login" || pathname === "/review") return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50">
