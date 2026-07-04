@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     let todayEvents: any[] = [];
     let weekEvents: any[] = [];
     let latestWeight: any = null;
+    let allNotes: any[] = [];
 
     try {
       await connectDB();
@@ -51,6 +52,11 @@ export async function POST(request: NextRequest) {
         })
           .sort({ timestamp: -1 })
           .lean();
+
+        allNotes = await TimelineEvent.find({
+          userId,
+          type: "note",
+        }).lean();
       }
     } catch (dbError) {
       console.warn("⚠️ MongoDB connection failed on coach API. Querying local file DB.");
@@ -74,6 +80,8 @@ export async function POST(request: NextRequest) {
 
         const weightEvents = allTodayEvents.filter((e) => e.type === "weight");
         latestWeight = weightEvents[0] || null;
+
+        allNotes = allTodayEvents.filter((e) => e.type === "note");
       }
     }
 
@@ -131,6 +139,17 @@ export async function POST(request: NextRequest) {
           ) / weekSleeps.length
         : 0;
 
+    // ── Active Calendar/Busy Event Detection ──
+    const todayDate = new Date();
+    const activeBusyEvent = allNotes.find((n: any) => {
+      if (!n.payload || !n.payload.startDate || !n.payload.endDate) return false;
+      const start = new Date(n.payload.startDate);
+      const end = new Date(n.payload.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return todayDate >= start && todayDate <= end;
+    }) || null;
+
     const context: CoachContext = {
       profile: {
         name: profile.name,
@@ -158,6 +177,14 @@ export async function POST(request: NextRequest) {
       recentWeightKg: latestWeight
         ? (latestWeight.payload as Record<string, number>)?.weightKg
         : null,
+      activeEvent: activeBusyEvent
+        ? {
+            title: activeBusyEvent.payload.title,
+            event_type: activeBusyEvent.payload.event_type,
+            startDate: activeBusyEvent.payload.startDate,
+            endDate: activeBusyEvent.payload.endDate,
+          }
+        : null,
     };
 
     // ── AI Engine: Generate coaching recommendation ──
@@ -175,49 +202,73 @@ export async function POST(request: NextRequest) {
       const actionItems: string[] = [];
       let motivation = "Consistency beats perfection. Focus on stacking successful days.";
 
-      // 1. Evaluate Status & Primary Insight
-      if (context.today.sleepHours && context.today.sleepHours < 6) {
+      if (activeBusyEvent) {
+        const type = activeBusyEvent.payload.event_type;
+        const eventLabel = type === "exam" ? "exam period" : type === "travel" ? "travel period" : "sick day";
         status = "needs_attention";
-        primaryInsight = `Sleep was short last night (${context.today.sleepHours}h). Your CNS recovery will be reduced today.`;
-        actionItems.push("Reduce today's lifting volume by 15-20% and avoid heavy single-rep PRs.");
-      } else if (proteinRemaining > 50 && context.today.caloriesConsumed > context.profile.targetCalories * 0.7) {
-        status = "needs_attention";
-        primaryInsight = "Calorie intake is high but protein is lagging. Prioritize lean protein sources next.";
-      } else if (context.today.workoutCompleted && proteinRemaining <= 10) {
-        status = "great_job";
-        primaryInsight = "Outstanding performance today! Workout completed and macros are perfectly dialed in.";
-      }
-
-      // 2. Add dynamic Action Items based on logs
-      const todaysWorkoutPlan = getTodaysWorkout(profile);
-      if (!context.today.workoutCompleted) {
-        if (todaysWorkoutPlan.name === "Rest Day") {
-          actionItems.push("Today is a scheduled Rest Day. Focus on recovery, light mobility, and hydration.");
+        primaryInsight = `Health OS adapted: We detected you are in your ${eventLabel}. Targets scaled down to prioritize recovery.`;
+        motivation = "Health over perfection. Rest, recover, and focus on what matters most today.";
+        
+        actionItems.push("Prioritize rest and recover your physical & mental energy.");
+        actionItems.push("Ensure you stay hydrated and have light, nourishing meals.");
+        if (type !== "sick") {
+          actionItems.push("Short 15-min recovery walks to clear your mind.");
         } else {
-          actionItems.push(`${todaysWorkoutPlan.name} is scheduled. Focus on progressive overload suggestions (beat previous weights).`);
+          actionItems.push("Zero workout session today. Focus entirely on sleep.");
         }
       } else {
-        actionItems.push("Workout session logged successfully. Rest, rehydrate, and recover.");
-      }
-
-      // Protein target
-      if (proteinRemaining > 0) {
-        let source = "lean protein";
-        if (profile.dietPreference === "vegetarian" || profile.dietPreference === "vegan") {
-          source = "paneer, curd, tofu, or lentils";
-        } else {
-          source = "egg whites, chicken breasts, or whey";
+        // 1. Evaluate Status & Primary Insight
+        if (context.today.sleepHours && context.today.sleepHours < 6) {
+          status = "needs_attention";
+          primaryInsight = `Sleep was short last night (${context.today.sleepHours}h). Your CNS recovery will be reduced today.`;
+          actionItems.push("Reduce today's lifting volume by 15-20% and avoid heavy single-rep PRs.");
+        } else if (proteinRemaining > 50 && context.today.caloriesConsumed > context.profile.targetCalories * 0.7) {
+          status = "needs_attention";
+          primaryInsight = "Calorie intake is high but protein is lagging. Prioritize lean protein sources next.";
+        } else if (context.today.workoutCompleted && proteinRemaining <= 10) {
+          status = "great_job";
+          primaryInsight = "Outstanding performance today! Workout completed and macros are perfectly dialed in.";
         }
-        actionItems.push(`Need ${proteinRemaining}g more protein. Consider having ${source} to hit your target.`);
-      } else {
-        actionItems.push("Protein target met for the day! Excellent job fueling your muscles.");
+
+        // 2. Add dynamic Action Items based on logs
+        const todaysWorkoutPlan = getTodaysWorkout(profile);
+        if (!context.today.workoutCompleted) {
+          if (todaysWorkoutPlan.name === "Rest Day") {
+            actionItems.push("Today is a scheduled Rest Day. Focus on recovery, light mobility, and hydration.");
+          } else {
+            actionItems.push(`${todaysWorkoutPlan.name} is scheduled. Focus on progressive overload suggestions (beat previous weights).`);
+          }
+        } else {
+          actionItems.push("Workout session logged successfully. Rest, rehydrate, and recover.");
+        }
       }
 
-      // Steps target
-      const stepsGoal = profile.stepsTarget || 10000;
+      // Protein target (only for non-fallback or normal days)
+      if (!activeBusyEvent) {
+        if (proteinRemaining > 0) {
+          let source = "lean protein";
+          if (profile.dietPreference === "vegetarian" || profile.dietPreference === "vegan") {
+            source = "paneer, curd, tofu, or lentils";
+          } else {
+            source = "egg whites, chicken breasts, or whey";
+          }
+          actionItems.push(`Need ${proteinRemaining}g more protein. Consider having ${source} to hit your target.`);
+        } else {
+          actionItems.push("Protein target met for the day! Excellent job fueling your muscles.");
+        }
+      }
+
+      // Steps target (scaled if busy event is active)
+      let stepsGoal = profile.stepsTarget || 10000;
+      if (activeBusyEvent) {
+        const type = activeBusyEvent.payload.event_type;
+        if (type === "exam") stepsGoal = 5000;
+        else if (type === "travel") stepsGoal = 6000;
+        else if (type === "sick") stepsGoal = 3000;
+      }
       const stepsRemaining = stepsGoal - (context.today.stepsCount || 0);
       if (stepsRemaining > 0) {
-        actionItems.push(`You are ${stepsRemaining} steps short of your daily target (${stepsGoal}). A quick 15-min walk will bridge the gap.`);
+        actionItems.push(`Aim for ${stepsGoal} steps today (${stepsRemaining} left). A short walk will clear your mind.`);
       } else {
         actionItems.push("Step target achieved! Keeping your neat activity high is excellent.");
       }

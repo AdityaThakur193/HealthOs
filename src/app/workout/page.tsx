@@ -23,6 +23,7 @@ export default function WorkoutTracker() {
   const [fetchingHistory, setFetchingHistory] = useState(true);
   const [exercises, setExercises] = useState<ExerciseState[]>([]);
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
+  const [pastWorkouts, setPastWorkouts] = useState<any[]>([]);
 
   useEffect(() => {
     async function checkProfileAndLoadHistory() {
@@ -77,6 +78,7 @@ export default function WorkoutTracker() {
         if (res.ok) {
           const data = await res.json();
           const pastEvents = data.events || [];
+          setPastWorkouts(pastEvents);
 
           // Match exercises by ID across all recent workouts to find previous weights
           const updatedExercises = initialExercises.map((currentEx) => {
@@ -359,6 +361,47 @@ export default function WorkoutTracker() {
           )}
         </button>
       </div>
+
+      {/* Workout History Section */}
+      {pastWorkouts.length > 0 && (
+        <div className="pt-6 border-t border-white/5 animate-in-delay-3 space-y-3">
+          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Recent Workout Logs</h3>
+          <div className="space-y-3">
+            {pastWorkouts.map((w, idx) => (
+              <GlassCard key={idx} className="p-4 space-y-2 border border-white/5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-white capitalize">{w.payload.name || "Logged Workout"}</h4>
+                  <span className="text-[10px] text-zinc-500">
+                    {new Date(w.timestamp).toLocaleDateString([], { month: "short", day: "numeric" })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 text-[10px] text-zinc-400">
+                  <span>💪 Volume: <strong className="text-brand-400">{w.payload.totalVolumeKg?.toLocaleString()} kg</strong></span>
+                  <span>🔥 Sets: <strong className="text-cyan-400">{w.payload.completedSets}</strong></span>
+                </div>
+                <div className="border-t border-white/5 pt-2 mt-1">
+                  <details className="cursor-pointer group">
+                    <summary className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider select-none hover:text-zinc-300 transition-colors flex items-center justify-between">
+                      <span>View Exercises Log</span>
+                      <span className="group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <ul className="mt-2 space-y-1.5 pl-1 text-[10px] text-zinc-400 list-disc list-inside">
+                      {w.payload.exercises?.map((ex: any, eIdx: number) => {
+                        const doneSets = ex.sets?.filter((s: any) => s.completed) || [];
+                        return (
+                          <li key={eIdx} className="capitalize">
+                            <strong>{ex.name}</strong>: {doneSets.length} sets logged (max {Math.max(...doneSets.map((s: any) => s.weight || 0))}kg)
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </details>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

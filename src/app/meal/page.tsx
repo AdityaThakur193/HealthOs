@@ -20,6 +20,7 @@ export default function MealCapture() {
 
   // Flow State: 'idle' | 'analyzing' | 'results'
   const [state, setState] = useState<"idle" | "analyzing" | "results">("idle");
+  const [mode, setMode] = useState<"photo" | "manual">("photo");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [foods, setFoods] = useState<FoodItem[]>([]);
   const [confidence, setConfidence] = useState(0.9);
@@ -27,6 +28,11 @@ export default function MealCapture() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isMock, setIsMock] = useState(false);
+
+  // Manual meal form states
+  const [manualName, setManualName] = useState("");
+  const [manualCal, setManualCal] = useState("");
+  const [manualProt, setManualProt] = useState("");
 
   useEffect(() => {
     async function checkProfileAndLoadHistory() {
@@ -164,6 +170,63 @@ export default function MealCapture() {
     }
   };
 
+  const handleSaveManualMeal = async () => {
+    const userId = localStorage.getItem("healthos_userId");
+    if (!userId || !manualName.trim()) return;
+
+    setLoadingHistory(true);
+    try {
+      const res = await fetch("/api/timeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          type: "meal",
+          payload: {
+            name: manualName.trim(),
+            totalCalories: parseInt(manualCal) || 0,
+            totalProteinG: parseInt(manualProt) || 0,
+            foods: [
+              {
+                name: manualName.trim(),
+                portionSize: "medium",
+                estimatedCalories: parseInt(manualCal) || 0,
+                proteinG: parseInt(manualProt) || 0,
+                carbsG: 0,
+                fatG: 0,
+              },
+            ],
+          },
+          source: "manual",
+        }),
+      });
+
+      if (res.ok) {
+        setShowSuccess(true);
+        setManualName("");
+        setManualCal("");
+        setManualProt("");
+        
+        // Reload today's log history
+        const histRes = await fetch(`/api/timeline?userId=${userId}&type=meal`);
+        if (histRes.ok) {
+          const histData = await histRes.json();
+          const todayStr = new Date().toDateString();
+          const todayEvents = (histData.events || []).filter(
+            (event: any) => new Date(event.timestamp).toDateString() === todayStr
+          );
+          setHistory(todayEvents);
+        }
+        
+        setTimeout(() => setShowSuccess(false), 2000);
+      }
+    } catch (err) {
+      console.error("Failed to save manual meal:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   return (
     <div className="page-container space-y-6">
       {/* Success Toast */}
@@ -190,25 +253,100 @@ export default function MealCapture() {
         className="hidden"
       />
 
-      {/* Camera Capture Area */}
+      {/* Mode Selector Tabs (only in idle state) */}
+      {state === "idle" && (
+        <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 animate-in">
+          <button
+            onClick={() => setMode("photo")}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+              mode === "photo" ? "bg-brand-500 text-white shadow-md" : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            📸 AI Photo Capture
+          </button>
+          <button
+            onClick={() => setMode("manual")}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+              mode === "manual" ? "bg-brand-500 text-white shadow-md" : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            📝 Manual Meal Log
+          </button>
+        </div>
+      )}
+
+      {/* Capture Forms Area */}
       {state === "idle" && (
         <div className="space-y-6 animate-in-delay-1">
-          <GlassCard
-            onClick={handleTriggerCamera}
-            className="border-2 border-dashed border-zinc-800 hover:border-brand-500/40 p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 min-h-60"
-          >
-            <div className="w-16 h-16 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-400 mb-4 glow-green">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8">
-                <path d="M12 9a3.75 3.75 0 100 7.5A3.75 3.75 0 0012 9z" />
-                <path fillRule="evenodd" d="M9.344 3.071a2.18 2.18 0 011.785-.92h1.744c.66 0 1.258.307 1.636.845l.9 1.286c.26.372.697.587 1.157.587h1.684a2.977 2.977 0 012.977 2.977v8.993a2.977 2.977 0 01-2.977 2.977H5.251a2.977 2.977 0 01-2.977-2.977V7.844a2.977 2.977 0 012.977-2.977h1.684c.46 0 .897-.215 1.157-.587l.9-1.286zM12 7.5a5.25 5.25 0 100 10.5 5.25 5.25 0 000-10.5z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-bold text-white">Snap your plate</h3>
-            <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto">
-              Aim camera at food. Health OS identifies ingredients and portions instantly.
-            </p>
-          </GlassCard>
-
+          {mode === "photo" ? (
+            <GlassCard
+              onClick={handleTriggerCamera}
+              className="border-2 border-dashed border-zinc-800 hover:border-brand-500/40 p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 min-h-60"
+            >
+              <div className="w-16 h-16 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-400 mb-4 glow-green">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8">
+                  <path d="M12 9a3.75 3.75 0 100 7.5A3.75 3.75 0 0012 9z" />
+                  <path fillRule="evenodd" d="M9.344 3.071a2.18 2.18 0 011.785-.92h1.744c.66 0 1.258.307 1.636.845l.9 1.286c.26.372.697.587 1.157.587h1.684a2.977 2.977 0 012.977 2.977v8.993a2.977 2.977 0 01-2.977 2.977H5.251a2.977 2.977 0 01-2.977-2.977V7.844a2.977 2.977 0 012.977-2.977h1.684c.46 0 .897-.215 1.157-.587l.9-1.286zM12 7.5a5.25 5.25 0 100 10.5 5.25 5.25 0 000-10.5z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-bold text-white">Snap your plate</h3>
+              <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto">
+                Aim camera at food. Health OS identifies ingredients and portions instantly.
+              </p>
+            </GlassCard>
+          ) : (
+            <GlassCard className="p-5 space-y-4 border border-white/10 relative overflow-hidden">
+              <div className="absolute top-1/2 right-0 -translate-y-1/2 w-32 h-32 bg-cyan-500/5 blur-[50px] rounded-full -z-10" />
+              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Log Custom Plate</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                    Meal Name / Description
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2 Paneer Roti + Curd"
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    className="input-glass text-xs h-11"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                      Calories (kcal)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 520"
+                      value={manualCal}
+                      onChange={(e) => setManualCal(e.target.value)}
+                      className="input-glass text-xs h-11"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                      Protein (g)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 22"
+                      value={manualProt}
+                      onChange={(e) => setManualProt(e.target.value)}
+                      className="input-glass text-xs h-11"
+                    />
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleSaveManualMeal}
+                className="btn-primary w-full py-3 mt-2 flex items-center justify-center font-bold text-xs"
+                disabled={!manualName.trim()}
+              >
+                Log Meal Event
+              </button>
+            </GlassCard>
+          )}
 
           {/* Today's Meals History */}
           <div className="space-y-3">

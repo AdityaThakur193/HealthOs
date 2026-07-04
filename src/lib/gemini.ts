@@ -118,6 +118,12 @@ export interface CoachContext {
     avgSleep: number;
   };
   recentWeightKg: number | null;
+  activeEvent?: {
+    title: string;
+    event_type: "exam" | "travel" | "sick";
+    startDate: string;
+    endDate: string;
+  } | null;
 }
 
 export interface CoachRecommendation {
@@ -134,7 +140,7 @@ export async function generateDailyCoach(
   const model = getModel();
 
   const prompt = `You are a personal health coach AI named "Health OS Coach".
-Your personality: supportive, direct, no guilt-tripping, focused on the NEXT action.
+Your personality: supportive, direct, calm, no guilt-tripping, focused on the NEXT action.
 
 User context (pre-calculated, do NOT recalculate):
 ${JSON.stringify(context, null, 2)}
@@ -142,14 +148,15 @@ ${JSON.stringify(context, null, 2)}
 Generate a daily coaching recommendation as JSON:
 - "greeting": short personalized greeting (use their name)
 - "status": "on_track" | "needs_attention" | "great_job"
-- "primaryInsight": ONE key insight about today (e.g., "Your sleep was short — consider reducing workout intensity")
-- "actionItems": array of 2-3 specific next actions
+- "primaryInsight": ONE key insight about today. If an activeEvent (like exams, travel, or sickness) is present, adapt immediately: suggest active recovery or rest, explain that targets are lowered, and comfort them.
+- "actionItems": array of 2-3 specific next actions. If activeEvent is present, keep actions simple (e.g. hydration, rest, gentle walks).
 - "motivation": one encouraging sentence (no guilt, no shame)
 
 Rules:
-- Never guilt the user for missing workouts or eating badly
+- Never guilt the user for missing workouts or eating badly.
+- If they have activeEvent, adapt targets downward (e.g. step count target is lower). Encourage them that health is a long term relationship.
 - If they return after days off, say "Welcome back. Let's focus on today."
-- Every recommendation must explain WHY
+- Every recommendation must explain WHY, WHAT, and EXPECTED OUTCOME.
 - Return ONLY valid JSON, no markdown.`;
 
   const result = await model.generateContent(prompt);

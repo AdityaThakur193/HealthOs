@@ -71,10 +71,20 @@ export default function ProgressRing({
       {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {label && (
-          <span className="text-2xl font-bold text-white">{label}</span>
+          <span 
+            className="font-bold text-white"
+            style={{ fontSize: size < 100 ? `${size * 0.18}px` : "24px" }}
+          >
+            {label}
+          </span>
         )}
         {sublabel && (
-          <span className="text-xs text-zinc-400 mt-0.5">{sublabel}</span>
+          <span 
+            className="text-zinc-400 mt-0.5"
+            style={{ fontSize: size < 100 ? `${size * 0.1}px` : "12px" }}
+          >
+            {sublabel}
+          </span>
         )}
       </div>
     </div>

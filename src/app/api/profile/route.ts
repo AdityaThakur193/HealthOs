@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { UserProfile, TimelineEvent } from "@/lib/db/models";
-import { getLocalProfile, saveLocalProfile, createLocalEvent, deleteLocalEvents, countLocalEvents } from "@/lib/db/fallback";
+import { getLocalProfile, saveLocalProfile, createLocalEvent, deleteLocalEvents, countLocalEvents, deleteLocalProfile } from "@/lib/db/fallback";
 
 /**
  * Helper to calculate TDEE, BMR, and targets (deterministic math).
@@ -307,3 +307,45 @@ export async function POST(request: NextRequest) {
 
   return Response.json({ profile: savedProfile }, { status: 200 });
 }
+
+/**
+ * DELETE /api/profile
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const email = searchParams.get("email");
+
+    if (!email) {
+      return Response.json({ error: "email is required" }, { status: 400 });
+    }
+
+    try {
+      await connectDB();
+      const profile = await UserProfile.findOne({ email: email.toLowerCase() });
+      if (profile) {
+        const userId = profile._id.toString();
+        // Delete all timeline events for this user
+        await TimelineEvent.deleteMany({ userId });
+        // Delete user profile
+        await UserProfile.deleteOne({ email: email.toLowerCase() });
+        console.log(`✅ Deleted MongoDB profile and timeline events for: ${email}`);
+      }
+    } catch (dbError) {
+      console.warn("⚠️ MongoDB offline. Deleting local JSON record.");
+      const profile = await getLocalProfile(email);
+      if (profile) {
+        const userId = profile._id.toString();
+        await deleteLocalEvents(userId);
+        await deleteLocalProfile(email);
+        console.log(`✅ Deleted local JSON profile and events for: ${email}`);
+      }
+    }
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error("Profile DELETE error:", error);
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+

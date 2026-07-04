@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { TimelineEvent } from "@/lib/db/models";
-import { getLocalEvents, createLocalEvent } from "@/lib/db/fallback";
+import { getLocalEvents, createLocalEvent, deleteLocalEventById } from "@/lib/db/fallback";
 
 /**
  * GET /api/timeline
@@ -93,3 +93,33 @@ export async function POST(request: NextRequest) {
     return Response.json({ event }, { status: 201 });
   }
 }
+
+/**
+ * DELETE /api/timeline
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const eventId = searchParams.get("eventId");
+
+    if (!eventId) {
+      return Response.json({ error: "eventId is required" }, { status: 400 });
+    }
+
+    try {
+      await connectDB();
+      await TimelineEvent.deleteOne({ _id: eventId });
+      console.log(`✅ Deleted MongoDB timeline event: ${eventId}`);
+    } catch (dbError) {
+      console.warn("⚠️ MongoDB offline. Deleting local JSON record.");
+      await deleteLocalEventById(eventId);
+      console.log(`✅ Deleted local JSON event: ${eventId}`);
+    }
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error("Timeline DELETE error:", error);
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+

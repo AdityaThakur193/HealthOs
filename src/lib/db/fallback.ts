@@ -113,3 +113,17 @@ export async function countLocalEvents(userId: string): Promise<number> {
   const db = initDB();
   return db.events.filter((e) => e.userId === userId).length;
 }
+
+export async function deleteLocalProfile(email: string) {
+  const db = initDB();
+  db.profiles = db.profiles.filter((p) => p.email.toLowerCase() !== email.toLowerCase());
+  saveDB(db);
+}
+
+export async function deleteLocalEventById(eventId: string) {
+  const db = initDB();
+  db.events = db.events.filter((e) => e._id !== eventId);
+  saveDB(db);
+}
+
+

@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [coachLoading, setCoachLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
+  const [activeEvent, setActiveEvent] = useState<any>(null);
 
   // Quick log states
   const [weightInput, setWeightInput] = useState("");
@@ -52,6 +53,19 @@ export default function Dashboard() {
         const data = await todayRes.json();
         const events = data.events || [];
 
+        // Filter and find active busy calendar events (travel, exams, sick)
+        const notes = events.filter((e: any) => e.type === "note");
+        const todayDate = new Date();
+        const foundActiveEvent = notes.find((n: any) => {
+          if (!n.payload || !n.payload.startDate || !n.payload.endDate) return false;
+          const start = new Date(n.payload.startDate);
+          const end = new Date(n.payload.endDate);
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+          return todayDate >= start && todayDate <= end;
+        });
+        setActiveEvent(foundActiveEvent || null);
+
         // Aggregate today's stats
         let cal = 0;
         let prot = 0;
@@ -63,8 +77,8 @@ export default function Dashboard() {
         events.forEach((event: any) => {
           // Check if event is from today
           const eventDate = new Date(event.timestamp).toDateString();
-          const todayDate = new Date().toDateString();
-          if (eventDate === todayDate) {
+          const todayDateStr = new Date().toDateString();
+          if (eventDate === todayDateStr) {
             if (event.type === "meal") {
               cal += event.payload.totalCalories || 0;
               prot += event.payload.totalProteinG || 0;
@@ -174,7 +188,15 @@ export default function Dashboard() {
   const targetCal = profile?.targetCalories || 2200;
   const targetProt = profile?.targetProteinG || 150;
   const sleepTarget = profile?.sleepTarget || 8;
-  const stepsTarget = profile?.stepsTarget || 10000;
+  
+  // Scale steps goal if busy event is active (guilt-free dynamic target scaling)
+  let stepsTarget = profile?.stepsTarget || 10000;
+  if (activeEvent) {
+    const type = activeEvent.payload.event_type;
+    if (type === "exam") stepsTarget = 5000;
+    else if (type === "travel") stepsTarget = 6000;
+    else if (type === "sick") stepsTarget = 3000;
+  }
 
   // Resolve today's scheduled workout name dynamically
   const todaysWorkout = profile
@@ -184,11 +206,27 @@ export default function Dashboard() {
         goal: profile.goal,
       })
     : null;
-  const workoutLabel = todaysWorkout
+
+  let workoutLabel = todaysWorkout
     ? todaysWorkout.name === "Rest Day"
       ? "Recovery & Mobility (Rest Day)"
       : `Complete ${todaysWorkout.name}`
     : "Hit Gym (Workout)";
+
+  if (activeEvent) {
+    const type = activeEvent.payload.event_type;
+    if (type === "sick") {
+      workoutLabel = "Rest & Recover Mode (Sick Day)";
+    } else {
+      workoutLabel = "Active Recovery & Mobility (Rest)";
+    }
+  }
+
+  // Calculate Readiness Score based on Sleep, Steps, and Protein consistency
+  const sleepScore = today.sleepHours ? Math.min(100, (today.sleepHours / sleepTarget) * 100) : 80;
+  const stepsScore = today.steps ? Math.min(100, (today.steps / stepsTarget) * 100) : 70;
+  const proteinScore = today.protein ? Math.min(100, (today.protein / targetProt) * 100) : 60;
+  const readinessScore = Math.round((sleepScore * 0.4) + (stepsScore * 0.3) + (proteinScore * 0.3));
 
   // Checklist computation
   const missionItems = [
@@ -222,6 +260,40 @@ export default function Dashboard() {
           <span className="badge-success glow-green">Active</span>
         </div>
       </div>
+
+      {/* Active Calendar Event Alert if present (guilt-free recovery scaling) */}
+      {activeEvent && (
+        <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-xl flex items-center gap-2 animate-in">
+          <span className="text-sm">📅</span>
+          <span>
+            Active Event: <strong>{activeEvent.payload.title}</strong> is active today. Daily targets are scaled back.
+          </span>
+        </div>
+      )}
+
+      {/* Readiness HUD Card */}
+      <GlassCard className="p-4 flex items-center justify-between animate-in-delay-1 border border-white/10 relative overflow-hidden">
+        <div className="absolute top-1/2 left-1/3 -translate-y-1/2 w-32 h-32 bg-cyan-500/5 blur-[50px] rounded-full -z-10" />
+        <div className="space-y-1">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Readiness Score</span>
+          <h2 className="text-lg font-extrabold text-white">
+            {readinessScore >= 80 ? "Fully Charged ⚡" : readinessScore >= 60 ? "Steady State 🔋" : "Low Energy ⚠️"}
+          </h2>
+          <p className="text-[11px] text-zinc-400 max-w-[210px] leading-relaxed">
+            Based on sleep, steps, and dynamic consistency targets.
+          </p>
+        </div>
+        <div className="flex-shrink-0 relative">
+          <ProgressRing
+            value={readinessScore}
+            max={100}
+            size={70}
+            strokeWidth={6}
+            color="#06b6d4"
+            label={`${readinessScore}%`}
+          />
+        </div>
+      </GlassCard>
 
       {/* Main Calorie Ring Card */}
       <GlassCard className="p-6 flex flex-col items-center text-center animate-in-delay-1 border border-white/10 relative overflow-hidden">
