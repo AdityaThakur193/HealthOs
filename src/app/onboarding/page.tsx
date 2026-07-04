@@ -281,6 +281,24 @@ function OnboardingContent() {
                   onChange={(e) => setTargetWeightKg(parseFloat(e.target.value))}
                   className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-brand-500"
                 />
+
+                {heightCm > 100 && (
+                  <div className="mt-3 p-3 rounded-xl bg-white/2 border border-white/5 flex items-center justify-between text-left">
+                    <div className="space-y-0.5">
+                      <span className="text-[9px] uppercase tracking-widest text-zinc-500 font-extrabold block">Health OS Recommend</span>
+                      <span className="text-[10px] text-zinc-400 block leading-tight">
+                        Healthy Range: <strong>{Math.round(18.5 * (heightCm / 100) * (heightCm / 100))} - {Math.round(24.9 * (heightCm / 100) * (heightCm / 100))} kg</strong>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setTargetWeightKg(Math.round(22 * (heightCm / 100) * (heightCm / 100)))}
+                      className="px-2.5 py-1 bg-cyan-950/40 hover:bg-cyan-950/60 border border-cyan-800/30 rounded-lg text-[9px] font-extrabold text-cyan-400 transition-all uppercase tracking-wider"
+                    >
+                      Use Ideal ({Math.round(22 * (heightCm / 100) * (heightCm / 100))}kg)
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
