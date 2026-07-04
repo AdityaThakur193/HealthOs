@@ -296,23 +296,28 @@ function OnboardingContent() {
                 />
 
                 {heightCm > 100 && (
-                  <div className="mt-3 p-3 rounded-xl bg-white/2 border border-white/5 flex items-center justify-between text-left">
-                    <div className="space-y-0.5">
-                      <span className="text-[9px] uppercase tracking-widest text-zinc-500 font-extrabold block">Health OS Recommend</span>
-                      <span className="text-[10px] text-zinc-400 block leading-tight">
-                        Healthy Range: <strong>{Math.round(18.5 * (heightCm / 100) * (heightCm / 100))} - {Math.round(24.9 * (heightCm / 100) * (heightCm / 100))} kg</strong>
-                      </span>
+                  <div className="space-y-2 mt-3">
+                    <div className="p-3 rounded-xl bg-white/2 border border-white/5 flex items-center justify-between text-left">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] uppercase tracking-widest text-zinc-500 font-extrabold block">Starting Estimate</span>
+                        <span className="text-[10px] text-zinc-400 block leading-tight">
+                          Healthy Range: <strong>{Math.round(18.5 * (heightCm / 100) * (heightCm / 100))} - {Math.round(24.9 * (heightCm / 100) * (heightCm / 100))} kg</strong>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTargetWeightKg(Math.round(22 * (heightCm / 100) * (heightCm / 100)));
+                          setHasManuallyAdjustedTarget(true);
+                        }}
+                        className="px-2.5 py-1 bg-cyan-950/40 hover:bg-cyan-950/60 border border-cyan-800/30 rounded-lg text-[9px] font-extrabold text-cyan-400 transition-all uppercase tracking-wider"
+                      >
+                        Use Baseline ({Math.round(22 * (heightCm / 100) * (heightCm / 100))}kg)
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTargetWeightKg(Math.round(22 * (heightCm / 100) * (heightCm / 100)));
-                        setHasManuallyAdjustedTarget(true);
-                      }}
-                      className="px-2.5 py-1 bg-cyan-950/40 hover:bg-cyan-950/60 border border-cyan-800/30 rounded-lg text-[9px] font-extrabold text-cyan-400 transition-all uppercase tracking-wider"
-                    >
-                      Use Ideal ({Math.round(22 * (heightCm / 100) * (heightCm / 100))}kg)
-                    </button>
+                    <p className="text-[9px] text-zinc-600 leading-tight">
+                      ⚠️ Note: Every body is unique. This standard BMI baseline (22.0) does not account for muscle mass or bone density. Health OS will adapt this as you log workouts and actual weight trends.
+                    </p>
                   </div>
                 )}
               </div>
