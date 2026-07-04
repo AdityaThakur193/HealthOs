@@ -230,6 +230,7 @@ export async function POST(request: NextRequest) {
     medicalConditions,
     sleepTarget,
     collegeSchedule,
+    seedDemo,
   } = body;
 
   if (!name || !email || !age || !gender || !heightCm || !weightKg || !goal || !activityLevel || !gymExperience) {
@@ -295,9 +296,8 @@ export async function POST(request: NextRequest) {
     savedProfile = await saveLocalProfile(profileData);
   }
 
-  // Only seed sample data on FIRST profile creation — never on updates
-  // This prevents destroying real user-logged events when editing profile
-  if (savedProfile && isNewProfile) {
+  // Only seed sample data on FIRST profile creation and if user requested it
+  if (savedProfile && isNewProfile && seedDemo === true) {
     await seedDemoData(
       savedProfile._id.toString(),
       parsedWeight,

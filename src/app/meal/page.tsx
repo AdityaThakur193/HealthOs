@@ -16,7 +16,8 @@ interface FoodItem {
 
 export default function MealCapture() {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // Flow State: 'idle' | 'analyzing' | 'results'
   const [state, setState] = useState<"idle" | "analyzing" | "results">("idle");
@@ -110,7 +111,11 @@ export default function MealCapture() {
   };
 
   const handleTriggerCamera = () => {
-    fileInputRef.current?.click();
+    cameraInputRef.current?.click();
+  };
+
+  const handleTriggerGallery = () => {
+    galleryInputRef.current?.click();
   };
 
   const handlePortionChange = (index: number, size: "small" | "medium" | "large") => {
@@ -243,12 +248,19 @@ export default function MealCapture() {
         </div>
       </div>
 
-      {/* Hidden file input */}
+      {/* Hidden file inputs */}
       <input
         type="file"
         accept="image/*"
         capture="environment"
-        ref={fileInputRef}
+        ref={cameraInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <input
+        type="file"
+        accept="image/*"
+        ref={galleryInputRef}
         onChange={handleFileChange}
         className="hidden"
       />
@@ -279,21 +291,42 @@ export default function MealCapture() {
       {state === "idle" && (
         <div className="space-y-6 animate-in-delay-1">
           {mode === "photo" ? (
-            <GlassCard
-              onClick={handleTriggerCamera}
-              className="border-2 border-dashed border-zinc-800 hover:border-brand-500/40 p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 min-h-60"
-            >
-              <div className="w-16 h-16 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-400 mb-4 glow-green">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8">
-                  <path d="M12 9a3.75 3.75 0 100 7.5A3.75 3.75 0 0012 9z" />
-                  <path fillRule="evenodd" d="M9.344 3.071a2.18 2.18 0 011.785-.92h1.744c.66 0 1.258.307 1.636.845l.9 1.286c.26.372.697.587 1.157.587h1.684a2.977 2.977 0 012.977 2.977v8.993a2.977 2.977 0 01-2.977 2.977H5.251a2.977 2.977 0 01-2.977-2.977V7.844a2.977 2.977 0 012.977-2.977h1.684c.46 0 .897-.215 1.157-.587l.9-1.286zM12 7.5a5.25 5.25 0 100 10.5 5.25 5.25 0 000-10.5z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-bold text-white">Snap your plate</h3>
-              <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto">
-                Aim camera at food. Health OS identifies ingredients and portions instantly.
-              </p>
-            </GlassCard>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Camera Action Card */}
+              <GlassCard
+                onClick={handleTriggerCamera}
+                className="border border-white/10 hover:border-brand-500/40 p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 min-h-[160px] relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-500/5 blur-[40px] rounded-full -z-10" />
+                <div className="w-12 h-12 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-400 mb-3 glow-green">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                    <path d="M12 9a3.75 3.75 0 100 7.5A3.75 3.75 0 0012 9z" />
+                    <path fillRule="evenodd" d="M9.344 3.071a2.18 2.18 0 011.785-.92h1.744c.66 0 1.258.307 1.636.845l.9 1.286c.26.372.697.587 1.157.587h1.684a2.977 2.977 0 012.977 2.977v8.993a2.977 2.977 0 01-2.977 2.977H5.251a2.977 2.977 0 01-2.977-2.977V7.844a2.977 2.977 0 012.977-2.977h1.684c.46 0 .897-.215 1.157-.587l.9-1.286zM12 7.5a5.25 5.25 0 100 10.5 5.25 5.25 0 000-10.5z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h3 className="text-xs font-bold text-white">Live Camera</h3>
+                <p className="text-[9px] text-zinc-500 mt-1 max-w-[120px] mx-auto leading-relaxed">
+                  Snap a fresh photo of your meal now
+                </p>
+              </GlassCard>
+
+              {/* Gallery Action Card */}
+              <GlassCard
+                onClick={handleTriggerGallery}
+                className="border border-white/10 hover:border-cyan-500/40 p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 min-h-[160px] relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 blur-[40px] rounded-full -z-10" />
+                <div className="w-12 h-12 rounded-full bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3 glow-cyan">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                    <path fillRule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h3 className="text-xs font-bold text-white">Photo Gallery</h3>
+                <p className="text-[9px] text-zinc-500 mt-1 max-w-[120px] mx-auto leading-relaxed">
+                  Choose a saved photo from your device library
+                </p>
+              </GlassCard>
+            </div>
           ) : (
             <GlassCard className="p-5 space-y-4 border border-white/10 relative overflow-hidden">
               <div className="absolute top-1/2 right-0 -translate-y-1/2 w-32 h-32 bg-cyan-500/5 blur-[50px] rounded-full -z-10" />
