@@ -161,7 +161,12 @@ function OnboardingContent() {
   const multipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
   const calculatedTdee = Math.round(calculatedBmr * multipliers[activityLevel]);
   const calGoal = Math.round(goal === "lose_fat" ? calculatedTdee - 500 : goal === "build_muscle" ? calculatedTdee + 300 : goal === "recomp" ? calculatedTdee - 100 : calculatedTdee);
-  const proteinGoal = Math.round(weightKg * (goal === "lose_fat" ? 2.2 : goal === "build_muscle" ? 1.8 : goal === "recomp" ? 2.3 : 2.0));
+  
+  // Calculate reference weight based on body composition (BMI rules)
+  const heightM = heightCm / 100;
+  const bmi = weightKg / (heightM * heightM);
+  const referenceWeight = bmi > 25 ? (targetWeightKg || Math.round(22 * heightM * heightM)) : weightKg;
+  const proteinGoal = Math.round(referenceWeight * (goal === "lose_fat" ? 2.2 : goal === "build_muscle" ? 1.8 : goal === "recomp" ? 2.3 : 2.0));
 
   return (
     <div className="page-container flex flex-col justify-between min-h-dvh pb-10">

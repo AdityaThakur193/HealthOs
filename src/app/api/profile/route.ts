@@ -11,6 +11,7 @@ function calculateHealthTargets(data: {
   gender: "male" | "female" | "other";
   heightCm: number;
   weightKg: number;
+  targetWeightKg?: number;
   goal: "lose_fat" | "build_muscle" | "maintain" | "recomp" | "general_health";
   activityLevel: "sedentary" | "light" | "moderate" | "active" | "very_active";
   gymExperience: "beginner" | "intermediate" | "advanced";
@@ -33,18 +34,27 @@ function calculateHealthTargets(data: {
   };
   const tdee = bmr * multipliers[data.activityLevel];
 
+  // Calculate reference weight based on body composition (BMI rules)
+  const heightM = data.heightCm / 100;
+  const bmi = data.weightKg / (heightM * heightM);
+  let referenceWeight = data.weightKg;
+  if (bmi > 25) {
+    const idealWeight = 22 * heightM * heightM;
+    referenceWeight = data.targetWeightKg || idealWeight;
+  }
+
   let targetCalories = tdee;
-  let targetProteinG = data.weightKg * 2.0;
+  let targetProteinG = referenceWeight * 2.0;
 
   if (data.goal === "lose_fat") {
     targetCalories -= 500;
-    targetProteinG = data.weightKg * 2.2;
+    targetProteinG = referenceWeight * 2.2;
   } else if (data.goal === "build_muscle") {
     targetCalories += 300;
-    targetProteinG = data.weightKg * 1.8;
+    targetProteinG = referenceWeight * 1.8;
   } else if (data.goal === "recomp") {
     targetCalories -= 100;
-    targetProteinG = data.weightKg * 2.3;
+    targetProteinG = referenceWeight * 2.3;
   }
 
   return {
@@ -247,6 +257,7 @@ export async function POST(request: NextRequest) {
     gender,
     heightCm: parseInt(heightCm),
     weightKg: parsedWeight,
+    targetWeightKg: targetWeightKg ? parseFloat(targetWeightKg) : undefined,
     goal,
     activityLevel,
     gymExperience,
