@@ -222,11 +222,28 @@ export default function Dashboard() {
     }
   }
 
-  // Calculate Readiness Score based on Sleep, Steps, and Protein consistency
-  const sleepScore = today.sleepHours ? Math.min(100, (today.sleepHours / sleepTarget) * 100) : 80;
-  const stepsScore = today.steps ? Math.min(100, (today.steps / stepsTarget) * 100) : 70;
-  const proteinScore = today.protein ? Math.min(100, (today.protein / targetProt) * 100) : 60;
-  const readinessScore = Math.round((sleepScore * 0.4) + (stepsScore * 0.3) + (proteinScore * 0.3));
+  // Calculate Readiness Score dynamically based on Sleep & Sick states (guilt-free & honest)
+  let readinessScore: number | null = null;
+  let readinessStatus = "Calibrating 🔋";
+  let readinessDescription = "Log last night's sleep to calculate today's readiness score.";
+
+  const isSick = activeEvent && activeEvent.payload.event_type === "sick";
+
+  if (isSick) {
+    readinessScore = 30;
+    readinessStatus = "Low Energy (Sick) 🤒";
+    readinessDescription = "Take it easy today. Focus on rest and hydration without guilt.";
+  } else if (today.sleepHours > 0) {
+    readinessScore = Math.min(100, Math.round((today.sleepHours / sleepTarget) * 100));
+    readinessStatus = readinessScore >= 80 ? "Fully Charged ⚡" : readinessScore >= 60 ? "Steady State 🔋" : "Low Energy ⚠️";
+    readinessDescription = readinessScore >= 80 
+      ? "Sleep goal met. You are physically ready for optimal performance today." 
+      : "Under-slept. Scale down workout intensity and prioritize recovery.";
+  } else {
+    readinessScore = null;
+    readinessStatus = "Calibrating 🔋";
+    readinessDescription = "Log last night's sleep to unlock today's readiness score.";
+  }
 
   // Checklist computation
   const missionItems = [
@@ -276,21 +293,21 @@ export default function Dashboard() {
         <div className="absolute top-1/2 left-1/3 -translate-y-1/2 w-32 h-32 bg-cyan-500/5 blur-[50px] rounded-full -z-10" />
         <div className="space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Readiness Score</span>
-          <h2 className="text-lg font-extrabold text-white">
-            {readinessScore >= 80 ? "Fully Charged ⚡" : readinessScore >= 60 ? "Steady State 🔋" : "Low Energy ⚠️"}
+          <h2 className="text-base font-extrabold text-white">
+            {readinessStatus}
           </h2>
-          <p className="text-[11px] text-zinc-400 max-w-[210px] leading-relaxed">
-            Based on sleep, steps, and dynamic consistency targets.
+          <p className="text-[10px] text-zinc-400 max-w-[210px] leading-tight">
+            {readinessDescription}
           </p>
         </div>
         <div className="flex-shrink-0 relative">
           <ProgressRing
-            value={readinessScore}
+            value={readinessScore ?? 0}
             max={100}
             size={70}
             strokeWidth={6}
-            color="#06b6d4"
-            label={`${readinessScore}%`}
+            color={readinessScore === null ? "#52525b" : "#06b6d4"}
+            label={readinessScore !== null ? `${readinessScore}%` : "—"}
           />
         </div>
       </GlassCard>
