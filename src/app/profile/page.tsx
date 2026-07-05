@@ -28,6 +28,12 @@ export default function ProfilePage() {
   const [dietPreference, setDietPreference] = useState("none");
   const [gymExperience, setGymExperience] = useState("beginner");
   const [collegeSchedule, setCollegeSchedule] = useState("");
+  const [neckCm, setNeckCm] = useState("");
+  const [waistCm, setWaistCm] = useState("");
+  const [hipCm, setHipCm] = useState("");
+  const [customCalories, setCustomCalories] = useState("");
+  const [customProtein, setCustomProtein] = useState("");
+  const [useCustomMacros, setUseCustomMacros] = useState(false);
 
   // Calendar Event Manager States
   const [events, setEvents] = useState<any[]>([]);
@@ -75,6 +81,12 @@ export default function ProfilePage() {
         setDietPreference(prof.dietPreference || "none");
         setGymExperience(prof.gymExperience || "beginner");
         setCollegeSchedule(prof.collegeSchedule || "");
+        setNeckCm(prof.neckCm ? String(prof.neckCm) : "");
+        setWaistCm(prof.waistCm ? String(prof.waistCm) : "");
+        setHipCm(prof.hipCm ? String(prof.hipCm) : "");
+        setCustomCalories(prof.customCalories ? String(prof.customCalories) : "");
+        setCustomProtein(prof.customProtein ? String(prof.customProtein) : "");
+        setUseCustomMacros(prof.useCustomMacros || false);
 
         // Fetch Timeline Events to filter for busy calendar events (notes)
         const timelineRes = await fetch(`/api/timeline?userId=${userId}`);
@@ -116,6 +128,12 @@ export default function ProfilePage() {
           dietPreference,
           gymExperience,
           collegeSchedule: collegeSchedule.trim() || undefined,
+          neckCm: neckCm ? parseFloat(neckCm) : undefined,
+          waistCm: waistCm ? parseFloat(waistCm) : undefined,
+          hipCm: hipCm ? parseFloat(hipCm) : undefined,
+          customCalories: useCustomMacros && customCalories ? parseInt(customCalories) : undefined,
+          customProtein: useCustomMacros && customProtein ? parseInt(customProtein) : undefined,
+          useCustomMacros,
         }),
       });
 
@@ -344,6 +362,87 @@ export default function ProfilePage() {
                     className="input-glass text-xs h-11 text-center"
                   />
                 </div>
+              </div>
+
+              {/* Optional Body Measurements (Navy Body Fat Method) */}
+              <div className="border-t border-white/5 pt-4 space-y-3">
+                <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Body Measurements (Optional)</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Neck (cm)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 38"
+                      value={neckCm}
+                      onChange={(e) => setNeckCm(e.target.value)}
+                      className="input-glass text-xs h-11 text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Waist (cm)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 92"
+                      value={waistCm}
+                      onChange={(e) => setWaistCm(e.target.value)}
+                      className="input-glass text-xs h-11 text-center"
+                    />
+                  </div>
+                </div>
+
+                {((profile?.gender === "female" || profile?.gender === "other")) && (
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Hip (cm)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 104"
+                      value={hipCm}
+                      onChange={(e) => setHipCm(e.target.value)}
+                      className="input-glass text-xs h-11 text-center"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Custom Macro Targets Overrides */}
+              <div className="border-t border-white/5 pt-4 space-y-3">
+                <div 
+                  onClick={() => setUseCustomMacros(!useCustomMacros)}
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                >
+                  <input
+                    type="checkbox"
+                    checked={useCustomMacros}
+                    onChange={() => {}}
+                    className="w-3.5 h-3.5 rounded text-cyan-500 bg-zinc-900 border-white/10 focus:ring-0 cursor-pointer"
+                  />
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Manual Calorie Override</span>
+                </div>
+
+                {useCustomMacros && (
+                  <div className="grid grid-cols-2 gap-3 animate-in">
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Custom Calories (kcal)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 2500"
+                        value={customCalories}
+                        onChange={(e) => setCustomCalories(e.target.value)}
+                        className="input-glass text-xs h-11 text-center"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Custom Protein (g)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 170"
+                        value={customProtein}
+                        onChange={(e) => setCustomProtein(e.target.value)}
+                        className="input-glass text-xs h-11 text-center"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </GlassCard>

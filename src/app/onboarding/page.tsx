@@ -40,6 +40,12 @@ function OnboardingContent() {
   const [conditionInput, setConditionInput] = useState("");
   const [seedDemo, setSeedDemo] = useState(false);
   const [hasManuallyAdjustedTarget, setHasManuallyAdjustedTarget] = useState(false);
+  const [neckCm, setNeckCm] = useState("");
+  const [waistCm, setWaistCm] = useState("");
+  const [hipCm, setHipCm] = useState("");
+  const [customCalories, setCustomCalories] = useState("");
+  const [customProtein, setCustomProtein] = useState("");
+  const [useCustomMacros, setUseCustomMacros] = useState(false);
 
   // Auto-calculate suggested ideal target weight when height changes (guilt-free, effort-reducing)
   useEffect(() => {
@@ -79,6 +85,12 @@ function OnboardingContent() {
           setMedicalConditions(p.medicalConditions || []);
           setSleepTarget(p.sleepTarget || 8);
           setCollegeSchedule(p.collegeSchedule || "");
+          setNeckCm(p.neckCm ? String(p.neckCm) : "");
+          setWaistCm(p.waistCm ? String(p.waistCm) : "");
+          setHipCm(p.hipCm ? String(p.hipCm) : "");
+          setCustomCalories(p.customCalories ? String(p.customCalories) : "");
+          setCustomProtein(p.customProtein ? String(p.customProtein) : "");
+          setUseCustomMacros(p.useCustomMacros || false);
         } else if (emailParam) {
           setEmail(emailParam);
         }
@@ -136,6 +148,12 @@ function OnboardingContent() {
           sleepTarget,
           collegeSchedule,
           seedDemo,
+          neckCm: neckCm ? parseFloat(neckCm) : undefined,
+          waistCm: waistCm ? parseFloat(waistCm) : undefined,
+          hipCm: hipCm ? parseFloat(hipCm) : undefined,
+          customCalories: useCustomMacros && customCalories ? parseInt(customCalories) : undefined,
+          customProtein: useCustomMacros && customProtein ? parseInt(customProtein) : undefined,
+          useCustomMacros,
         }),
       });
 
@@ -156,17 +174,49 @@ function OnboardingContent() {
     }
   };
 
-  // Helper calculations for review step
-  const calculatedBmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (gender === "male" ? 5 : gender === "female" ? -161 : -80);
+  // Helper calculations for review step (using Katch-McArdle if body fat measurements are provided)
+  const getBodyFatForBmr = () => {
+    const neck = parseFloat(neckCm);
+    const waist = parseFloat(waistCm);
+    const height = heightCm;
+    if (isNaN(neck) || isNaN(waist) || height <= 0 || waist <= neck) return null;
+    
+    if (gender === "male") {
+      const waistIn = waist / 2.54;
+      const neckIn = neck / 2.54;
+      const heightIn = height / 2.54;
+      if (waistIn <= neckIn) return null;
+      return 86.010 * Math.log10(waistIn - neckIn) - 70.041 * Math.log10(heightIn) + 36.76;
+    } else {
+      const hip = parseFloat(hipCm);
+      if (isNaN(hip)) return null;
+      const waistIn = waist / 2.54;
+      const hipIn = hip / 2.54;
+      const neckIn = neck / 2.54;
+      const heightIn = height / 2.54;
+      if ((waistIn + hipIn) <= neckIn) return null;
+      return 163.205 * Math.log10(waistIn + hipIn - neckIn) - 97.684 * Math.log10(heightIn) - 78.387;
+    }
+  };
+
+  const bfPct = getBodyFatForBmr();
+  const calculatedBmr = bfPct !== null && bfPct > 0
+    ? 370 + 21.6 * (weightKg * (1 - bfPct / 100))
+    : 10 * weightKg + 6.25 * heightCm - 5 * age + (gender === "male" ? 5 : gender === "female" ? -161 : -80);
+
   const multipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
   const calculatedTdee = Math.round(calculatedBmr * multipliers[activityLevel]);
-  const calGoal = Math.round(goal === "lose_fat" ? calculatedTdee - 500 : goal === "build_muscle" ? calculatedTdee + 300 : goal === "recomp" ? calculatedTdee - 100 : calculatedTdee);
+  
+  const standardCalGoal = Math.round(goal === "lose_fat" ? calculatedTdee - 500 : goal === "build_muscle" ? calculatedTdee + 300 : goal === "recomp" ? calculatedTdee - 100 : calculatedTdee);
+  const calGoal = useCustomMacros && customCalories ? parseInt(customCalories) : standardCalGoal;
   
   // Calculate reference weight based on body composition (BMI rules)
   const heightM = heightCm / 100;
   const bmi = weightKg / (heightM * heightM);
   const referenceWeight = bmi > 25 ? (targetWeightKg || Math.round(22 * heightM * heightM)) : weightKg;
-  const proteinGoal = Math.round(referenceWeight * (goal === "lose_fat" ? 2.2 : goal === "build_muscle" ? 1.8 : goal === "recomp" ? 2.3 : 2.0));
+  
+  const standardProteinGoal = Math.round(referenceWeight * (goal === "lose_fat" ? 2.2 : goal === "build_muscle" ? 1.8 : goal === "recomp" ? 2.3 : 2.0));
+  const proteinGoal = useCustomMacros && customProtein ? parseInt(customProtein) : standardProteinGoal;
 
   return (
     <div className="page-container flex flex-col justify-between min-h-dvh pb-10">
@@ -323,6 +373,64 @@ function OnboardingContent() {
                     <p className="text-[9px] text-zinc-600 leading-tight">
                       ⚠️ Note: Every body is unique. This standard BMI baseline (22.0) does not account for muscle mass or bone density. Health OS will adapt this as you log workouts and actual weight trends.
                     </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Optional Body Measurements (Navy Body Fat Method) */}
+              <div className="border-t border-white/5 pt-5 space-y-4">
+                <div>
+                  <h3 className="text-xs font-bold text-white mb-0.5">Body Measurements (Optional)</h3>
+                  <p className="text-[10px] text-zinc-500 leading-tight">
+                    Add measurements to estimate body fat % and calculate a highly personalized calorie/protein baseline (Katch-McArdle).
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-semibold mb-1 block">Neck Circumference (cm)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 38"
+                      value={neckCm}
+                      onChange={(e) => setNeckCm(e.target.value)}
+                      className="input-glass text-xs py-2 px-3"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-semibold mb-1 block">Waist Circumference (cm)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 92"
+                      value={waistCm}
+                      onChange={(e) => setWaistCm(e.target.value)}
+                      className="input-glass text-xs py-2 px-3"
+                    />
+                  </div>
+                </div>
+
+                {(gender === "female" || gender === "other") && (
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-semibold mb-1 block">Hip Circumference (cm)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 104"
+                      value={hipCm}
+                      onChange={(e) => setHipCm(e.target.value)}
+                      className="input-glass text-xs py-2 px-3"
+                    />
+                  </div>
+                )}
+
+                {bfPct !== null && (
+                  <div className="p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/10 text-cyan-400 text-[10px] leading-relaxed flex items-center justify-between">
+                    <div>
+                      <span>Estimated Body Fat: <strong>{bfPct}%</strong></span>
+                      <span className="block text-[9px] text-cyan-500 mt-0.5">
+                        Lean Body Mass: <strong>{Math.round(weightKg * (1 - bfPct / 100))} kg</strong>
+                      </span>
+                    </div>
+                    <span className="badge-info text-[9px]">Katch-McArdle BMR Active</span>
                   </div>
                 )}
               </div>
@@ -633,6 +741,50 @@ function OnboardingContent() {
                 <span className="font-semibold text-brand-400">{gymFrequency} Days / Week ({gymAccess.replace("_", " ")})</span>
               </div>
             </GlassCard>
+
+            {/* Custom Target Override (Respect human autonomy, Philosophy 18) */}
+            <div className="space-y-3">
+              <div 
+                onClick={() => setUseCustomMacros(!useCustomMacros)}
+                className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 select-none cursor-pointer hover:bg-white/10 transition-all"
+              >
+                <input
+                  type="checkbox"
+                  checked={useCustomMacros}
+                  onChange={() => {}}
+                  className="w-4 h-4 rounded text-cyan-500 bg-zinc-900 border-white/10 focus:ring-0 cursor-pointer"
+                />
+                <div className="text-left">
+                  <span className="text-xs font-bold text-white block">Override Targets Manually</span>
+                  <span className="text-[10px] text-zinc-500 block mt-0.5">Use custom target daily calories and protein goals.</span>
+                </div>
+              </div>
+
+              {useCustomMacros && (
+                <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-white/2 border border-white/5 animate-in">
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-semibold mb-1 block">Custom Calories (kcal)</label>
+                    <input
+                      type="number"
+                      placeholder={String(standardCalGoal)}
+                      value={customCalories}
+                      onChange={(e) => setCustomCalories(e.target.value)}
+                      className="input-glass text-xs py-2 px-3"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-semibold mb-1 block">Custom Protein (g)</label>
+                    <input
+                      type="number"
+                      placeholder={String(standardProteinGoal)}
+                      value={customProtein}
+                      onChange={(e) => setCustomProtein(e.target.value)}
+                      className="input-glass text-xs py-2 px-3"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div 
               onClick={() => setSeedDemo(!seedDemo)}

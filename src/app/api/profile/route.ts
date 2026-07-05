@@ -12,17 +12,61 @@ function calculateHealthTargets(data: {
   heightCm: number;
   weightKg: number;
   targetWeightKg?: number;
+  neckCm?: number;
+  waistCm?: number;
+  hipCm?: number;
+  customCalories?: number;
+  customProtein?: number;
+  useCustomMacros?: boolean;
   goal: "lose_fat" | "build_muscle" | "maintain" | "recomp" | "general_health";
   activityLevel: "sedentary" | "light" | "moderate" | "active" | "very_active";
   gymExperience: "beginner" | "intermediate" | "advanced";
 }) {
-  let bmr = 10 * data.weightKg + 6.25 * data.heightCm - 5 * data.age;
-  if (data.gender === "male") {
-    bmr += 5;
-  } else if (data.gender === "female") {
-    bmr -= 161;
+  // 1. Calculate body fat percentage if measurements are provided (US Navy Method)
+  let bodyFatPct: number | null = null;
+  if (data.neckCm && data.waistCm && data.heightCm) {
+    const neck = data.neckCm;
+    const waist = data.waistCm;
+    const height = data.heightCm;
+    if (waist > neck) {
+      if (data.gender === "male") {
+        const waistIn = waist / 2.54;
+        const neckIn = neck / 2.54;
+        const heightIn = height / 2.54;
+        if (waistIn > neckIn) {
+          bodyFatPct = 86.010 * Math.log10(waistIn - neckIn) - 70.041 * Math.log10(heightIn) + 36.76;
+        }
+      } else {
+        const hip = data.hipCm || 0;
+        if (hip > 0) {
+          const waistIn = waist / 2.54;
+          const hipIn = hip / 2.54;
+          const neckIn = neck / 2.54;
+          const heightIn = height / 2.54;
+          if ((waistIn + hipIn) > neckIn) {
+            bodyFatPct = 163.205 * Math.log10(waistIn + hipIn - neckIn) - 97.684 * Math.log10(heightIn) - 78.387;
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Calculate BMR
+  let bmr = 0;
+  if (bodyFatPct !== null && bodyFatPct > 0 && !isNaN(bodyFatPct)) {
+    // Katch-McArdle BMR (gold standard based on lean mass)
+    const leanMass = data.weightKg * (1 - bodyFatPct / 100);
+    bmr = 370 + 21.6 * leanMass;
   } else {
-    bmr -= 80;
+    // Mifflin-St Jeor fallback
+    bmr = 10 * data.weightKg + 6.25 * data.heightCm - 5 * data.age;
+    if (data.gender === "male") {
+      bmr += 5;
+    } else if (data.gender === "female") {
+      bmr -= 161;
+    } else {
+      bmr -= 80;
+    }
   }
 
   const multipliers = {
@@ -55,6 +99,16 @@ function calculateHealthTargets(data: {
   } else if (data.goal === "recomp") {
     targetCalories -= 100;
     targetProteinG = referenceWeight * 2.3;
+  }
+
+  // Apply custom calorie/protein target overrides if requested (Philosophy 18: Autonomy)
+  if (data.useCustomMacros) {
+    if (data.customCalories && data.customCalories > 0) {
+      targetCalories = data.customCalories;
+    }
+    if (data.customProtein && data.customProtein > 0) {
+      targetProteinG = data.customProtein;
+    }
   }
 
   return {
@@ -241,6 +295,12 @@ export async function POST(request: NextRequest) {
     sleepTarget,
     collegeSchedule,
     seedDemo,
+    neckCm,
+    waistCm,
+    hipCm,
+    customCalories,
+    customProtein,
+    useCustomMacros,
   } = body;
 
   if (!name || !email || !age || !gender || !heightCm || !weightKg || !goal || !activityLevel || !gymExperience) {
@@ -258,6 +318,12 @@ export async function POST(request: NextRequest) {
     heightCm: parseInt(heightCm),
     weightKg: parsedWeight,
     targetWeightKg: targetWeightKg ? parseFloat(targetWeightKg) : undefined,
+    neckCm: neckCm ? parseFloat(neckCm) : undefined,
+    waistCm: waistCm ? parseFloat(waistCm) : undefined,
+    hipCm: hipCm ? parseFloat(hipCm) : undefined,
+    customCalories: customCalories ? parseInt(customCalories) : undefined,
+    customProtein: customProtein ? parseInt(customProtein) : undefined,
+    useCustomMacros: useCustomMacros || false,
     goal,
     activityLevel,
     gymExperience,
@@ -282,6 +348,12 @@ export async function POST(request: NextRequest) {
     medicalConditions: medicalConditions || [],
     sleepTarget: parseInt(sleepTarget || "8"),
     collegeSchedule: collegeSchedule || "",
+    neckCm: neckCm ? parseFloat(neckCm) : undefined,
+    waistCm: waistCm ? parseFloat(waistCm) : undefined,
+    hipCm: hipCm ? parseFloat(hipCm) : undefined,
+    customCalories: customCalories ? parseInt(customCalories) : undefined,
+    customProtein: customProtein ? parseInt(customProtein) : undefined,
+    useCustomMacros: useCustomMacros || false,
     ...targets,
   };
 

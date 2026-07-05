@@ -40,6 +40,12 @@ export interface IUserProfile extends Document {
   bmr?: number;
   targetCalories?: number;
   targetProteinG?: number;
+  neckCm?: number;
+  waistCm?: number;
+  hipCm?: number;
+  customCalories?: number;
+  customProtein?: number;
+  useCustomMacros?: boolean;
 
   createdAt: Date;
   updatedAt: Date;
@@ -102,6 +108,12 @@ const UserProfileSchema = new Schema<IUserProfile>(
     bmr: Number,
     targetCalories: Number,
     targetProteinG: Number,
+    neckCm: Number,
+    waistCm: Number,
+    hipCm: Number,
+    customCalories: Number,
+    customProtein: Number,
+    useCustomMacros: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
