@@ -166,12 +166,47 @@ export async function GET(request: NextRequest) {
       profile.targetCalories = profileDoc.targetCalories;
     }
 
+    // Calculate Logging Streak
+    const uniqueLoggingDays = new Set(
+      events.map((e) => new Date(e.timestamp).toDateString())
+    );
+
+    let streak = 0;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const todayStr = startOfToday.toDateString();
+    const yesterday = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayStr = yesterday.toDateString();
+
+    let currentCheck = startOfToday;
+    if (uniqueLoggingDays.has(todayStr)) {
+      streak = 1;
+      currentCheck = yesterday;
+    } else if (uniqueLoggingDays.has(yesterdayStr)) {
+      streak = 1;
+      currentCheck = new Date(yesterday.getTime() - 24 * 60 * 60 * 1000);
+    }
+
+    if (streak > 0) {
+      while (true) {
+        const dateStr = currentCheck.toDateString();
+        if (uniqueLoggingDays.has(dateStr)) {
+          streak++;
+          currentCheck = new Date(currentCheck.getTime() - 24 * 60 * 60 * 1000);
+        } else {
+          break;
+        }
+      }
+    }
+
     return Response.json({
       profile,
       tdeeMode: tdeeResult.status,
       daysRemaining: tdeeResult.daysRemaining,
       avgCalories: tdeeResult.avgCalories,
       weightDeltaKg: tdeeResult.weightDeltaKg,
+      streak,
     });
   } catch (error) {
     console.warn("⚠️ MongoDB connection failed. Falling back to local file DB.");

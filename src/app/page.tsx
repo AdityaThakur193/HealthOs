@@ -39,6 +39,7 @@ export default function Dashboard() {
   const [weightDeltaKg, setWeightDeltaKg] = useState(0);
   const [showTdeeModal, setShowTdeeModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [streak, setStreak] = useState(0);
 
   // Quick log states
   const [weightInput, setWeightInput] = useState("");
@@ -150,6 +151,7 @@ export default function Dashboard() {
         setDaysRemaining(typeof data.daysRemaining === "number" ? data.daysRemaining : 14);
         setAvgCalories(data.avgCalories || 0);
         setWeightDeltaKg(data.weightDeltaKg || 0);
+        setStreak(data.streak || 0);
         localStorage.setItem("healthos_userId", data.profile._id);
         await fetchDashboardData(data.profile._id);
       } catch (err) {
@@ -280,10 +282,17 @@ export default function Dashboard() {
       {/* Top Header */}
       <div className="flex items-center justify-between py-2 border-b border-white/5 animate-in">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Command Center</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+            Command Center • {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+          </span>
           <h1 className="text-xl font-bold text-white mt-0.5">{getGreeting()}, {profile?.name}</h1>
         </div>
         <div className="flex items-center gap-1.5">
+          {streak > 0 && (
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-extrabold text-amber-400 uppercase tracking-widest flex items-center gap-1">
+              🔥 {streak} {streak === 1 ? "Day" : "Days"}
+            </span>
+          )}
           {tdeeMode === "adaptive" ? (
             <button 
               onClick={() => setShowTdeeModal(true)}
