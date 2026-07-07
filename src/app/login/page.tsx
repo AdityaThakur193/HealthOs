@@ -37,7 +37,8 @@ export default function Login() {
           router.push("/");
         }
       } else {
-        setError("Unable to connect to the server. Please try again.");
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || "Unable to connect to the server. Please try again.");
       }
     } catch (err) {
       console.error("Login connection error:", err);

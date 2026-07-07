@@ -26,6 +26,9 @@ export default function WorkoutTracker() {
   const [pastWorkouts, setPastWorkouts] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [showHowToLog, setShowHowToLog] = useState(false);
+  const [customExName, setCustomExName] = useState("");
+  const [customExMuscle, setCustomExMuscle] = useState("");
+  const [showAddCustomForm, setShowAddCustomForm] = useState(false);
 
   useEffect(() => {
     async function checkProfileAndLoadHistory() {
@@ -186,14 +189,48 @@ export default function WorkoutTracker() {
     );
   };
 
+  const handleAddCustomExercise = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customExName.trim() || !customExMuscle.trim()) return;
+
+    const targetSets = exercises[0]?.targetSets || 3;
+    const targetReps = exercises[0]?.targetReps || "8-12";
+
+    const newEx: ExerciseState = {
+      id: `custom_${Date.now()}`,
+      name: customExName.trim(),
+      muscleGroup: customExMuscle.trim(),
+      targetSets,
+      targetReps,
+      sets: Array.from({ length: targetSets }, () => ({
+        weight: 0,
+        reps: 0,
+        completed: false,
+      })),
+    };
+
+    setExercises((prev) => [...prev, newEx]);
+    setCustomExName("");
+    setCustomExMuscle("");
+    setShowAddCustomForm(false);
+  };
+
   const handleFinishWorkout = async () => {
     const userId = localStorage.getItem("healthos_userId");
     if (!userId || !plan) return;
 
-    setLoading(true);
-
     let totalVolume = 0;
     let loggedSetsCount = 0;
+
+    const testLoggedCount = exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0);
+    if (testLoggedCount === 0) {
+      const confirmLogEmpty = confirm("⚠️ You haven't checked off any completed sets today! Do you want to log this as an empty workout session?");
+      if (!confirmLogEmpty) {
+        return;
+      }
+    }
+
+    setLoading(true);
 
     const exercisesLogged = exercises.map((ex) => {
       const completedSets = ex.sets.filter((s) => s.completed);
@@ -422,6 +459,72 @@ export default function WorkoutTracker() {
             onToggleSet={(setIndex) => handleToggleSet(ex.id, setIndex)}
           />
         ))}
+      </div>
+
+      {/* Custom Exercise Section */}
+      <div className="animate-in-delay-2">
+        {!showAddCustomForm ? (
+          <button
+            type="button"
+            onClick={() => setShowAddCustomForm(true)}
+            className="w-full py-3 rounded-xl border border-dashed border-white/10 hover:border-white/20 bg-white/2 hover:bg-white/5 text-zinc-400 hover:text-white transition-all text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <span>➕</span> Add Custom Exercise to Session
+          </button>
+        ) : (
+          <GlassCard className="p-4 border border-white/10 space-y-4">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Add Custom Exercise</h4>
+            <form onSubmit={handleAddCustomExercise} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                    Exercise Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Hammer Strength Row"
+                    value={customExName}
+                    onChange={(e) => setCustomExName(e.target.value)}
+                    className="input-glass text-xs py-2 px-3"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                    Muscle Group
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Back"
+                    value={customExMuscle}
+                    onChange={(e) => setCustomExMuscle(e.target.value)}
+                    className="input-glass text-xs py-2 px-3"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddCustomForm(false);
+                    setCustomExName("");
+                    setCustomExMuscle("");
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-white/5 text-zinc-400 hover:text-white transition-all text-[10px] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary px-3 py-1.5 rounded-lg text-white font-bold text-[10px] cursor-pointer"
+                >
+                  Add Exercise
+                </button>
+              </div>
+            </form>
+          </GlassCard>
+        )}
       </div>
 
       {/* Finish button */}

@@ -103,9 +103,29 @@ function OnboardingContent() {
   const totalSteps = 6;
 
   const nextStep = () => {
-    if (step === 0 && (!name || !email)) {
-      setError("Please fill in your name and email.");
-      return;
+    if (step === 0) {
+      if (!name || !email) {
+        setError("Please fill in your name and email.");
+        return;
+      }
+      if (!age || age <= 0 || age > 120) {
+        setError("Please enter a valid age between 1 and 120.");
+        return;
+      }
+    }
+    if (step === 1) {
+      if (!heightCm || heightCm <= 50 || heightCm > 250) {
+        setError("Please enter a valid height between 50 and 250 cm.");
+        return;
+      }
+      if (!weightKg || weightKg <= 20 || weightKg > 300) {
+        setError("Please enter a valid weight between 20 and 300 kg.");
+        return;
+      }
+      if (!targetWeightKg || targetWeightKg <= 20 || targetWeightKg > 300) {
+        setError("Please enter a valid target weight between 20 and 300 kg.");
+        return;
+      }
     }
     setError("");
     if (step < totalSteps - 1) {

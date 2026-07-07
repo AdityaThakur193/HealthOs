@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [showTdeeModal, setShowTdeeModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [streak, setStreak] = useState(0);
+  const [todayEvents, setTodayEvents] = useState<any[]>([]);
 
   // Quick log states
   const [weightInput, setWeightInput] = useState("");
@@ -101,6 +102,13 @@ export default function Dashboard() {
           }
         });
 
+        // Store today's events for log management/deletion
+        const todayDateStr = new Date().toDateString();
+        const todaysLogs = events.filter((event: any) => 
+          new Date(event.timestamp).toDateString() === todayDateStr
+        );
+        setTodayEvents(todaysLogs);
+
         setToday({
           calories: Math.round(cal),
           protein: Math.round(prot),
@@ -129,37 +137,72 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    async function initDashboard() {
-      try {
-        const email = localStorage.getItem("healthos_email");
-        if (!email) {
-          router.push("/login");
-          return;
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm("Are you sure you want to delete this log?")) return;
+    try {
+      const res = await fetch(`/api/timeline?eventId=${eventId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        const userId = localStorage.getItem("healthos_userId");
+        if (userId) {
+          await initDashboard();
         }
-
-        const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
-        const data = await res.json();
-
-        if (data.notInitialized) {
-          router.push(`/onboarding?email=${encodeURIComponent(email)}`);
-          return;
-        }
-
-        setProfile(data.profile);
-        setTdeeMode(data.tdeeMode || "calibrating");
-        setDaysRemaining(typeof data.daysRemaining === "number" ? data.daysRemaining : 14);
-        setAvgCalories(data.avgCalories || 0);
-        setWeightDeltaKg(data.weightDeltaKg || 0);
-        setStreak(data.streak || 0);
-        localStorage.setItem("healthos_userId", data.profile._id);
-        await fetchDashboardData(data.profile._id);
-      } catch (err) {
-        console.error("Dashboard init error", err);
-      } finally {
-        setLoading(false);
+      } else {
+        alert("Failed to delete log. Please try again.");
       }
+    } catch (err) {
+      console.error("Delete event error:", err);
+      alert("Error deleting log.");
     }
+  };
+
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const initDashboard = async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const email = localStorage.getItem("healthos_email");
+      if (!email) {
+        router.push("/login");
+        return;
+      }
+
+      const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      if (data.notInitialized) {
+        router.push(`/onboarding?email=${encodeURIComponent(email)}`);
+        return;
+      }
+
+      if (!data || !data.profile) {
+        throw new Error("Missing profile info. Database configuration may be incomplete.");
+      }
+
+      setProfile(data.profile);
+      setTdeeMode(data.tdeeMode || "calibrating");
+      setDaysRemaining(typeof data.daysRemaining === "number" ? data.daysRemaining : 14);
+      setAvgCalories(data.avgCalories || 0);
+      setWeightDeltaKg(data.weightDeltaKg || 0);
+      setStreak(data.streak || 0);
+      localStorage.setItem("healthos_userId", data.profile._id);
+      await fetchDashboardData(data.profile._id);
+    } catch (err: any) {
+      console.error("Dashboard init error", err);
+      setErrorMsg(err.message || "Failed to load dashboard metrics. Ensure database is online.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     initDashboard();
   }, [router]);
 
@@ -193,6 +236,26 @@ export default function Dashboard() {
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white">
         <div className="w-8 h-8 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-4" />
         <p className="text-zinc-500 text-xs font-semibold tracking-wider uppercase animate-pulse">Syncing Health OS...</p>
+      </div>
+    );
+  }
+
+  if (errorMsg) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white p-4">
+        <GlassCard className="p-6 text-center border border-white/10 max-w-sm w-full space-y-4">
+          <div className="text-3xl">⚠️</div>
+          <h2 className="text-base font-bold text-white">System Offline</h2>
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            {errorMsg}
+          </p>
+          <button 
+            onClick={initDashboard}
+            className="btn-primary w-full py-2.5 font-bold text-xs"
+          >
+            Retry Connection
+          </button>
+        </GlassCard>
       </div>
     );
   }
@@ -429,6 +492,96 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+      </GlassCard>
+
+      {/* Today's Activity Logs */}
+      <GlassCard className="p-5 space-y-4 animate-in-delay-3">
+        <h3 className="text-sm font-bold text-white">Today's Logs</h3>
+        {todayEvents.length === 0 ? (
+          <div className="text-center py-6 px-4 border border-dashed border-white/10 rounded-2xl">
+            <span className="text-2xl">⚡</span>
+            <h4 className="text-xs font-bold text-zinc-300 mt-2">No activity logged today</h4>
+            <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed max-w-xs mx-auto">
+              Tap the green <strong>+</strong> button below to log your weight, sleep, or meals. Every entry helps calibrate your Adaptive TDEE!
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2 justify-center">
+              <button 
+                onClick={() => {
+                  setQuickLogOpen(true);
+                  setActiveForm("steps");
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-bold hover:bg-white/10 text-zinc-300 cursor-pointer"
+              >
+                👣 Log Steps
+              </button>
+              <button 
+                onClick={() => {
+                  setQuickLogOpen(true);
+                  setActiveForm("sleep");
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-bold hover:bg-white/10 text-zinc-300 cursor-pointer"
+              >
+                💤 Log Sleep
+              </button>
+              <button 
+                onClick={() => router.push("/meal")}
+                className="px-2.5 py-1.5 rounded-lg bg-brand-500/10 border border-brand-500/20 text-[9px] font-bold hover:bg-brand-500/20 text-brand-400 cursor-pointer"
+              >
+                📸 Scan Meal
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {todayEvents.map((event) => {
+              let details = "";
+              let title = event.type.toUpperCase();
+              
+              if (event.type === "meal") {
+                title = "Meal Capture";
+                const foodsList = event.payload.foods?.map((f: any) => f.name).join(", ") || "Meal Log";
+                details = `${foodsList} (${event.payload.totalCalories || 0} kcal, ${event.payload.totalProteinG || 0}g protein)`;
+              } else if (event.type === "weight") {
+                title = "Weight Log";
+                details = `${event.payload.weightKg || 0} kg logged`;
+              } else if (event.type === "steps") {
+                title = "Daily Steps";
+                details = `${event.payload.count?.toLocaleString() || 0} steps`;
+              } else if (event.type === "sleep") {
+                title = "Sleep Log";
+                details = `${event.payload.hours || 0} hours of sleep`;
+              } else if (event.type === "water") {
+                title = "Water Log";
+                details = `${event.payload.amountL || 0} L consumed`;
+              } else if (event.type === "workout") {
+                title = "Workout Session";
+                details = `${event.payload.name || "Workout"} logged`;
+              } else if (event.type === "note") {
+                title = "Calendar Event";
+                details = `${event.payload.title || "Busy schedule note"}`;
+              }
+
+              return (
+                <div 
+                  key={event._id || event.id} 
+                  className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/2 hover:bg-white/5 transition-all text-xs"
+                >
+                  <div className="text-left">
+                    <span className="font-bold text-zinc-300 block">{title}</span>
+                    <span className="text-[10px] text-zinc-500 mt-0.5 block capitalize">{details}</span>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteEvent(event._id || event.id)}
+                    className="w-6 h-6 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center font-bold text-xs select-none cursor-pointer"
+                    title="Delete log"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </GlassCard>
 
       {/* Quick Action Drawer toggle */}

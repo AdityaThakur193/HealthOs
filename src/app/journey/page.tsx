@@ -160,6 +160,47 @@ export default function Journey() {
     }
   };
 
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm("Are you sure you want to delete this log?")) return;
+    try {
+      const res = await fetch(`/api/timeline?eventId=${eventId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        const userId = localStorage.getItem("healthos_userId");
+        if (userId) {
+          const timelineRes = await fetch(`/api/timeline?userId=${userId}`);
+          if (timelineRes.ok) {
+            const data = await timelineRes.json();
+            setAllEvents(data.events || []);
+          }
+        }
+      } else {
+        alert("Failed to delete log.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting log.");
+    }
+  };
+
+  const getGroupedEvents = () => {
+    const groups: Record<string, any[]> = {};
+    allEvents.forEach((event) => {
+      const dateStr = new Date(event.timestamp).toLocaleDateString([], {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      if (!groups[dateStr]) {
+        groups[dateStr] = [];
+      }
+      groups[dateStr].push(event);
+    });
+    return Object.entries(groups);
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white">
@@ -332,6 +373,75 @@ export default function Journey() {
             </div>
           </GlassCard>
         </div>
+      </div>
+
+      {/* Historical Timeline Feed */}
+      <div className="space-y-4 animate-in-delay-3 pt-4 border-t border-white/5">
+        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Chronological Log History</h3>
+        {allEvents.length === 0 ? (
+          <GlassCard className="p-6 text-center text-zinc-500 text-xs">
+            No history logs found. Start logging on the dashboard!
+          </GlassCard>
+        ) : (
+          <div className="space-y-4">
+            {getGroupedEvents().map(([dateStr, events]) => (
+              <div key={dateStr} className="space-y-2">
+                <span className="text-[10px] font-bold text-brand-400 uppercase tracking-wider block pl-1">
+                  {dateStr}
+                </span>
+                <div className="space-y-2">
+                  {events.map((event: any) => {
+                    let details = "";
+                    let title = event.type.toUpperCase();
+                    
+                    if (event.type === "meal") {
+                      title = "Meal Log";
+                      const foodsList = event.payload.foods?.map((f: any) => f.name).join(", ") || "Meal Log";
+                      details = `${foodsList} (${event.payload.totalCalories || 0} kcal, ${event.payload.totalProteinG || 0}g protein)`;
+                    } else if (event.type === "weight") {
+                      title = "Weight Log";
+                      details = `${event.payload.weightKg || 0} kg logged`;
+                    } else if (event.type === "steps") {
+                      title = "Daily Steps";
+                      details = `${event.payload.count?.toLocaleString() || 0} steps`;
+                    } else if (event.type === "sleep") {
+                      title = "Sleep Log";
+                      details = `${event.payload.hours || 0} hours of sleep`;
+                    } else if (event.type === "water") {
+                      title = "Water Log";
+                      details = `${event.payload.amountL || 0} L consumed`;
+                    } else if (event.type === "workout") {
+                      title = "Workout Session";
+                      details = `${event.payload.name || "Workout"} (${event.payload.totalVolumeKg?.toLocaleString() || 0} kg volume)`;
+                    } else if (event.type === "note") {
+                      title = "Calendar Event";
+                      details = `${event.payload.title || "Busy schedule note"}`;
+                    }
+
+                    return (
+                      <div 
+                        key={event._id || event.id} 
+                        className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/2 hover:bg-white/5 transition-all text-xs"
+                      >
+                        <div className="text-left">
+                          <span className="font-bold text-zinc-300 block">{title}</span>
+                          <span className="text-[10px] text-zinc-500 mt-0.5 block capitalize">{details}</span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteEvent(event._id || event.id)}
+                          className="w-6 h-6 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center font-bold text-xs select-none cursor-pointer"
+                          title="Delete log"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Data Ownership & Controls Card */}
