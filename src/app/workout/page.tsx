@@ -319,15 +319,24 @@ export default function WorkoutTracker() {
         <span className="badge-info">Target: ~{plan?.targetDurationMin}m</span>
       </div>
 
-      {/* Routine focus info */}
       <GlassCard className="p-4 flex justify-between text-xs animate-in-delay-1">
         <div>
           <span className="text-zinc-500">Focus:</span>
           <p className="font-semibold text-white mt-0.5">{plan?.focus}</p>
         </div>
         <div className="text-right">
-          <span className="text-zinc-500">Suggested Volume:</span>
+          <span className="text-zinc-500 flex items-center justify-end gap-1">
+            Suggested Workload:
+            <span 
+              title="Total load lifted (sets × reps × weight) across the entire workout. This is a progression target, not a single lift!" 
+              className="cursor-pointer text-zinc-400 bg-white/5 border border-white/10 rounded-full w-3.5 h-3.5 flex items-center justify-center text-[9px] font-bold"
+              onClick={() => setShowHowToLog(true)}
+            >
+              ?
+            </span>
+          </span>
           <p className="font-semibold text-brand-400 mt-0.5">~ {Math.round(suggestedVolume).toLocaleString()} kg</p>
+          <span className="text-[8px] text-zinc-500 block mt-0.5">(Cumulative weight lifted today)</span>
         </div>
       </GlassCard>
 
@@ -525,6 +534,17 @@ function HowToLogModal({ open, onClose }: { open: boolean; onClose: () => void }
             <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-brand-400">3. Logging a Set</h4>
             <p className="leading-relaxed text-[11px]">
               Fill in your weight and reps for each set, then tap the checkmark. Completed sets turn green and are recorded to your timeline.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-brand-400">4. Workout Workload (Volume)</h4>
+            <p className="leading-relaxed text-[11px]">
+              This is the cumulative weight lifted across all your completed sets:
+              <span className="block mt-1 bg-white/5 p-1.5 rounded text-[10px] text-center font-mono">
+                Volume = Sets × Reps × Weight
+              </span>
+              For example: doing 3 sets of 10 reps at 50 kg equals 1,500 kg of workload. It is a macro measure of your session capacity, not a single lift!
             </p>
           </div>
         </div>
