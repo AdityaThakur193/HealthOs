@@ -38,7 +38,6 @@ function OnboardingContent() {
 
   const [allergyInput, setAllergyInput] = useState("");
   const [conditionInput, setConditionInput] = useState("");
-  const [seedDemo, setSeedDemo] = useState(false);
   const [hasManuallyAdjustedTarget, setHasManuallyAdjustedTarget] = useState(false);
   const [neckCm, setNeckCm] = useState("");
   const [waistCm, setWaistCm] = useState("");
@@ -147,7 +146,6 @@ function OnboardingContent() {
           medicalConditions,
           sleepTarget,
           collegeSchedule,
-          seedDemo,
           neckCm: neckCm ? parseFloat(neckCm) : undefined,
           waistCm: waistCm ? parseFloat(waistCm) : undefined,
           hipCm: hipCm ? parseFloat(hipCm) : undefined,
@@ -784,22 +782,6 @@ function OnboardingContent() {
                   </div>
                 </div>
               )}
-            </div>
-
-            <div 
-              onClick={() => setSeedDemo(!seedDemo)}
-              className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 select-none cursor-pointer hover:bg-white/10 transition-all"
-            >
-              <input
-                type="checkbox"
-                checked={seedDemo}
-                onChange={() => {}}
-                className="w-4 h-4 rounded text-brand-500 bg-zinc-900 border-white/10 focus:ring-0 cursor-pointer"
-              />
-              <div className="text-left">
-                <span className="text-xs font-bold text-white block">Seed Demonstration History</span>
-                <span className="text-[10px] text-zinc-500 block mt-0.5">Pre-populate timeline weight logs, meals, and sleep for testing.</span>
-              </div>
             </div>
 
             <p className="text-[11px] text-zinc-500 leading-relaxed text-center">
