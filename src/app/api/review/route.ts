@@ -31,6 +31,9 @@ export async function GET(request: NextRequest) {
       }
     } catch (dbError) {
       console.warn("⚠️ MongoDB connection failed on review API. Querying local file DB.");
+      if (process.env.NODE_ENV === "production") {
+        return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
+      }
       profile = await getLocalProfileById(userId);
       if (profile) {
         const allEvents = await getLocalEvents({ userId });

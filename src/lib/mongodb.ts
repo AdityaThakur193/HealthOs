@@ -49,8 +49,8 @@ async function connectDB(): Promise<typeof mongoose> {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 1500, // Timeout after 1.5s if Atlas is unreachable
-      connectTimeoutMS: 1500,
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s if Atlas is unreachable
+      connectTimeoutMS: 5000,
     };
 
     cached.promise = mongoose

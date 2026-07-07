@@ -98,6 +98,10 @@ export default function MealCapture() {
           setConfidence(data.analysis.confidence || 0.9);
           setIsMock(data.isMock === true);
           setState("results");
+        } else if (res.status === 429) {
+          const data = await res.json();
+          alert(`⏳ Gemini API quota reached.\n\n${data.message}`);
+          setState("idle");
         } else {
           alert("Analysis failed. Try again.");
           setState("idle");
@@ -446,8 +450,13 @@ export default function MealCapture() {
       {state === "results" && (
         <div className="space-y-5 animate-in">
           {isMock && (
-            <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-center">
-              <span className="text-xs text-yellow-400">⚠️ Demo mode — connect Gemini API for real food analysis</span>
+            <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-center space-y-1">
+              <p className="text-xs font-bold text-yellow-400">⚠️ Demo Result — Not Your Actual Food</p>
+              <p className="text-[10px] text-yellow-600 leading-snug">
+                Gemini API quota reached (20 req/day on free tier). Resets daily at midnight UTC, or enable billing at{" "}
+                <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline">console.cloud.google.com</a>
+                {" "}for higher limits.
+              </p>
             </div>
           )}
           {/* Summary header */}

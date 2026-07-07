@@ -4,6 +4,7 @@ import { TimelineEvent, UserProfile } from "@/lib/db/models";
 import { getLocalProfileById, getLocalEvents } from "@/lib/db/fallback";
 import { generateDailyCoach, CoachContext } from "@/lib/gemini";
 import { getTodaysWorkout } from "@/lib/workoutPlans";
+import { calculateAdaptiveTdee } from "@/lib/tdee";
 
 /**
  * POST /api/coach
@@ -22,6 +23,7 @@ export async function POST(request: NextRequest) {
     let weekEvents: any[] = [];
     let latestWeight: any = null;
     let allNotes: any[] = [];
+    let tdeeEvents: any[] = [];
 
     try {
       await connectDB();
@@ -33,18 +35,24 @@ export async function POST(request: NextRequest) {
         const startOfDay = new Date(now);
         startOfDay.setHours(0, 0, 0, 0);
 
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - 7);
+        const fourteenDaysAgo = new Date(now);
+        fourteenDaysAgo.setDate(now.getDate() - 14);
 
         todayEvents = await TimelineEvent.find({
           userId,
           timestamp: { $gte: startOfDay },
         }).lean();
 
-        weekEvents = await TimelineEvent.find({
+        // Fetch 14 days of events for TDEE & Week trends
+        const fourteenDayEvents = await TimelineEvent.find({
           userId,
-          timestamp: { $gte: startOfWeek },
+          timestamp: { $gte: fourteenDaysAgo },
         }).lean();
+
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - 7);
+
+        weekEvents = fourteenDayEvents.filter((e) => new Date(e.timestamp) >= startOfWeek);
 
         latestWeight = await TimelineEvent.findOne({
           userId,
@@ -57,9 +65,15 @@ export async function POST(request: NextRequest) {
           userId,
           type: "note",
         }).lean();
+
+        // Pass 14 day events to TDEE calculations
+        tdeeEvents = fourteenDayEvents;
       }
     } catch (dbError) {
       console.warn("⚠️ MongoDB connection failed on coach API. Querying local file DB.");
+      if (process.env.NODE_ENV === "production") {
+        return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
+      }
       profile = await getLocalProfileById(userId);
 
       if (profile) {
@@ -72,9 +86,16 @@ export async function POST(request: NextRequest) {
           (e) => new Date(e.timestamp).getTime() >= startOfDay.getTime()
         );
 
+        const fourteenDaysAgo = new Date(now);
+        fourteenDaysAgo.setDate(now.getDate() - 14);
+        
+        const fourteenDayEvents = allTodayEvents.filter(
+          (e) => new Date(e.timestamp).getTime() >= fourteenDaysAgo.getTime()
+        );
+
         const startOfWeek = new Date(now);
         startOfWeek.setDate(now.getDate() - 7);
-        weekEvents = allTodayEvents.filter(
+        weekEvents = fourteenDayEvents.filter(
           (e) => new Date(e.timestamp).getTime() >= startOfWeek.getTime()
         );
 
@@ -82,6 +103,7 @@ export async function POST(request: NextRequest) {
         latestWeight = weightEvents[0] || null;
 
         allNotes = allTodayEvents.filter((e) => e.type === "note");
+        tdeeEvents = fourteenDayEvents;
       }
     }
 
@@ -150,6 +172,9 @@ export async function POST(request: NextRequest) {
       return todayDate >= start && todayDate <= end;
     }) || null;
 
+    // Calculate Adaptive TDEE for AI Coach Context
+    const tdeeResult = calculateAdaptiveTdee(profile, tdeeEvents);
+
     const context: CoachContext = {
       profile: {
         name: profile.name,
@@ -185,6 +210,10 @@ export async function POST(request: NextRequest) {
             endDate: activeBusyEvent.payload.endDate,
           }
         : null,
+      tdeeMode: tdeeResult.status,
+      daysRemaining: tdeeResult.daysRemaining,
+      avgCalories14d: tdeeResult.avgCalories,
+      weightDeltaKg14d: tdeeResult.weightDeltaKg,
     };
 
     // ── AI Engine: Generate coaching recommendation ──

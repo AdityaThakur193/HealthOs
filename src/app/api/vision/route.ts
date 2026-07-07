@@ -67,9 +67,25 @@ export async function POST(request: NextRequest) {
         // Stripping potential base64 prefix
         const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
         analysis = await analyzeMealImage(cleanBase64, mimeType || "image/jpeg");
-      } catch (geminiError) {
-        console.warn("⚠️ Gemini Vision API call failed (quota limit/error). Falling back to mock food detection:", geminiError);
-        // Quick artificial delay
+      } catch (geminiError: any) {
+        const isQuotaError =
+          geminiError?.status === 429 ||
+          String(geminiError).includes("429") ||
+          String(geminiError).includes("quota");
+
+        if (isQuotaError) {
+          console.warn("⚠️ Gemini quota exceeded — returning error to client");
+          return Response.json(
+            {
+              error: "quota_exceeded",
+              message:
+                "Gemini API daily limit reached. Wait until tomorrow or enable billing at console.cloud.google.com for higher limits.",
+            },
+            { status: 429 }
+          );
+        }
+
+        console.warn("⚠️ Gemini Vision API call failed. Falling back to mock:", geminiError);
         await new Promise((r) => setTimeout(r, 1000));
         analysis = getMockMealAnalysis();
         isMock = true;

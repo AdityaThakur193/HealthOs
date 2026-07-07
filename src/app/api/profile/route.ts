@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { UserProfile, TimelineEvent } from "@/lib/db/models";
 import { getLocalProfile, saveLocalProfile, createLocalEvent, deleteLocalEvents, countLocalEvents, deleteLocalProfile } from "@/lib/db/fallback";
+import { calculateAdaptiveTdee } from "@/lib/tdee";
 
 /**
  * Helper to calculate TDEE, BMR, and targets (deterministic math).
@@ -251,22 +252,65 @@ export async function GET(request: NextRequest) {
     }
 
     await connectDB();
-    const profile = await UserProfile.findOne({ email: email.toLowerCase() }).lean();
+    const profileDoc = await UserProfile.findOne({ email: email.toLowerCase() });
 
-    if (!profile) {
+    if (!profileDoc) {
       return Response.json({ notInitialized: true }, { status: 200 });
     }
 
-    return Response.json({ profile });
+    const profile = profileDoc.toObject();
+
+    // Query events to calculate Adaptive TDEE
+    const events = await TimelineEvent.find({ userId: profile._id }).lean();
+    const tdeeResult = calculateAdaptiveTdee(profile, events);
+
+    // If adaptive TDEE is computed and differs from stored, let's update it in the DB
+    if (tdeeResult.status === "adaptive" && tdeeResult.calculatedTdee !== profile.tdee) {
+      profileDoc.tdee = tdeeResult.calculatedTdee;
+      
+      // Re-calculate target calories based on goal if custom macros overrides are NOT enabled
+      if (!profileDoc.useCustomMacros) {
+        let newTargetCalories = tdeeResult.calculatedTdee;
+        if (profileDoc.goal === "lose_fat") {
+          newTargetCalories -= 500;
+        } else if (profileDoc.goal === "build_muscle") {
+          newTargetCalories += 300;
+        } else if (profileDoc.goal === "recomp") {
+          newTargetCalories -= 100;
+        }
+        profileDoc.targetCalories = Math.round(newTargetCalories);
+      }
+      
+      await profileDoc.save();
+      profile.tdee = profileDoc.tdee;
+      profile.targetCalories = profileDoc.targetCalories;
+    }
+
+    return Response.json({
+      profile,
+      tdeeMode: tdeeResult.status,
+      daysRemaining: tdeeResult.daysRemaining,
+      avgCalories: tdeeResult.avgCalories,
+      weightDeltaKg: tdeeResult.weightDeltaKg,
+    });
   } catch (error) {
     console.warn("⚠️ MongoDB connection failed. Falling back to local file DB.");
+    if (process.env.NODE_ENV === "production") {
+      return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
+    }
     const { searchParams } = new URL(request.url);
     const email = searchParams.get("email");
     const profile = await getLocalProfile(email || undefined);
     if (!profile) {
       return Response.json({ notInitialized: true }, { status: 200 });
     }
-    return Response.json({ profile });
+    return Response.json({
+      profile,
+      tdeeMode: "calibrating",
+      daysRemaining: 14,
+      avgCalories: 0,
+      weightDeltaKg: 0,
+    });
   }
 }
 
@@ -374,6 +418,9 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.warn("⚠️ MongoDB connection failed during POST. Saving to local file DB.");
+    if (process.env.NODE_ENV === "production") {
+      return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
+    }
     const existingLocal = await getLocalProfile(email);
     isNewProfile = !existingLocal;
     savedProfile = await saveLocalProfile(profileData);

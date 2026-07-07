@@ -10,11 +10,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 let _genAI: GoogleGenerativeAI | null = null;
 
-/**
- * Get the Gemini model instance (lazy initialization).
- * Uses gemini-2.5-flash for speed and multimodal capabilities.
- */
-function getModel() {
+function getGenAI(): GoogleGenerativeAI {
   if (!_genAI) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -24,7 +20,24 @@ function getModel() {
     }
     _genAI = new GoogleGenerativeAI(apiKey);
   }
-  return _genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  return _genAI;
+}
+
+/**
+ * Vision model — supports multimodal (images + text).
+ * Free tier: ~20 req/day. Enable billing in Google Cloud Console
+ * to unlock 1,500 req/day at no charge within free limits.
+ */
+function getVisionModel() {
+  return getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+}
+
+/**
+ * Text coach model — lightweight text generation.
+ * Free tier: ~20 req/day. Enable billing to unlock higher quotas.
+ */
+function getCoachModel() {
+  return getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
 }
 
 /**
@@ -64,7 +77,7 @@ export async function analyzeMealImage(
   imageBase64: string,
   mimeType: string = "image/jpeg"
 ): Promise<MealAnalysis> {
-  const model = getModel();
+  const model = getVisionModel();
 
   const prompt = `You are a nutrition analysis AI for an Indian college student's health app.
 Analyze this food image and return a JSON object with:
@@ -124,6 +137,10 @@ export interface CoachContext {
     startDate: string;
     endDate: string;
   } | null;
+  tdeeMode?: "adaptive" | "calibrating";
+  daysRemaining?: number;
+  avgCalories14d?: number;
+  weightDeltaKg14d?: number;
 }
 
 export interface CoachRecommendation {
@@ -137,7 +154,7 @@ export interface CoachRecommendation {
 export async function generateDailyCoach(
   context: CoachContext
 ): Promise<CoachRecommendation> {
-  const model = getModel();
+  const model = getCoachModel();
 
   const prompt = `You are a personal health coach AI named "Health OS Coach".
 Your personality: supportive, direct, calm, no guilt-tripping, focused on the NEXT action.
@@ -148,7 +165,10 @@ ${JSON.stringify(context, null, 2)}
 Generate a daily coaching recommendation as JSON:
 - "greeting": short personalized greeting (use their name)
 - "status": "on_track" | "needs_attention" | "great_job"
-- "primaryInsight": ONE key insight about today. If an activeEvent (like exams, travel, or sickness) is present, adapt immediately: suggest active recovery or rest, explain that targets are lowered, and comfort them.
+- "primaryInsight": ONE key insight about today. 
+  * If the user is in "adaptive" TDEE mode, explain that their targets are dynamically calculated based on their actual metabolism (e.g. mention if their maintenance has shifted and why, referencing their 14-day weight delta and calorie intake).
+  * If in "calibrating" mode, encourage them to stay consistent with logs: "We are calibrating your metabolic engine. Need X more days of logs."
+  * If an activeEvent (like exams, travel, or sickness) is present, adapt immediately: suggest active recovery or rest, explain that targets are lowered, and comfort them.
 - "actionItems": array of 2-3 specific next actions. If activeEvent is present, keep actions simple (e.g. hydration, rest, gentle walks).
 - "motivation": one encouraging sentence (no guilt, no shame)
 

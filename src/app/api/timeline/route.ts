@@ -39,6 +39,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.warn("⚠️ MongoDB connection failed on timeline GET. Querying local file DB.");
+    if (process.env.NODE_ENV === "production") {
+      return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
+    }
     const events = await getLocalEvents({
       userId,
       type: type || undefined,
@@ -82,6 +85,9 @@ export async function POST(request: NextRequest) {
     return Response.json({ event }, { status: 201 });
   } catch (error) {
     console.warn("⚠️ MongoDB connection failed on timeline POST. Saving to local file DB.");
+    if (process.env.NODE_ENV === "production") {
+      return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
+    }
     const event = await createLocalEvent({
       userId,
       type,
@@ -112,6 +118,9 @@ export async function DELETE(request: NextRequest) {
       console.log(`✅ Deleted MongoDB timeline event: ${eventId}`);
     } catch (dbError) {
       console.warn("⚠️ MongoDB offline. Deleting local JSON record.");
+      if (process.env.NODE_ENV === "production") {
+        return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
+      }
       await deleteLocalEventById(eventId);
       console.log(`✅ Deleted local JSON event: ${eventId}`);
     }

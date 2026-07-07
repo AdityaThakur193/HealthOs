@@ -33,6 +33,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const [activeEvent, setActiveEvent] = useState<any>(null);
+  const [tdeeMode, setTdeeMode] = useState<"adaptive" | "calibrating">("calibrating");
+  const [daysRemaining, setDaysRemaining] = useState(14);
+  const [avgCalories, setAvgCalories] = useState(0);
+  const [weightDeltaKg, setWeightDeltaKg] = useState(0);
+  const [showTdeeModal, setShowTdeeModal] = useState(false);
 
   // Quick log states
   const [weightInput, setWeightInput] = useState("");
@@ -140,6 +145,10 @@ export default function Dashboard() {
         }
 
         setProfile(data.profile);
+        setTdeeMode(data.tdeeMode || "calibrating");
+        setDaysRemaining(typeof data.daysRemaining === "number" ? data.daysRemaining : 14);
+        setAvgCalories(data.avgCalories || 0);
+        setWeightDeltaKg(data.weightDeltaKg || 0);
         localStorage.setItem("healthos_userId", data.profile._id);
         await fetchDashboardData(data.profile._id);
       } catch (err) {
@@ -274,6 +283,21 @@ export default function Dashboard() {
           <h1 className="text-xl font-bold text-white mt-0.5">{getGreeting()}, {profile?.name}</h1>
         </div>
         <div className="flex items-center gap-1.5">
+          {tdeeMode === "adaptive" ? (
+            <button 
+              onClick={() => setShowTdeeModal(true)}
+              className="px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[9px] font-extrabold text-cyan-400 uppercase tracking-widest flex items-center gap-1 hover:bg-cyan-500/20 transition-all cursor-pointer"
+            >
+              <span>⚡</span> Adaptive
+            </button>
+          ) : (
+            <button 
+              onClick={() => setShowTdeeModal(true)}
+              className="px-2.5 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-[9px] font-extrabold text-yellow-400 uppercase tracking-widest flex items-center gap-1 hover:bg-yellow-500/20 transition-all cursor-pointer"
+            >
+              <span>🔋</span> Calibrating ({daysRemaining}d)
+            </button>
+          )}
           <span className="badge-success glow-green">Active</span>
         </div>
       </div>
@@ -651,6 +675,87 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+          </GlassCard>
+        </div>
+      )}
+      {/* TDEE Calibration Info Drawer Modal */}
+      {showTdeeModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in">
+          <GlassCard className="p-6 max-w-sm w-full border border-white/10 relative overflow-hidden space-y-4">
+            <button 
+              onClick={() => setShowTdeeModal(false)}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white text-lg font-bold"
+            >
+              ×
+            </button>
+            
+            <div className="space-y-1.5 text-center">
+              <div className="w-12 h-12 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mx-auto text-xl">
+                {tdeeMode === "adaptive" ? "⚡" : "🔋"}
+              </div>
+              <h3 className="text-base font-bold text-white mt-2">
+                {tdeeMode === "adaptive" ? "Empirical TDEE Active" : "Metabolic Calibration"}
+              </h3>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
+                MacroFactor Calorie Engine
+              </p>
+            </div>
+
+            <div className="space-y-2.5 pt-2 border-t border-white/5 text-xs text-zinc-300">
+              {tdeeMode === "adaptive" ? (
+                <>
+                  <p className="leading-relaxed">
+                    Health OS has successfully calibrated your metabolism. Your daily budget is adjusted dynamically using actual changes in your body weight compared to your daily calorie logs.
+                  </p>
+                  <div className="p-3 bg-white/5 rounded-xl space-y-1.5 text-[11px]">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">14d Average Calories:</span>
+                      <span className="font-semibold text-white">{avgCalories} kcal</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">14d Weight Change:</span>
+                      <span className={`font-semibold ${weightDeltaKg < 0 ? "text-green-400" : "text-amber-400"}`}>
+                        {weightDeltaKg > 0 ? `+${weightDeltaKg}` : weightDeltaKg} kg
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t border-white/5 pt-1.5">
+                      <span className="text-zinc-500 font-medium">True Maintenance (TDEE):</span>
+                      <span className="font-bold text-cyan-400">{profile?.tdee} kcal</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="leading-relaxed">
+                    To estimate your exact daily calorie expenditure (TDEE) and prevent metabolic overestimation, the algorithm needs a rolling window of calorie and weight logs.
+                  </p>
+                  <div className="p-3 bg-white/5 rounded-xl space-y-1.5 text-[11px]">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Weight Logs (Min 3):</span>
+                      <span className="font-semibold text-white">{14 - daysRemaining > 3 ? 3 : 14 - daysRemaining}/3 logged</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Calorie Logs (Min 7):</span>
+                      <span className="font-semibold text-white">{14 - daysRemaining > 7 ? 7 : 14 - daysRemaining}/7 logged</span>
+                    </div>
+                    <div className="flex justify-between border-t border-white/5 pt-1.5">
+                      <span className="text-zinc-500 font-medium">Calibration State:</span>
+                      <span className="font-bold text-yellow-400">Needs {daysRemaining} more days of data</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 leading-snug">
+                    💡 Tip: Try to log your morning weight and track every meal. Inconsistent logging extends calibration.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowTdeeModal(false)}
+              className="btn-primary w-full py-2.5 font-bold text-xs"
+            >
+              Understood
+            </button>
           </GlassCard>
         </div>
       )}
