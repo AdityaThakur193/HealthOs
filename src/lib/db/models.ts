@@ -135,7 +135,8 @@ export type TimelineEventType =
   | "steps"
   | "photo"
   | "measurement"
-  | "note";
+  | "note"
+  | "water";
 
 export interface ITimelineEvent extends Document {
   userId: mongoose.Types.ObjectId;
@@ -167,6 +168,7 @@ const TimelineEventSchema = new Schema<ITimelineEvent>(
         "photo",
         "measurement",
         "note",
+        "water",
       ],
       required: true,
     },
