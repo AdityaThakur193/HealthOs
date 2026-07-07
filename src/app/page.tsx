@@ -349,7 +349,7 @@ export default function Dashboard() {
           <span className="text-[9px] font-extrabold uppercase tracking-widest text-[#c87a53] font-mono">
             {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
           </span>
-          <h1 className="text-xl font-bold text-white mt-1 font-heading leading-tight">{getGreeting()}, Aditya</h1>
+          <h1 className="text-xl font-bold text-white mt-1 font-heading leading-tight">{getGreeting()}, {profile?.name || "User"}</h1>
           <div className="flex items-center gap-1.5 mt-2">
             {streak > 0 && (
               <span className="px-2 py-0.5 rounded-md bg-[#c87a53]/10 border border-[#c87a53]/30 text-[8px] font-extrabold text-[#e29b74] uppercase tracking-wider flex items-center gap-1 font-mono">
@@ -560,7 +560,7 @@ export default function Dashboard() {
       <div className="animate-in-delay-2">
         <CoachInsight
           status={coachData?.status || "on_track"}
-          greeting={coachData?.greeting || `Hey Aditya`}
+          greeting={coachData?.greeting || `Hey ${profile?.name || "User"}`}
           primaryInsight={
             coachData?.primaryInsight ||
             "Coaching engine is building context. Complete your checklist items to receive personalized daily recommendations."
