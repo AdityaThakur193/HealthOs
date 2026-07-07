@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ExerciseCard from "@/components/ExerciseCard";
-import { getTodaysWorkout, type WorkoutPlan } from "@/lib/workoutPlans";
+import { getTodaysWorkout, getWeekSchedule, type WorkoutPlan } from "@/lib/workoutPlans";
 
 interface ExerciseState {
   id: string;
@@ -24,6 +24,8 @@ export default function WorkoutTracker() {
   const [exercises, setExercises] = useState<ExerciseState[]>([]);
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [pastWorkouts, setPastWorkouts] = useState<any[]>([]);
+  const [profile, setProfile] = useState<any>(null);
+  const [showHowToLog, setShowHowToLog] = useState(false);
 
   useEffect(() => {
     async function checkProfileAndLoadHistory() {
@@ -46,6 +48,7 @@ export default function WorkoutTracker() {
 
         // Generate today's workout from profile
         const profile = profileData.profile;
+        setProfile(profile);
         const todaysPlan = getTodaysWorkout({
           gymFrequency: profile.gymFrequency,
           gymExperience: profile.gymExperience,
@@ -328,6 +331,72 @@ export default function WorkoutTracker() {
         </div>
       </GlassCard>
 
+      {/* Weekly Program Split HUD */}
+      {profile && (() => {
+        const frequency = profile.gymFrequency || 4;
+        const schedule = getWeekSchedule(frequency);
+        const daysOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
+        const currentDay = new Date().getDay();
+        const getDayLabel = (d: number) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d];
+
+        return (
+          <GlassCard className="p-4 space-y-3 border border-white/10 relative overflow-hidden animate-in-delay-1">
+            <div className="flex justify-between items-baseline">
+              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Your Weekly Program</h3>
+              <span className="text-[10px] text-brand-400 font-bold">{frequency}-Day Split</span>
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {daysOrder.map((d) => {
+                const scheduled = schedule.find((s) => s.day === d);
+                const isToday = d === currentDay;
+                return (
+                  <div 
+                    key={d} 
+                    className={`p-2 rounded-xl flex flex-col items-center justify-between text-center transition-all ${
+                      isToday 
+                        ? "bg-cyan-500/10 border border-cyan-500/30 glow-cyan relative" 
+                        : "bg-white/2 border border-white/5"
+                    }`}
+                  >
+                    <span className={`text-[9px] font-bold ${isToday ? "text-cyan-400" : "text-zinc-500"}`}>
+                      {getDayLabel(d)}
+                    </span>
+                    <span className={`text-[8px] font-black uppercase tracking-tighter mt-1 block truncate w-full ${
+                      scheduled 
+                        ? "text-brand-400 font-bold" 
+                        : "text-zinc-600 font-normal"
+                    }`}>
+                      {scheduled ? scheduled.name.replace(" Day", "").replace(" A", "").replace(" B", "") : "Rest"}
+                    </span>
+                    {isToday && (
+                      <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </GlassCard>
+        );
+      })()}
+
+      {/* Dynamic Overload Guide Card */}
+      <GlassCard 
+        className="p-3.5 flex items-center justify-between border border-white/10 bg-white/2 cursor-pointer hover:bg-white/5 transition-all animate-in-delay-1" 
+        onClick={() => setShowHowToLog(true)}
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="text-base">💡</span>
+          <div className="text-left">
+            <h4 className="text-[11px] font-bold text-white">How does progressive overload work?</h4>
+            <p className="text-[9px] text-zinc-500 mt-0.5">Learn how suggested weights are calculated</p>
+          </div>
+        </div>
+        <span className="text-zinc-500 text-xs">→</span>
+      </GlassCard>
+
       {/* Exercise card list */}
       <div className="space-y-4 animate-in-delay-2">
         {exercises.map((ex) => (
@@ -402,6 +471,71 @@ export default function WorkoutTracker() {
           </div>
         </div>
       )}
+      {/* How To Log Guide Modal */}
+      <HowToLogModal open={showHowToLog} onClose={() => setShowHowToLog(false)} />
+    </div>
+  );
+}
+
+// How To Log Guide Modal Overlay
+function HowToLogModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in">
+      <GlassCard className="p-6 max-w-sm w-full border border-white/10 relative overflow-hidden space-y-4 max-h-[90vh] overflow-y-auto">
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 text-zinc-500 hover:text-white text-lg font-bold"
+        >
+          ×
+        </button>
+        
+        <div className="space-y-1.5 text-center">
+          <div className="w-12 h-12 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mx-auto text-xl">
+            🏋️
+          </div>
+          <h3 className="text-base font-bold text-white mt-2">
+            Progressive Overload Guide
+          </h3>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
+            Double Progression Method
+          </p>
+        </div>
+
+        <div className="space-y-3 pt-2 border-t border-white/5 text-xs text-zinc-300">
+          <div className="space-y-1">
+            <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-brand-400">1. Suggested Weights</h4>
+            <p className="leading-relaxed text-[11px]">
+              Suggested weights are calculated dynamically from your past logged workouts. The app tracks the maximum weight you successfully lifted for a completed set of an exercise.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-brand-400">2. How to Level Up</h4>
+            <p className="leading-relaxed text-[11px]">
+              If you hit the maximum reps in your target rep range (e.g. 12 reps on a 10-12 range) on all sets, the algorithm automatically increments your suggested weight next time:
+            </p>
+            <ul className="list-disc pl-4 mt-1 text-[10px] text-zinc-400 space-y-0.5">
+              <li><strong>+2.5 kg</strong> for Barbell exercises</li>
+              <li><strong>+2.0 kg</strong> for Dumbbell exercises</li>
+            </ul>
+          </div>
+
+          <div className="space-y-1">
+            <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-brand-400">3. Logging a Set</h4>
+            <p className="leading-relaxed text-[11px]">
+              Fill in your weight and reps for each set, then tap the checkmark. Completed sets turn green and are recorded to your timeline.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="btn-primary w-full py-2.5 font-bold text-xs"
+        >
+          Let's Lift
+        </button>
+      </GlassCard>
     </div>
   );
 }
