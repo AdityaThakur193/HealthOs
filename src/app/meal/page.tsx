@@ -14,6 +14,49 @@ interface FoodItem {
   fatG: number;
 }
 
+function compressImage(file: File, maxWidth: number = 800, maxHeight: number = 800, quality: number = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Could not get canvas context"));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl);
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+}
+
 export default function MealCapture() {
   const router = useRouter();
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -72,46 +115,45 @@ export default function MealCapture() {
     checkProfileAndLoadHistory();
   }, [router]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result as string;
-      setImagePreview(base64);
-      setState("analyzing");
+    setState("analyzing");
 
-      try {
-        const res = await fetch("/api/vision", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageBase64: base64,
-            mimeType: file.type,
-          }),
-        });
+    try {
+      // Compress image to fit Vercel payload constraints (max 800px, 70% quality JPEG)
+      const compressedBase64 = await compressImage(file, 800, 800, 0.7);
+      setImagePreview(compressedBase64);
 
-        if (res.ok) {
-          const data = await res.json();
-          setFoods(data.analysis.foods || []);
-          setConfidence(data.analysis.confidence || 0.9);
-          setIsMock(data.isMock === true);
-          setState("results");
-        } else if (res.status === 429) {
-          const data = await res.json();
-          alert(`⏳ Gemini API quota reached.\n\n${data.message}`);
-          setState("idle");
-        } else {
-          alert("Analysis failed. Try again.");
-          setState("idle");
-        }
-      } catch (err) {
-        console.error(err);
+      const res = await fetch("/api/vision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: compressedBase64,
+          mimeType: "image/jpeg",
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setFoods(data.analysis.foods || []);
+        setConfidence(data.analysis.confidence || 0.9);
+        setIsMock(data.isMock === true);
+        setState("results");
+      } else if (res.status === 429) {
+        const data = await res.json();
+        alert(`⏳ Gemini API quota reached.\n\n${data.message}`);
+        setState("idle");
+      } else {
+        alert("Analysis failed. Try again.");
         setState("idle");
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Compression/Upload error:", err);
+      alert("Failed to analyze image. Ensure it is a valid photo.");
+      setState("idle");
+    }
   };
 
   const handleTriggerCamera = () => {
