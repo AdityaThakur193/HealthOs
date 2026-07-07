@@ -38,6 +38,7 @@ export default function Dashboard() {
   const [avgCalories, setAvgCalories] = useState(0);
   const [weightDeltaKg, setWeightDeltaKg] = useState(0);
   const [showTdeeModal, setShowTdeeModal] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
 
   // Quick log states
   const [weightInput, setWeightInput] = useState("");
@@ -371,6 +372,21 @@ export default function Dashboard() {
           loading={coachLoading}
         />
       </div>
+
+      {/* Targets Explanation Guide Card */}
+      <GlassCard 
+        className="p-4 flex items-center justify-between border border-cyan-500/20 bg-cyan-950/10 cursor-pointer hover:bg-cyan-950/20 transition-all animate-in-delay-2" 
+        onClick={() => setShowGuideModal(true)}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">🎓</span>
+          <div className="text-left">
+            <h4 className="text-xs font-bold text-white">Your Targets Explained</h4>
+            <p className="text-[10px] text-zinc-400 mt-0.5">Learn how Health OS calculated your {targetCal} kcal budget</p>
+          </div>
+        </div>
+        <span className="text-zinc-500 text-sm">→</span>
+      </GlassCard>
 
       {/* Today's Checklist */}
       <GlassCard className="p-5 space-y-4 animate-in-delay-3">
@@ -755,6 +771,113 @@ export default function Dashboard() {
               className="btn-primary w-full py-2.5 font-bold text-xs"
             >
               Understood
+            </button>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* Target Explanation Guide Modal Overlay */}
+      {showGuideModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in">
+          <GlassCard className="p-6 max-w-sm w-full border border-white/10 relative overflow-hidden space-y-4 max-h-[90vh] overflow-y-auto">
+            <button 
+              onClick={() => setShowGuideModal(false)}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white text-lg font-bold"
+            >
+              ×
+            </button>
+            
+            <div className="space-y-1.5 text-center">
+              <div className="w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mx-auto text-xl">
+                🎓
+              </div>
+              <h3 className="text-base font-bold text-white mt-2">
+                Your Targets Explained
+              </h3>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
+                How Health OS Metaphor works
+              </p>
+            </div>
+
+            <div className="space-y-3.5 pt-2 border-t border-white/5 text-xs text-zinc-300">
+              <div className="space-y-1.5">
+                <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-cyan-400">1. What is Health OS?</h4>
+                <p className="leading-relaxed text-[11px]">
+                  Unlike apps that use standard estimations and shame you for missing days, Health OS acts as a <strong>Command Center</strong>. It adapts to your actual biology through mathematical calibration instead of forcing rigid rules.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-cyan-400">2. Calorie Budget Math</h4>
+                <div className="p-3 bg-white/5 rounded-xl space-y-2 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Your Base Metabolism (BMR):</span>
+                    <span className="font-semibold text-white">{profile?.bmr || 1964} kcal</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Activity Level Factor:</span>
+                    <span className="font-semibold text-white">
+                      {profile?.activityLevel === "sedentary" ? "1.2 (Sedentary)" :
+                       profile?.activityLevel === "light" ? "1.375 (Lightly Active)" :
+                       profile?.activityLevel === "moderate" ? "1.55 (Moderately Active)" :
+                       profile?.activityLevel === "active" ? "1.725 (Active)" : "1.9 (Very Active)"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/5 pb-1.5">
+                    <span className="text-zinc-500">Estimated Maintenance (TDEE):</span>
+                    <span className="font-semibold text-white">{profile?.tdee || 3041} kcal</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Goal Target Adjustment:</span>
+                    <span className="font-semibold text-amber-400">
+                      {profile?.goal === "lose_fat" ? "-500 kcal (Deficit)" :
+                       profile?.goal === "build_muscle" ? "+300 kcal (Surplus)" :
+                       profile?.goal === "recomp" ? "-100 kcal (Body Recomp)" : "0 kcal (Maintenance)"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/5 pt-1.5">
+                    <span className="text-zinc-500 font-medium">Daily Calorie Target:</span>
+                    <span className="font-bold text-brand-400">{profile?.targetCalories || 2125} kcal</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-cyan-400">3. Protein Target Math</h4>
+                <p className="leading-relaxed text-[11px]">
+                  Your Protein target of <strong>{profile?.targetProteinG || 154}g</strong> is set to protect your lean mass. This is calculated dynamically:
+                </p>
+                <div className="p-3 bg-white/5 rounded-xl text-[11px] space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Goal Target Weight:</span>
+                    <span className="font-semibold text-white">{profile?.targetWeightKg || profile?.weightKg || 89} kg</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Multiplier:</span>
+                    <span className="font-semibold text-white">
+                      {profile?.goal === "lose_fat" ? "2.2g per kg" :
+                       profile?.goal === "recomp" ? "2.3g per kg" :
+                       profile?.goal === "build_muscle" ? "1.8g per kg" : "2.0g per kg"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-cyan-400">4. What you need to do</h4>
+                <ul className="list-disc pl-4 space-y-1 text-[10px] text-zinc-400">
+                  <li><strong>Log Morning Weight:</strong> Tracks rate of body weight changes.</li>
+                  <li><strong>Snap Meal Photos:</strong> AI analyzes and updates your calories/protein.</li>
+                  <li><strong>Track Sleep:</strong> Unlocks your daily readiness HUD and scales targets if you're fatigued.</li>
+                </ul>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowGuideModal(false)}
+              className="btn-primary w-full py-2.5 font-bold text-xs"
+            >
+              Start Tracking
             </button>
           </GlassCard>
         </div>
