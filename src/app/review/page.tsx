@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ReviewCard from "@/components/ReviewCard";
 import GlassCard from "@/components/GlassCard";
+import { Scale, Utensils, Zap, Moon, Lightbulb, BarChart2, Calendar, TrendingDown, ArrowDown, ArrowUp } from "lucide-react";
 
 /* ─────────────────────────────────────────────
  * Types (mirrors API response)
@@ -225,7 +226,7 @@ export default function WeeklyReview() {
   /* ── Loading State ─────────────────────── */
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
         <div className="w-8 h-8 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-4" />
         <p className="text-zinc-500 text-xs font-semibold tracking-wider uppercase">
           Loading Weekly Insights...
@@ -237,7 +238,7 @@ export default function WeeklyReview() {
   /* ── Error State ───────────────────────── */
   if (error || !review) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white gap-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white gap-4">
         <span className="text-4xl">⚠️</span>
         <p className="text-zinc-400 text-sm">{error ?? "No review data available."}</p>
         <button
@@ -254,17 +255,16 @@ export default function WeeklyReview() {
   /* ── No Data State ─────────────────────── */
   if (!hasAnyData(review)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white gap-4">
-        <span className="text-5xl">📊</span>
-        <h2 className="text-xl font-bold">No data yet</h2>
-        <p className="text-zinc-400 text-sm text-center max-w-xs">
-          Start logging meals, workouts, weight, and sleep to see your weekly
-          review here.
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white gap-4">
+        <BarChart2 className="w-12 h-12 text-[#8ba893]" />
+        <h2 className="text-xl font-bold font-heading">No data yet</h2>
+        <p className="text-zinc-400 text-xs text-center max-w-xs leading-relaxed">
+          Start logging meals, workouts, weight, and sleep to see your weekly review here. Every data point helps calibrate the metabolic engine!
         </p>
         <button
           onClick={() => router.push("/")}
           type="button"
-          className="btn-primary px-6 py-2 text-sm mt-2"
+          className="btn-primary px-6 py-2.5 text-xs font-bold mt-2"
         >
           Go Home
         </button>
@@ -283,7 +283,7 @@ export default function WeeklyReview() {
   const deltaColor =
     review.weight.deltaKg !== null
       ? review.weight.deltaKg <= 0
-        ? "text-brand-400"
+        ? "text-[#8ba893]"
         : "text-red-400"
       : "text-zinc-500";
 
@@ -301,10 +301,10 @@ export default function WeeklyReview() {
       {/* Header */}
       <div className="flex items-center justify-between py-2 border-b border-white/5 animate-in">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 font-mono">
             Pillar 5
           </span>
-          <h1 className="text-xl font-bold text-white mt-0.5">
+          <h1 className="text-xl font-bold text-white mt-0.5 font-heading">
             Weekly Report
           </h1>
         </div>
@@ -319,48 +319,56 @@ export default function WeeklyReview() {
             <ReviewCard
               title="Weight Journey"
               subtitle={weightSubtitle}
-              accentColor="#22c55e"
-              icon="📉"
+              accentColor="#8ba893"
+              icon={<Scale className="w-5 h-5 text-[#8ba893]" />}
             >
-              <div className="space-y-6 pt-2">
-                <div className="flex items-center justify-around text-center">
-                  <div>
-                    <span className="text-xs text-zinc-500">Started</span>
-                    <p className="text-lg font-bold text-white mt-1">
-                      {review.weight.startKg !== null
-                        ? `${review.weight.startKg} kg`
-                        : "— kg"}
-                    </p>
+              <div className="space-y-4 pt-2 text-left">
+                <div className="grid grid-cols-12 gap-3 items-center">
+                  <div className="col-span-5 space-y-3.5 border-r border-white/5 pr-4 py-2">
+                    <div>
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono block">Initial</span>
+                      <p className="text-base font-extrabold text-white mt-1 font-heading">
+                        {review.weight.startKg !== null
+                          ? `${review.weight.startKg} kg`
+                          : "— kg"}
+                      </p>
+                    </div>
+                    <div className="pt-2.5 border-t border-white/5">
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono block">Current</span>
+                      <p className="text-base font-extrabold text-white mt-1 font-heading">
+                        {review.weight.endKg !== null
+                          ? `${review.weight.endKg} kg`
+                          : "— kg"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-brand-400 text-xl font-black">
-                    {review.weight.deltaKg !== null && review.weight.deltaKg <= 0
-                      ? "↓"
-                      : review.weight.deltaKg !== null && review.weight.deltaKg > 0
-                        ? "↑"
-                        : "—"}
-                  </div>
-                  <div>
-                    <span className="text-xs text-zinc-500">Current</span>
-                    <p className="text-lg font-bold text-white mt-1">
-                      {review.weight.endKg !== null
-                        ? `${review.weight.endKg} kg`
-                        : "— kg"}
-                    </p>
+                  
+                  <div className="col-span-7 p-4 bg-white/2 border border-white/5 rounded-2xl text-center flex flex-col justify-center min-h-[110px]">
+                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono">
+                      Weekly Delta
+                    </span>
+                    <h2 className={`text-2xl font-black mt-1 font-heading ${deltaColor}`}>
+                      {deltaDisplay}
+                    </h2>
+                    {review.weight.deltaKg !== null && (
+                      <span className="inline-flex items-center justify-center gap-0.5 mt-1.5 px-2 py-0.5 rounded-full bg-white/5 text-[9px] font-semibold text-zinc-400">
+                        {review.weight.deltaKg <= 0 ? (
+                          <>
+                            <ArrowDown className="w-3.5 h-3.5 text-[#8ba893]" />
+                            Loss
+                          </>
+                        ) : (
+                          <>
+                            <ArrowUp className="w-3.5 h-3.5 text-red-400" />
+                            Gain
+                          </>
+                        )}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="p-4 bg-brand-500/5 border border-brand-500/20 rounded-2xl text-center">
-                  <span className="text-xs text-zinc-400">
-                    Total Change This Week
-                  </span>
-                  <h2
-                    className={`text-3xl font-black mt-1 ${deltaColor}`}
-                  >
-                    {deltaDisplay}
-                  </h2>
-                </div>
-
-                <p className="text-[11px] text-zinc-500 leading-relaxed text-center">
+                <p className="text-[10px] text-zinc-500 leading-relaxed text-center mt-2">
                   {review.weight.deltaKg !== null
                     ? "Weight fluctuations are normal. Focus on the weekly trend, not daily numbers."
                     : "Log your weight daily for the most accurate weekly trend."}
@@ -376,39 +384,39 @@ export default function WeeklyReview() {
             <ReviewCard
               title="Nutrition & Fuel"
               subtitle={`Tracked ${review.nutrition.daysLogged} day${review.nutrition.daysLogged !== 1 ? "s" : ""} this week`}
-              accentColor="#06b6d4"
-              icon="🍛"
+              accentColor="#8ba893"
+              icon={<Utensils className="w-5 h-5 text-[#8ba893]" />}
             >
-              <div className="space-y-4 pt-2">
+              <div className="space-y-4 pt-2 text-left">
                 <div className="grid grid-cols-2 gap-3">
-                  <GlassCard className="p-3 text-center">
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+                  <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-center">
+                    <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-mono font-bold block">
                       Daily Average
                     </span>
-                    <p className="text-lg font-extrabold text-white mt-1">
+                    <p className="text-base font-extrabold text-white mt-1 font-heading">
                       {fmtNum(review.nutrition.avgCalories)} kcal
                     </p>
-                  </GlassCard>
-                  <GlassCard className="p-3 text-center">
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+                  </div>
+                  <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-center">
+                    <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-mono font-bold block">
                       Avg Protein
                     </span>
-                    <p className="text-lg font-extrabold text-cyan-400 mt-1">
+                    <p className="text-base font-extrabold text-[#8ba893] mt-1 font-heading">
                       {review.nutrition.avgProteinG} g
                     </p>
-                  </GlassCard>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 pt-1">
                   <div className="flex justify-between text-xs">
-                    <span className="text-zinc-500">Calorie Adherence:</span>
-                    <span className="font-semibold text-brand-400">
+                    <span className="text-zinc-500 font-medium">Calorie Adherence:</span>
+                    <span className="font-bold text-[#8ba893]">
                       {review.nutrition.calorieAdherence}% consistent
                     </span>
                   </div>
-                  <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-zinc-800/50 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-brand-400 rounded-full transition-all duration-500"
+                      className="h-full bg-[#8ba893] rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(review.nutrition.calorieAdherence, 100)}%` }}
                     />
                   </div>
@@ -416,14 +424,14 @@ export default function WeeklyReview() {
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
-                    <span className="text-zinc-500">Protein Adherence:</span>
-                    <span className="font-semibold text-cyan-400">
+                    <span className="text-zinc-500 font-medium">Protein Adherence:</span>
+                    <span className="font-bold text-[#c87a53]">
                       {review.nutrition.proteinAdherence}% consistent
                     </span>
                   </div>
-                  <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-zinc-800/50 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-cyan-400 rounded-full transition-all duration-500"
+                      className="h-full bg-[#c87a53] rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(review.nutrition.proteinAdherence, 100)}%` }}
                     />
                   </div>
@@ -439,33 +447,33 @@ export default function WeeklyReview() {
             <ReviewCard
               title="Gym Adherence"
               subtitle="Progression and overload achievements"
-              accentColor="#8b5cf6"
-              icon="⚡"
+              accentColor="#c87a53"
+              icon={<Zap className="w-5 h-5 text-[#c87a53]" />}
             >
-              <div className="space-y-4 pt-2">
-                <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl text-center">
-                  <span className="text-xs text-zinc-400">
+              <div className="space-y-4 pt-2 text-left">
+                <div className="p-4 bg-[#c87a53]/5 border border-[#c87a53]/20 rounded-2xl text-center">
+                  <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono">
                     Workouts Logged
                   </span>
-                  <h2 className="text-3xl font-black text-purple-400 mt-1">
+                  <h2 className="text-2xl font-black text-[#c87a53] mt-1 font-heading">
                     {review.training.sessionsCompleted} / {review.profile.gymFrequency} sessions
                   </h2>
                 </div>
 
-                <GlassCard className="p-3.5 space-y-2">
+                <GlassCard className="p-3.5 space-y-2 border border-white/5">
                   {review.training.topExercise && (
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between text-xs border-b border-white/5 pb-2">
                       <span className="text-zinc-400">Top Exercise</span>
-                      <span className="text-purple-400 font-bold">
+                      <span className="text-[#c87a53] font-bold">
                         {review.training.topExercise}
                       </span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center justify-between text-xs pt-1">
                     <span className="text-zinc-400">
                       Total Weekly Lift Volume
                     </span>
-                    <span className="text-purple-400 font-bold">
+                    <span className="text-[#8ba893] font-bold font-mono">
                       {fmtNum(review.training.totalVolumeKg)} kg
                     </span>
                   </div>
@@ -481,34 +489,34 @@ export default function WeeklyReview() {
             <ReviewCard
               title="Sleep & Recovery"
               subtitle="Rest quality and schedule consistency"
-              accentColor="#3b82f6"
-              icon="😴"
+              accentColor="#8ba893"
+              icon={<Moon className="w-5 h-5 text-[#8ba893]" />}
             >
-              <div className="space-y-4 pt-2">
+              <div className="space-y-4 pt-2 text-left">
                 <div className="grid grid-cols-2 gap-3">
-                  <GlassCard className="p-3 text-center">
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+                  <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-center">
+                    <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-mono font-bold block">
                       Avg Sleep
                     </span>
-                    <p className="text-lg font-extrabold text-white mt-1">
+                    <p className="text-base font-extrabold text-white mt-1 font-heading">
                       {review.recovery.avgSleepHours > 0
                         ? `${review.recovery.avgSleepHours} hrs`
                         : "— hrs"}
                     </p>
-                  </GlassCard>
-                  <GlassCard className="p-3 text-center">
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+                  </div>
+                  <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-center">
+                    <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-mono font-bold block">
                       Avg Steps
                     </span>
-                    <p className="text-lg font-extrabold text-blue-400 mt-1">
+                    <p className="text-base font-extrabold text-[#c87a53] mt-1 font-heading">
                       {review.recovery.avgSteps > 0
                         ? fmtNum(review.recovery.avgSteps)
                         : "—"}
                     </p>
-                  </GlassCard>
+                  </div>
                 </div>
 
-                <p className="text-xs text-zinc-400 leading-relaxed text-center">
+                <p className="text-[10px] text-zinc-400 leading-relaxed text-center bg-white/3 border border-white/5 p-3.5 rounded-xl mt-2">
                   {review.recovery.avgSleepHours >= 7.5
                     ? `Your sleep averaged ${review.recovery.avgSleepHours} hrs across ${review.recovery.daysWithSleep} nights — excellent recovery.`
                     : review.recovery.avgSleepHours > 0
@@ -526,18 +534,20 @@ export default function WeeklyReview() {
             <ReviewCard
               title="Coach Insight"
               subtitle="Your personalized weekly feedback"
-              accentColor="#f59e0b"
-              icon="💡"
+              accentColor="#c87a53"
+              icon={<Lightbulb className="w-5 h-5 text-[#c87a53]" />}
             >
-              <div className="space-y-4 pt-2">
-                <p className="text-xs text-zinc-300 leading-relaxed bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl">
-                  &ldquo;{coachSummary.mainText}&rdquo;
-                </p>
-                <GlassCard className="p-3 text-center text-xs">
-                  <p className="text-zinc-500 font-semibold uppercase tracking-wider text-[10px]">
-                    Next Week&apos;s Focus
+              <div className="space-y-4 pt-2 text-left">
+                <div className="relative p-4 rounded-2xl bg-white/2 border-l-2 border-[#c87a53]/60 border-t border-r border-b border-white/5">
+                  <p className="text-xs text-zinc-300 leading-relaxed italic">
+                    &ldquo;{coachSummary.mainText}&rdquo;
                   </p>
-                  <p className="font-bold text-amber-400 mt-1">
+                </div>
+                <GlassCard className="p-3.5 border border-white/5 text-center">
+                  <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono block">
+                    Next Week's Focus
+                  </span>
+                  <p className="font-bold text-[#c87a53] text-xs mt-1.5 leading-snug">
                     {coachSummary.adjustment}
                   </p>
                 </GlassCard>
@@ -554,7 +564,7 @@ export default function WeeklyReview() {
               className="w-1.5 h-1.5 rounded-full transition-all duration-300"
               style={{
                 background:
-                  i === slide ? "#22c55e" : "rgba(255,255,255,0.2)",
+                  i === slide ? "#8ba893" : "rgba(255,255,255,0.15)",
                 transform: i === slide ? "scale(1.3)" : "scale(1)",
               }}
             />
@@ -568,7 +578,7 @@ export default function WeeklyReview() {
           <button
             onClick={prevSlide}
             type="button"
-            className="btn-ghost flex-1 py-3 text-center"
+            className="btn-ghost flex-1 py-3 text-center text-xs font-bold"
           >
             Prev
           </button>
@@ -580,7 +590,7 @@ export default function WeeklyReview() {
           <button
             onClick={() => router.push("/")}
             type="button"
-            className="btn-primary flex-[2] py-3 text-center font-bold"
+            className="btn-primary flex-[2] py-3 text-center font-bold text-xs"
           >
             Done
           </button>
@@ -588,7 +598,7 @@ export default function WeeklyReview() {
           <button
             onClick={nextSlide}
             type="button"
-            className="btn-primary flex-[2] py-3 text-center font-bold"
+            className="btn-primary flex-[2] py-3 text-center font-bold text-xs"
           >
             Next Slide
           </button>

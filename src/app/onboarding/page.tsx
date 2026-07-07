@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ChipSelect from "@/components/ChipSelect";
 import StepIndicator from "@/components/StepIndicator";
+import { Flame, Dumbbell, Zap, Scale, Heart } from "lucide-react";
 
 function OnboardingContent() {
   const router = useRouter();
@@ -458,32 +459,32 @@ function OnboardingContent() {
 
         {step === 2 && (
           <div className="space-y-5 animate-in">
-            <h2 className="text-base font-semibold text-white">What is your primary focus?</h2>
+            <h2 className="text-base font-bold text-white font-heading">What is your primary focus?</h2>
             <div className="grid grid-cols-1 gap-3">
               {[
-                { value: "lose_fat", label: "Lose Fat", desc: "Sustainable caloric deficit focused on maintaining muscle", emoji: "🔥" },
-                { value: "build_muscle", label: "Build Muscle", desc: "Controlled caloric surplus optimized for hypertrophy", emoji: "💪" },
-                { value: "recomp", label: "Body Recomposition", desc: "Gain muscle and lose fat simultaneously", emoji: "⚡" },
-                { value: "maintain", label: "Maintain Weight", desc: "Stabilize weight and focus purely on recovery & energy", emoji: "⚖️" },
-                { value: "general_health", label: "General Health", desc: "Overall cardiovascular and metabolic fitness", emoji: "🌱" },
+                { value: "lose_fat", label: "Lose Fat", desc: "Sustainable caloric deficit focused on maintaining muscle", icon: <Flame className="w-6 h-6 text-[#c87a53]" /> },
+                { value: "build_muscle", label: "Build Muscle", desc: "Controlled caloric surplus optimized for hypertrophy", icon: <Dumbbell className="w-6 h-6 text-[#8ba893]" /> },
+                { value: "recomp", label: "Body Recomposition", desc: "Gain muscle and lose fat simultaneously", icon: <Zap className="w-6 h-6 text-[#c87a53]" /> },
+                { value: "maintain", label: "Maintain Weight", desc: "Stabilize weight and focus purely on recovery & energy", icon: <Scale className="w-6 h-6 text-[#8ba893]" /> },
+                { value: "general_health", label: "General Health", desc: "Overall cardiovascular and metabolic fitness", icon: <Heart className="w-6 h-6 text-red-400" /> },
               ].map((opt) => (
-                <GlassCard
+                <div
                   key={opt.value}
                   onClick={() => setGoal(opt.value as any)}
-                  className={`p-4 border text-left transition-all ${
+                  className={`p-4 border text-left transition-all rounded-tl-2xl rounded-br-2xl cursor-pointer ${
                     goal === opt.value
-                      ? "border-brand-500 bg-brand-500/5 glow-green"
-                      : "border-white/5 bg-white/2"
+                      ? "border-[#8ba893] bg-[#8ba893]/5 glow-green"
+                      : "border-white/5 bg-white/2 hover:border-[#8ba893]/20"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{opt.emoji}</span>
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex-shrink-0">{opt.icon}</div>
                     <div>
                       <h4 className="text-sm font-semibold text-white">{opt.label}</h4>
                       <p className="text-xs text-zinc-500 mt-0.5">{opt.desc}</p>
                     </div>
                   </div>
-                </GlassCard>
+                </div>
               ))}
             </div>
           </div>
@@ -845,7 +846,7 @@ function OnboardingContent() {
 export default function Onboarding() {
   return (
     <Suspense fallback={
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
         <div className="w-8 h-8 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-4" />
         <p className="text-zinc-500 text-xs font-semibold tracking-wider uppercase">Loading Onboarding Wizard...</p>
       </div>

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ProgressRing from "@/components/ProgressRing";
+import { Download, AlertTriangle, Scale, Activity, TrendingDown } from "lucide-react";
 
 interface WeightPoint {
   date: string;
@@ -203,7 +204,7 @@ export default function Journey() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
         <div className="w-8 h-8 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mb-4" />
         <p className="text-zinc-500 text-xs font-semibold tracking-wider uppercase">Loading Journey...</p>
       </div>
@@ -215,7 +216,7 @@ export default function Journey() {
     if (weightHistory.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center py-10 text-center space-y-2">
-          <span className="text-2xl">📉</span>
+          <Scale className="w-8 h-8 text-zinc-600 animate-pulse" />
           <p className="text-xs text-zinc-400 font-medium">No Weight Logs Found</p>
           <p className="text-[10px] text-zinc-600 max-w-xs leading-relaxed">
             We need your weight entries to display your trend. Log weight on the home dashboard to generate this graph.
@@ -275,7 +276,7 @@ export default function Journey() {
                   cx={p.x}
                   cy={p.y}
                   r={3.5}
-                  fill="#0a0a0f"
+                  fill="#0c0f0d"
                   stroke="#06b6d4"
                   strokeWidth={2}
                 />
@@ -318,14 +319,14 @@ export default function Journey() {
       <div className="flex items-center justify-between py-2 border-b border-white/5 animate-in">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Pillar 5</span>
-          <h1 className="text-xl font-bold text-white mt-0.5">Journey Progress</h1>
+          <h1 className="text-xl font-bold text-white mt-0.5 font-heading">Journey Progress</h1>
         </div>
       </div>
 
       {/* Main Single Question Indicator */}
-      <div className="bg-cyan-500/5 border border-cyan-500/10 rounded-2xl p-4 animate-in-delay-1 text-center">
-        <span className="text-[9px] font-extrabold uppercase tracking-widest text-cyan-400 block mb-1">Single Core Question</span>
-        <h2 className="text-sm font-semibold text-white">"How am I changing?"</h2>
+      <div className="bg-[#8ba893]/5 border border-[#8ba893]/10 rounded-2xl p-4 animate-in-delay-1 text-center">
+        <span className="text-[9px] font-extrabold uppercase tracking-widest text-[#8ba893] block mb-1">Single Core Question</span>
+        <h2 className="text-sm font-semibold text-white font-heading">"How am I changing?"</h2>
       </div>
 
       {/* SVG Weight Chart Card */}
@@ -457,17 +458,19 @@ export default function Journey() {
           <button
             onClick={handleExportData}
             disabled={exporting}
-            className="flex-1 py-3 text-xs font-semibold rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 transition-all flex items-center justify-center gap-1.5"
+            className="flex-1 py-3 text-xs font-semibold rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            📥 {exporting ? "Exporting..." : "Export Data"}
+            <Download className="w-3.5 h-3.5" />
+            <span>{exporting ? "Exporting..." : "Export Data"}</span>
           </button>
           
           <button
             onClick={handleDeleteAccount}
             disabled={deleting}
-            className="flex-1 py-3 text-xs font-semibold rounded-xl bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 transition-all flex items-center justify-center gap-1.5"
+            className="flex-1 py-3 text-xs font-semibold rounded-xl bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            ⚠️ {deleting ? "Deleting..." : "Delete Account"}
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>{deleting ? "Deleting..." : "Delete Account"}</span>
           </button>
         </div>
       </div>

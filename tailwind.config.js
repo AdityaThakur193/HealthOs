@@ -9,38 +9,67 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Health OS Design System
+        // Dynamic Health OS Design System mapped to CSS Variables
         brand: {
-          50: "#f0fdf4",
-          100: "#dcfce7",
-          200: "#bbf7d0",
-          300: "#86efac",
-          400: "#4ade80",
-          500: "#22c55e",
-          600: "#16a34a",
-          700: "#15803d",
-          800: "#166534",
-          900: "#14532d",
+          50: "rgba(139, 168, 147, 0.05)",
+          100: "rgba(139, 168, 147, 0.1)",
+          200: "rgba(139, 168, 147, 0.2)",
+          300: "rgba(139, 168, 147, 0.3)",
+          400: "var(--brand)", // Sage Green
+          500: "var(--brand)",
+          600: "var(--brand)",
+          700: "var(--brand)",
+          800: "var(--brand)",
+          900: "var(--brand)",
         },
         surface: {
-          DEFAULT: "#0a0a0f",
-          50: "#f8f9fa",
-          100: "#f1f3f5",
-          200: "#e9ecef",
-          700: "#1a1a2e",
-          800: "#12121f",
-          900: "#0a0a0f",
+          DEFAULT: "var(--background)",
+          50: "rgba(255, 255, 255, 0.02)",
+          100: "rgba(255, 255, 255, 0.04)",
+          200: "rgba(255, 255, 255, 0.06)",
+          700: "rgba(27, 34, 30, 0.4)",
+          800: "rgba(27, 34, 30, 0.5)",
+          900: "var(--background)", // moss obsidian
         },
         accent: {
-          blue: "#3b82f6",
-          purple: "#8b5cf6",
-          amber: "#f59e0b",
-          rose: "#f43f5e",
-          cyan: "#06b6d4",
+          DEFAULT: "var(--accent)", // Terracotta
+          blue: "var(--cyan)",
+          purple: "var(--purple)",
+          amber: "var(--amber)",
+          rose: "var(--rose)",
+          cyan: "var(--cyan)",
+        },
+        // Force standard Tailwind utility mappings to use CSS variables dynamically
+        cyan: {
+          50: "rgba(139, 168, 147, 0.05)",
+          100: "rgba(139, 168, 147, 0.1)",
+          200: "rgba(139, 168, 147, 0.2)",
+          300: "rgba(139, 168, 147, 0.3)",
+          400: "var(--cyan)",
+          500: "var(--cyan)",
+          600: "var(--cyan)",
+          700: "var(--cyan)",
+        },
+        amber: {
+          50: "rgba(200, 122, 83, 0.05)",
+          400: "var(--accent)",
+          500: "var(--accent)",
+          600: "var(--accent)",
+        },
+        emerald: {
+          400: "var(--brand)",
+          500: "var(--brand)",
+          600: "var(--brand)",
+        },
+        green: {
+          400: "var(--brand)",
+          500: "var(--brand)",
+          600: "var(--brand)",
         },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["'Plus Jakarta Sans'", "Inter", "system-ui", "sans-serif"],
+        heading: ["'Space Grotesk'", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
       borderRadius: {

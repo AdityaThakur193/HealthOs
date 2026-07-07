@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ExerciseCard from "@/components/ExerciseCard";
 import { getTodaysWorkout, getWeekSchedule, type WorkoutPlan } from "@/lib/workoutPlans";
+import { Dumbbell, Flame, Lightbulb, Plus, Activity, BookOpen, Compass, ChevronDown, CheckCircle, Info } from "lucide-react";
 
 interface ExerciseState {
   id: string;
@@ -291,7 +292,7 @@ export default function WorkoutTracker() {
 
   if (fetchingHistory) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
         <div className="w-8 h-8 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-4" />
         <p className="text-zinc-500 text-xs font-semibold tracking-wider uppercase">Loading Overload Targets...</p>
       </div>
@@ -310,27 +311,31 @@ export default function WorkoutTracker() {
           <span className="badge-info">{plan.focus}</span>
         </div>
 
-        <GlassCard className="p-6 text-center animate-in-delay-1">
-          <div className="text-4xl mb-3">🧘</div>
-          <h2 className="text-lg font-semibold text-white mb-2">Rest & Recover</h2>
-          <p className="text-sm text-zinc-400 mb-4">
+        <div className="p-6 text-center animate-in-delay-1 border border-white/5 bg-white/2 rounded-tl-3xl rounded-br-3xl">
+          <Compass className="w-10 h-10 text-[#8ba893] mx-auto animate-pulse mb-3" />
+          <h2 className="text-lg font-bold text-white mb-2 font-heading">Rest & Recover</h2>
+          <p className="text-xs text-zinc-400 mb-4 max-w-xs mx-auto leading-relaxed">
             Your muscles grow during recovery, not during the workout. Take today to recharge.
           </p>
-          <div className="space-y-3 text-left max-w-xs mx-auto">
+          <div className="space-y-3 text-left max-w-xs mx-auto border-t border-white/5 pt-4">
             <div className="flex items-center gap-3 text-xs text-zinc-400">
-              <span className="text-brand-400">✓</span> Get 7-9 hours of sleep tonight
+              <CheckCircle className="w-4 h-4 text-[#8ba893] flex-shrink-0" /> 
+              <span>Get 7-9 hours of sleep tonight</span>
             </div>
             <div className="flex items-center gap-3 text-xs text-zinc-400">
-              <span className="text-brand-400">✓</span> Stay hydrated — aim for 3L+ of water
+              <CheckCircle className="w-4 h-4 text-[#8ba893] flex-shrink-0" /> 
+              <span>Stay hydrated — aim for 3L+ of water</span>
             </div>
             <div className="flex items-center gap-3 text-xs text-zinc-400">
-              <span className="text-brand-400">✓</span> Light stretching or a 20-min walk
+              <CheckCircle className="w-4 h-4 text-[#8ba893] flex-shrink-0" /> 
+              <span>Light stretching or a 20-min walk</span>
             </div>
             <div className="flex items-center gap-3 text-xs text-zinc-400">
-              <span className="text-brand-400">✓</span> Hit your protein target (1.6-2g/kg)
+              <CheckCircle className="w-4 h-4 text-[#8ba893] flex-shrink-0" /> 
+              <span>Hit your protein target (1.6-2g/kg)</span>
             </div>
           </div>
-        </GlassCard>
+        </div>
 
         <div className="pt-4 border-t border-white/5 animate-in-delay-2">
           <button
@@ -351,7 +356,7 @@ export default function WorkoutTracker() {
       <div className="flex items-center justify-between py-2 border-b border-white/5 animate-in">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Pillar 3</span>
-          <h1 className="text-xl font-bold text-white mt-0.5">{plan?.name}</h1>
+          <h1 className="text-xl font-bold text-white mt-0.5 font-heading">{plan?.name}</h1>
         </div>
         <span className="badge-info">Target: ~{plan?.targetDurationMin}m</span>
       </div>
@@ -434,7 +439,7 @@ export default function WorkoutTracker() {
         onClick={() => setShowHowToLog(true)}
       >
         <div className="flex items-center gap-2.5">
-          <span className="text-base">💡</span>
+          <Lightbulb className="w-4 h-4 text-[#c87a53]" />
           <div className="text-left">
             <h4 className="text-[11px] font-bold text-white">How does progressive overload work?</h4>
             <p className="text-[9px] text-zinc-500 mt-0.5">Learn how suggested weights are calculated</p>
@@ -469,7 +474,7 @@ export default function WorkoutTracker() {
             onClick={() => setShowAddCustomForm(true)}
             className="w-full py-3 rounded-xl border border-dashed border-white/10 hover:border-white/20 bg-white/2 hover:bg-white/5 text-zinc-400 hover:text-white transition-all text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <span>➕</span> Add Custom Exercise to Session
+            <Plus className="w-3.5 h-3.5" /> Add Custom Exercise to Session
           </button>
         ) : (
           <GlassCard className="p-4 border border-white/10 space-y-4">
@@ -557,8 +562,8 @@ export default function WorkoutTracker() {
                   </span>
                 </div>
                 <div className="flex items-center gap-4 text-[10px] text-zinc-400">
-                  <span>💪 Volume: <strong className="text-brand-400">{w.payload.totalVolumeKg?.toLocaleString()} kg</strong></span>
-                  <span>🔥 Sets: <strong className="text-cyan-400">{w.payload.completedSets}</strong></span>
+                  <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3 text-[#8ba893]" /> Volume: <strong className="text-brand-400">{w.payload.totalVolumeKg?.toLocaleString()} kg</strong></span>
+                  <span className="flex items-center gap-1"><Flame className="w-3.5 h-3.5 text-[#c87a53]" /> Sets: <strong className="text-cyan-400">{w.payload.completedSets}</strong></span>
                 </div>
                 <div className="border-t border-white/5 pt-2 mt-1">
                   <details className="cursor-pointer group">
@@ -593,18 +598,19 @@ export default function WorkoutTracker() {
 function HowToLogModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in">
-      <GlassCard className="p-6 max-w-sm w-full border border-white/10 relative overflow-hidden space-y-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in">
+      <GlassCard className="p-6 max-w-sm w-full border border-white/10 relative overflow-hidden flex flex-col max-h-[80vh] space-y-4">
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 text-zinc-500 hover:text-white text-lg font-bold"
+          className="absolute top-4 right-4 text-zinc-500 hover:text-white text-lg font-bold z-10"
         >
           ×
         </button>
         
-        <div className="space-y-1.5 text-center">
-          <div className="w-12 h-12 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mx-auto text-xl">
-            🏋️
+        {/* Header */}
+        <div className="space-y-1.5 text-center flex-shrink-0">
+          <div className="w-12 h-12 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mx-auto">
+            <Dumbbell className="w-5 h-5 text-[#8ba893]" />
           </div>
           <h3 className="text-base font-bold text-white mt-2">
             Progressive Overload Guide
@@ -614,7 +620,8 @@ function HowToLogModal({ open, onClose }: { open: boolean; onClose: () => void }
           </p>
         </div>
 
-        <div className="space-y-3 pt-2 border-t border-white/5 text-xs text-zinc-300">
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto flex-1 pr-1 space-y-4 border-t border-white/5 pt-3 text-xs text-zinc-300">
           <div className="space-y-1">
             <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-brand-400">1. Suggested Weights</h4>
             <p className="leading-relaxed text-[11px]">
@@ -652,9 +659,10 @@ function HowToLogModal({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
         </div>
 
+        {/* Footer Action Button */}
         <button
           onClick={onClose}
-          className="btn-primary w-full py-2.5 font-bold text-xs"
+          className="btn-primary w-full py-2.5 font-bold text-xs flex-shrink-0"
         >
           Let's Lift
         </button>

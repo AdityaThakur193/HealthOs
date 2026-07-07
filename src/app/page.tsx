@@ -7,6 +7,7 @@ import ProgressRing from "@/components/ProgressRing";
 import MacroBar from "@/components/MacroBar";
 import CoachInsight from "@/components/CoachInsight";
 import { getTodaysWorkout } from "@/lib/workoutPlans";
+import { Flame, Dumbbell, Droplet, Footprints, Moon, Sparkles, Scale, GraduationCap, Compass, Calendar, Zap, Activity, Camera, Beef } from "lucide-react";
 
 interface TodayState {
   calories: number;
@@ -233,7 +234,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
         <div className="w-8 h-8 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-4" />
         <p className="text-zinc-500 text-xs font-semibold tracking-wider uppercase animate-pulse">Syncing Health OS...</p>
       </div>
@@ -242,7 +243,7 @@ export default function Dashboard() {
 
   if (errorMsg) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white p-4">
         <GlassCard className="p-6 text-center border border-white/10 max-w-sm w-full space-y-4">
           <div className="text-3xl">⚠️</div>
           <h2 className="text-base font-bold text-white">System Offline</h2>
@@ -343,98 +344,223 @@ export default function Dashboard() {
   return (
     <div className="page-container space-y-6 pb-28">
       {/* Top Header */}
-      <div className="flex items-center justify-between py-2 border-b border-white/5 animate-in">
-        <div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-            Command Center • {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+      <div className="flex items-start justify-between py-2 border-b border-white/5 animate-in">
+        <div className="text-left">
+          <span className="text-[9px] font-extrabold uppercase tracking-widest text-[#c87a53] font-mono">
+            {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
           </span>
-          <h1 className="text-xl font-bold text-white mt-0.5">{getGreeting()}, {profile?.name}</h1>
+          <h1 className="text-xl font-bold text-white mt-1 font-heading leading-tight">{getGreeting()}, Aditya</h1>
+          <div className="flex items-center gap-1.5 mt-2">
+            {streak > 0 && (
+              <span className="px-2 py-0.5 rounded-md bg-[#c87a53]/10 border border-[#c87a53]/30 text-[8px] font-extrabold text-[#e29b74] uppercase tracking-wider flex items-center gap-1 font-mono">
+                <Flame className="w-3 h-3 text-[#c87a53]" /> {streak} {streak === 1 ? "Day" : "Days"}
+              </span>
+            )}
+            {tdeeMode === "adaptive" ? (
+              <button 
+                onClick={() => setShowTdeeModal(true)}
+                className="px-2 py-0.5 rounded-md bg-[#8ba893]/10 border border-[#8ba893]/30 text-[8px] font-extrabold text-[#a8c3af] uppercase tracking-wider flex items-center gap-1 hover:bg-[#8ba893]/20 transition-all cursor-pointer font-mono"
+              >
+                <Zap className="w-2.5 h-2.5 text-[#8ba893]" /> Adaptive
+              </button>
+            ) : (
+              <button 
+                onClick={() => setShowTdeeModal(true)}
+                className="px-2 py-0.5 rounded-md bg-[#c87a53]/10 border border-[#c87a53]/20 text-[8px] font-extrabold text-[#e29b74] uppercase tracking-wider flex items-center gap-1 hover:bg-[#c87a53]/20 transition-all cursor-pointer font-mono"
+              >
+                <Compass className="w-2.5 h-2.5 text-[#e29b74] animate-spin" style={{ animationDuration: '8s' }} /> Calibration ({daysRemaining}d)
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          {streak > 0 && (
-            <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-extrabold text-amber-400 uppercase tracking-widest flex items-center gap-1">
-              🔥 {streak} {streak === 1 ? "Day" : "Days"}
-            </span>
-          )}
-          {tdeeMode === "adaptive" ? (
-            <button 
-              onClick={() => setShowTdeeModal(true)}
-              className="px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[9px] font-extrabold text-cyan-400 uppercase tracking-widest flex items-center gap-1 hover:bg-cyan-500/20 transition-all cursor-pointer"
-            >
-              <span>⚡</span> Adaptive
-            </button>
-          ) : (
-            <button 
-              onClick={() => setShowTdeeModal(true)}
-              className="px-2.5 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-[9px] font-extrabold text-yellow-400 uppercase tracking-widest flex items-center gap-1 hover:bg-yellow-500/20 transition-all cursor-pointer"
-            >
-              <span>🔋</span> Calibrating ({daysRemaining}d)
-            </button>
-          )}
-          <span className="badge-success glow-green">Active</span>
-        </div>
+
+        {/* Compact Readiness Indicator Card */}
+        <button 
+          onClick={() => {
+            if (today.sleepHours === 0) {
+              setQuickLogOpen(true);
+              setActiveForm("sleep");
+            } else {
+              setShowTdeeModal(true);
+            }
+          }}
+          className="p-2 border border-white/5 bg-white/2 rounded-tr-2xl rounded-bl-2xl flex items-center gap-2.5 hover:bg-white/5 transition-all text-left max-w-[170px]"
+        >
+          <ProgressRing
+            value={readinessScore ?? 0}
+            max={100}
+            size={38}
+            strokeWidth={4}
+            color={readinessScore === null ? "#5a645d" : "#8ba893"}
+            label={readinessScore !== null ? `${readinessScore}%` : "—"}
+          />
+          <div className="min-w-0">
+            <span className="text-[8px] text-zinc-500 font-extrabold uppercase tracking-wider block font-mono">Readiness</span>
+            <span className="text-[10px] font-bold text-white block truncate leading-snug">{readinessStatus.split(" ")[0]}</span>
+          </div>
+        </button>
       </div>
 
-      {/* Active Calendar Event Alert if present (guilt-free recovery scaling) */}
+      {/* Active Calendar Event Alert if present */}
       {activeEvent && (
-        <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-xl flex items-center gap-2 animate-in">
-          <span className="text-sm">📅</span>
+        <div className="p-3 bg-[#c87a53]/10 border border-[#c87a53]/20 text-[#e29b74] text-xs rounded-xl flex items-center gap-2 animate-in text-left">
+          <Calendar className="w-4 h-4 text-[#e29b74] flex-shrink-0" />
           <span>
             Active Event: <strong>{activeEvent.payload.title}</strong> is active today. Daily targets are scaled back.
           </span>
         </div>
       )}
 
-      {/* Readiness HUD Card */}
-      <GlassCard className="p-4 flex items-center justify-between animate-in-delay-1 border border-white/10 relative overflow-hidden">
-        <div className="absolute top-1/2 left-1/3 -translate-y-1/2 w-32 h-32 bg-cyan-500/5 blur-[50px] rounded-full -z-10" />
-        <div className="space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Readiness Score</span>
-          <h2 className="text-base font-extrabold text-white">
-            {readinessStatus}
-          </h2>
-          <p className="text-[10px] text-zinc-400 max-w-[210px] leading-tight">
-            {readinessDescription}
-          </p>
+      {/* 3-Column Compact Primary HUD (Asymmetric Rounded Corners, Hover Actions) */}
+      <div className="grid grid-cols-3 gap-3 animate-in-delay-1">
+        {/* Calories Card (Clickable: redirects to meal log) */}
+        <div 
+          onClick={() => router.push("/meal")}
+          className="p-3.5 flex flex-col justify-between border border-white/5 bg-white/2 hover:border-[#8ba893]/20 min-h-[110px] relative overflow-hidden rounded-tl-2xl rounded-br-2xl transition-all cursor-pointer group"
+        >
+          <div className="flex justify-between items-start">
+            <Flame className="w-4 h-4 text-[#c87a53] group-hover:scale-110 transition-transform" />
+            <ProgressRing
+              value={today.calories}
+              max={targetCal}
+              size={28}
+              strokeWidth={3}
+              color="var(--brand)"
+              label=""
+            />
+          </div>
+          <div className="mt-4 text-left">
+            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider font-mono block">Calories</span>
+            <span className="text-sm font-extrabold text-white mt-0.5 block font-heading">{today.calories}</span>
+            <span className="text-[8px] text-zinc-600 block mt-0.5">of {targetCal} kcal</span>
+          </div>
         </div>
-        <div className="flex-shrink-0 relative">
-          <ProgressRing
-            value={readinessScore ?? 0}
-            max={100}
-            size={70}
-            strokeWidth={6}
-            color={readinessScore === null ? "#52525b" : "#06b6d4"}
-            label={readinessScore !== null ? `${readinessScore}%` : "—"}
-          />
+
+        {/* Protein Card (Clickable: redirects to meal log) */}
+        <div 
+          onClick={() => router.push("/meal")}
+          className="p-3.5 flex flex-col justify-between border border-white/5 bg-white/2 hover:border-[#8ba893]/20 min-h-[110px] relative overflow-hidden rounded-tl-2xl rounded-br-2xl transition-all cursor-pointer group"
+        >
+          <div className="flex justify-between items-start">
+            <Beef className="w-4 h-4 text-[#8ba893] group-hover:scale-110 transition-transform" />
+            <ProgressRing
+              value={today.protein}
+              max={targetProt}
+              size={28}
+              strokeWidth={3}
+              color="var(--brand)"
+              label=""
+            />
+          </div>
+          <div className="mt-4 text-left">
+            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider font-mono block">Protein</span>
+            <span className="text-sm font-extrabold text-white mt-0.5 block font-heading">{today.protein}g</span>
+            <span className="text-[8px] text-zinc-600 block mt-0.5">of {targetProt}g</span>
+          </div>
         </div>
-      </GlassCard>
 
-      {/* Main Calorie Ring Card */}
-      <GlassCard className="p-6 flex flex-col items-center text-center animate-in-delay-1 border border-white/10 relative overflow-hidden">
-        {/* Glow behind ring */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-brand-500/10 blur-[80px] rounded-full -z-10" />
-
-        <ProgressRing
-          value={today.calories}
-          max={targetCal}
-          size={180}
-          strokeWidth={12}
-          color="#22c55e"
-          label={`${today.calories}`}
-          sublabel={`of ${targetCal} kcal`}
-        />
-
-        <div className="w-full mt-6 space-y-3 pt-6 border-t border-white/5">
-          <MacroBar label="Protein" value={today.protein} max={targetProt} color="#06b6d4" />
-          <MacroBar label="Water" value={today.waterL} max={3.5} unit="L" color="#3b82f6" />
+        {/* Water Card (Interactive: Direct Quick-Log Action Buttons) */}
+        <div className="p-3 flex flex-col justify-between border border-white/5 bg-white/2 min-h-[125px] relative overflow-hidden rounded-tl-2xl rounded-br-2xl transition-all">
+          <div className="flex justify-between items-start">
+            <Droplet className="w-4 h-4 text-blue-400" />
+            <ProgressRing
+              value={today.waterL}
+              max={3.5}
+              size={28}
+              strokeWidth={3}
+              color="var(--brand)"
+              label=""
+            />
+          </div>
+          <div className="mt-2 text-left">
+            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider font-mono block">Water</span>
+            <span className="text-sm font-extrabold text-white mt-0.5 block font-heading">{today.waterL}L</span>
+            <span className="text-[8px] text-zinc-600 block mt-0.5">of 3.5L</span>
+          </div>
+          {/* Inline Action Pills */}
+          <div className="flex gap-1 mt-2 pt-1.5 border-t border-white/5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleQuickLog("water", { amountL: 0.25 });
+              }}
+              className="flex-1 py-0.5 rounded bg-white/5 hover:bg-[#8ba893]/15 text-[8px] font-bold text-zinc-400 hover:text-white transition-all border border-white/5 hover:border-[#8ba893]/30 cursor-pointer"
+            >
+              +0.25L
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleQuickLog("water", { amountL: 0.5 });
+              }}
+              className="flex-1 py-0.5 rounded bg-white/5 hover:bg-[#8ba893]/15 text-[8px] font-bold text-zinc-400 hover:text-white transition-all border border-white/5 hover:border-[#8ba893]/30 cursor-pointer"
+            >
+              +0.5L
+            </button>
+          </div>
         </div>
-      </GlassCard>
+      </div>
 
-      {/* Coach Card */}
+      {/* 2-Column Secondary HUD */}
+      <div className="grid grid-cols-2 gap-3 animate-in-delay-1">
+        {/* Steps Card (Clickable: opens steps log drawer) */}
+        <div 
+          onClick={() => {
+            setQuickLogOpen(true);
+            setActiveForm("steps");
+          }}
+          className="p-3.5 flex flex-col justify-between border border-white/5 bg-white/2 hover:border-[#8ba893]/20 min-h-[105px] relative overflow-hidden rounded-tl-2xl rounded-br-2xl transition-all cursor-pointer group"
+        >
+          <div className="flex justify-between items-start">
+            <Footprints className="w-4 h-4 text-[#c87a53] group-hover:scale-110 transition-transform" />
+            <ProgressRing
+              value={today.steps}
+              max={stepsTarget}
+              size={28}
+              strokeWidth={3}
+              color="var(--brand)"
+              label=""
+            />
+          </div>
+          <div className="mt-3 text-left">
+            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider font-mono block">Steps</span>
+            <span className="text-sm font-extrabold text-white mt-0.5 block font-heading">{today.steps.toLocaleString()}</span>
+            <span className="text-[8px] text-zinc-600 block mt-0.5">of {stepsTarget.toLocaleString()} steps</span>
+          </div>
+        </div>
+
+        {/* Sleep Card (Clickable: opens sleep log drawer) */}
+        <div 
+          onClick={() => {
+            setQuickLogOpen(true);
+            setActiveForm("sleep");
+          }}
+          className="p-3.5 flex flex-col justify-between border border-white/5 bg-white/2 hover:border-[#8ba893]/20 min-h-[105px] relative overflow-hidden rounded-tl-2xl rounded-br-2xl transition-all cursor-pointer group"
+        >
+          <div className="flex justify-between items-start">
+            <Moon className="w-4 h-4 text-[#8ba893] group-hover:scale-110 transition-transform" />
+            <ProgressRing
+              value={today.sleepHours}
+              max={sleepTarget}
+              size={28}
+              strokeWidth={3}
+              color="var(--brand)"
+              label=""
+            />
+          </div>
+          <div className="mt-3 text-left">
+            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider font-mono block">Sleep</span>
+            <span className="text-sm font-extrabold text-white mt-0.5 block font-heading">{today.sleepHours}h</span>
+            <span className="text-[8px] text-zinc-600 block mt-0.5">of {sleepTarget} hours</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Coach Card (Bespoke Editorial Pull-Quote Block) */}
       <div className="animate-in-delay-2">
         <CoachInsight
           status={coachData?.status || "on_track"}
-          greeting={coachData?.greeting || `Hey ${profile?.name}`}
+          greeting={coachData?.greeting || `Hey Aditya`}
           primaryInsight={
             coachData?.primaryInsight ||
             "Coaching engine is building context. Complete your checklist items to receive personalized daily recommendations."
@@ -445,91 +571,65 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Targets Explanation Guide Card */}
-      <GlassCard 
-        className="p-4 flex items-center justify-between border border-cyan-500/20 bg-cyan-950/10 cursor-pointer hover:bg-cyan-950/20 transition-all animate-in-delay-2" 
-        onClick={() => setShowGuideModal(true)}
-      >
-        <div className="flex items-center gap-3">
-          <span className="text-xl">🎓</span>
-          <div className="text-left">
-            <h4 className="text-xs font-bold text-white">Your Targets Explained</h4>
-            <p className="text-[10px] text-zinc-400 mt-0.5">Learn how Health OS calculated your {targetCal} kcal budget</p>
-          </div>
-        </div>
-        <span className="text-zinc-500 text-sm">→</span>
-      </GlassCard>
-
-      {/* Today's Checklist */}
-      <GlassCard className="p-5 space-y-4 animate-in-delay-3">
+      {/* Today's Checklist (Bespoke Unified Dividers List) */}
+      <div className="p-5 space-y-4 animate-in-delay-3 border border-white/5 bg-white/2 rounded-tl-3xl rounded-br-3xl text-left">
         <div className="flex justify-between items-baseline">
-          <h3 className="text-sm font-bold text-white">Today's Mission</h3>
+          <h3 className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono">Today's Mission</h3>
           <span className="text-xs font-bold text-brand-400">{missionScore}% Done</span>
         </div>
 
-        <div className="space-y-3">
-          {missionItems.map((item, i) => (
-            <div
-              key={i}
-              className={`p-3 rounded-xl flex items-center justify-between border transition-all duration-300 ${
-                item.done
-                  ? "border-brand-500/20 bg-brand-500/5 text-zinc-300"
-                  : "border-white/5 bg-white/2 text-zinc-400"
-              }`}
-            >
-              <span className="text-xs font-medium">{item.label}</span>
-              <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
-                  item.done ? "bg-brand-500 text-white" : "border border-zinc-600 bg-transparent"
-                }`}
-              >
-                {item.done && (
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                    <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="divide-y divide-white/5">
+          {(() => {
+            const nextStepIndex = missionItems.findIndex((item) => !item.done);
+            return missionItems.map((item, i) => {
+              const isNextStep = i === nextStepIndex;
+              return (
+                <div
+                  key={i}
+                  className={`py-3 flex items-center justify-between transition-all duration-300 ${
+                    item.done
+                      ? "text-zinc-500 opacity-55"
+                      : isNextStep
+                      ? "text-white relative"
+                      : "text-zinc-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-left">
+                    {isNextStep && (
+                      <span className="px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-wider bg-[#c87a53] text-[#0c0f0d] rounded font-mono animate-pulse">
+                        Next Step
+                      </span>
+                    )}
+                    <span className="text-xs font-semibold">{item.label}</span>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                      item.done ? "bg-[#8ba893] text-[#0c0f0d]" : "border border-zinc-600 bg-transparent"
+                    }`}
+                  >
+                    {item.done && (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
-      </GlassCard>
+      </div>
 
       {/* Today's Activity Logs */}
-      <GlassCard className="p-5 space-y-4 animate-in-delay-3">
-        <h3 className="text-sm font-bold text-white">Today's Logs</h3>
+      <div className="p-5 space-y-4 animate-in-delay-3 border border-white/5 bg-white/2 rounded-tl-3xl rounded-br-3xl text-left">
+        <h3 className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono">Today's Logs</h3>
         {todayEvents.length === 0 ? (
           <div className="text-center py-6 px-4 border border-dashed border-white/10 rounded-2xl">
-            <span className="text-2xl">⚡</span>
+            <Sparkles className="w-5 h-5 text-[#8ba893] mx-auto animate-pulse" />
             <h4 className="text-xs font-bold text-zinc-300 mt-2">No activity logged today</h4>
             <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed max-w-xs mx-auto">
-              Tap the green <strong>+</strong> button below to log your weight, sleep, or meals. Every entry helps calibrate your Adaptive TDEE!
+              Tap the floating action button below to quickly log your daily steps, sleep, water, weight, or meals.
             </p>
-            <div className="mt-4 flex flex-wrap gap-2 justify-center">
-              <button 
-                onClick={() => {
-                  setQuickLogOpen(true);
-                  setActiveForm("steps");
-                }}
-                className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-bold hover:bg-white/10 text-zinc-300 cursor-pointer"
-              >
-                👣 Log Steps
-              </button>
-              <button 
-                onClick={() => {
-                  setQuickLogOpen(true);
-                  setActiveForm("sleep");
-                }}
-                className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-bold hover:bg-white/10 text-zinc-300 cursor-pointer"
-              >
-                💤 Log Sleep
-              </button>
-              <button 
-                onClick={() => router.push("/meal")}
-                className="px-2.5 py-1.5 rounded-lg bg-brand-500/10 border border-brand-500/20 text-[9px] font-bold hover:bg-brand-500/20 text-brand-400 cursor-pointer"
-              >
-                📸 Scan Meal
-              </button>
-            </div>
           </div>
         ) : (
           <div className="space-y-2">
@@ -582,38 +682,48 @@ export default function Dashboard() {
             })}
           </div>
         )}
-      </GlassCard>
+      </div>
 
-      {/* Quick Action Drawer toggle */}
-      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40">
+      {/* Floating Action Button (FAB) for Unified Logging Drawer */}
+      <div className="fixed bottom-24 right-6 z-40">
         <button
           onClick={() => {
-            setQuickLogOpen(!quickLogOpen);
+            setQuickLogOpen(true);
             setActiveForm("none");
           }}
-          className="w-12 h-12 rounded-full flex items-center justify-center text-white glow-green hover:scale-105 active:scale-95 transition-all duration-300"
-          style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}
+          className="w-14 h-14 rounded-full flex items-center justify-center text-[#0c0f0d] hover:scale-105 active:scale-95 transition-all duration-300 shadow-xl border border-white/10"
+          style={{ 
+            background: "linear-gradient(135deg, #8ba893, #7aa085)",
+            boxShadow: "0 8px 30px rgba(139, 168, 147, 0.4)"
+          }}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
             fill="currentColor"
-            className={`w-6 h-6 transition-transform duration-300 ${quickLogOpen ? "rotate-45" : ""}`}
+            className="w-7 h-7"
           >
             <path fillRule="evenodd" d="M12 3.75a.75.75 0 01.75.75v6.75h6.75a.75.75 0 010 1.5h-6.75v6.75a.75.75 0 01-1.5 0v-6.75H4.5a.75.75 0 010-1.5h6.75V4.5a.75.75 0 01.75-.75z" clipRule="evenodd" />
           </svg>
         </button>
       </div>
 
-      {/* Quick Log Drawer */}
+      {/* Unified Bottom Drawer Modal */}
       {quickLogOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 flex items-end justify-center">
+        <div className="fixed inset-0 bg-[#0c0f0d]/70 backdrop-blur-md z-50 flex items-end justify-center animate-in">
           <div className="absolute inset-0" onClick={() => setQuickLogOpen(false)} />
-          <GlassCard className="w-full max-w-lg p-6 space-y-4 rounded-t-3xl border-t border-white/10 z-40 relative animate-in max-h-[90vh] overflow-y-auto">
+          
+          <GlassCard className="w-full max-w-lg p-6 space-y-5 rounded-t-3xl border-t border-white/10 z-50 relative max-h-[90vh] overflow-y-auto bg-[#0c0f0d] text-left">
+            {/* Drawer drag handle visual cue */}
+            <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto -mt-1 mb-2" />
+            
             <div className="flex justify-between items-center pb-2 border-b border-white/5">
-              <h3 className="text-base font-bold text-white">Log Health Event</h3>
-              <button onClick={() => setQuickLogOpen(false)} className="text-xs text-zinc-500 hover:text-zinc-300">
-                Cancel
+              <h3 className="text-sm font-bold text-white font-heading uppercase tracking-wider">Log Health Entry</h3>
+              <button 
+                onClick={() => setQuickLogOpen(false)} 
+                className="w-6 h-6 rounded-full bg-white/5 text-zinc-400 hover:text-white flex items-center justify-center font-bold text-xs cursor-pointer"
+              >
+                ×
               </button>
             </div>
 
@@ -623,7 +733,7 @@ export default function Dashboard() {
                 onClick={() => {
                   const name = todaysWorkout?.name || "Workout Session";
                   if (todaysWorkout?.name === "Rest Day") {
-                    alert("Today is a scheduled Rest Day! Rest, recover, and hydrate.");
+                    alert("Today is a scheduled Rest Day! Focus on recovery.");
                     return;
                   }
                   const vol = todaysWorkout
@@ -640,60 +750,61 @@ export default function Dashboard() {
 
                   handleQuickLog("workout", { name, volumeKg: Math.round(vol) });
                 }}
-                className="p-3 bg-white/4 border border-white/5 rounded-2xl flex flex-col items-center gap-1.5 hover:border-brand-500/30 transition-all text-xs"
+                className={`p-3 bg-white/3 border border-white/5 rounded-2xl flex flex-col items-center gap-1.5 hover:border-[#8ba893]/30 transition-all text-xs cursor-pointer`}
               >
-                <span className="text-lg">🏋️</span>
-                <span className="font-semibold text-white">Complete Workout</span>
-                <span className="text-[10px] text-zinc-500 truncate max-w-[120px]">{todaysWorkout?.name || "Gym Routine"}</span>
+                <Dumbbell className="w-5 h-5 text-[#c87a53]" />
+                <span className="font-bold text-white">Complete Workout</span>
+                <span className="text-[10px] text-zinc-500 truncate max-w-[125px]">{todaysWorkout?.name || "Workout"}</span>
               </button>
 
-              {/* Custom step log */}
+              {/* Scan Meal Route */}
+              <button
+                onClick={() => {
+                  setQuickLogOpen(false);
+                  router.push("/meal");
+                }}
+                className={`p-3 bg-white/3 border border-white/5 rounded-2xl flex flex-col items-center gap-1.5 hover:border-[#8ba893]/30 transition-all text-xs cursor-pointer`}
+              >
+                <Camera className="w-5 h-5 text-[#8ba893]" />
+                <span className="font-bold text-white">Scan Meal (AI)</span>
+                <span className="text-[10px] text-zinc-500">Vision Analysis</span>
+              </button>
+
+              {/* Log Steps */}
               <button
                 onClick={() => setActiveForm(activeForm === "steps" ? "none" : "steps")}
-                className={`p-3 border rounded-2xl flex flex-col items-center gap-1.5 transition-all text-xs ${
-                  activeForm === "steps" ? "border-brand-500 bg-brand-500/5" : "bg-white/4 border-white/5"
+                className={`p-3 border rounded-2xl flex flex-col items-center gap-1.5 transition-all text-xs cursor-pointer ${
+                  activeForm === "steps" ? "border-[#8ba893] bg-[#8ba893]/5" : "bg-white/3 border-white/5"
                 }`}
               >
-                <span className="text-lg">👟</span>
-                <span className="font-semibold text-white">Log Steps</span>
-                <span className="text-[10px] text-zinc-500">Custom count</span>
+                <Footprints className="w-5 h-5 text-[#c87a53]" />
+                <span className="font-bold text-white">Log Steps</span>
+                <span className="text-[10px] text-zinc-500">Add count</span>
               </button>
 
-              {/* Custom meal log */}
-              <button
-                onClick={() => setActiveForm(activeForm === "meal" ? "none" : "meal")}
-                className={`p-3 border rounded-2xl flex flex-col items-center gap-1.5 transition-all text-xs ${
-                  activeForm === "meal" ? "border-brand-500 bg-brand-500/5" : "bg-white/4 border-white/5"
-                }`}
-              >
-                <span className="text-lg">🍛</span>
-                <span className="font-semibold text-white">Log Custom Meal</span>
-                <span className="text-[10px] text-zinc-500">Add macros</span>
-              </button>
-
-              {/* Custom sleep log */}
+              {/* Log Sleep */}
               <button
                 onClick={() => setActiveForm(activeForm === "sleep" ? "none" : "sleep")}
-                className={`p-3 border rounded-2xl flex flex-col items-center gap-1.5 transition-all text-xs ${
-                  activeForm === "sleep" ? "border-brand-500 bg-brand-500/5" : "bg-white/4 border-white/5"
+                className={`p-3 border rounded-2xl flex flex-col items-center gap-1.5 transition-all text-xs cursor-pointer ${
+                  activeForm === "sleep" ? "border-[#8ba893] bg-[#8ba893]/5" : "bg-white/3 border-white/5"
                 }`}
               >
-                <span className="text-lg">😴</span>
-                <span className="font-semibold text-white">Log Sleep</span>
-                <span className="text-[10px] text-zinc-500">Custom hours</span>
+                <Moon className="w-5 h-5 text-[#8ba893]" />
+                <span className="font-bold text-white">Log Sleep</span>
+                <span className="text-[10px] text-zinc-500">Add hours</span>
               </button>
             </div>
 
             {/* Custom Steps Form */}
             {activeForm === "steps" && (
-              <div className="p-3 bg-white/2 border border-white/5 rounded-2xl flex gap-2 items-end animate-in">
+              <div className="p-3.5 bg-white/2 border border-white/5 rounded-2xl flex gap-2 items-end animate-in">
                 <div className="flex-1">
-                  <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
-                    Steps Walked
+                  <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block mb-1 font-mono">
+                    <Footprints className="w-3.5 h-3.5 text-zinc-600 mr-1 inline" /> Steps Walked
                   </label>
                   <input
                     type="number"
-                    placeholder={`Target: ${stepsTarget.toLocaleString()}`}
+                    placeholder={`Goal: ${stepsTarget.toLocaleString()}`}
                     value={stepsInput}
                     onChange={(e) => setStepsInput(e.target.value)}
                     className="input-glass text-xs h-10"
@@ -708,7 +819,7 @@ export default function Dashboard() {
                       setActiveForm("none");
                     }
                   }}
-                  className="btn-primary px-4 py-2.5 h-10 rounded-xl"
+                  className="btn-primary px-4 py-2.5 h-10 rounded-xl cursor-pointer"
                 >
                   Save
                 </button>
@@ -717,15 +828,15 @@ export default function Dashboard() {
 
             {/* Custom Sleep Form */}
             {activeForm === "sleep" && (
-              <div className="p-3 bg-white/2 border border-white/5 rounded-2xl flex gap-2 items-end animate-in">
+              <div className="p-3.5 bg-white/2 border border-white/5 rounded-2xl flex gap-2 items-end animate-in">
                 <div className="flex-1">
-                  <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
-                    Sleep Duration (Hours)
+                  <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block mb-1 font-mono">
+                    <Moon className="w-3.5 h-3.5 text-zinc-600 mr-1 inline" /> Sleep Duration (Hours)
                   </label>
                   <input
                     type="number"
                     step="0.1"
-                    placeholder={`Target: ${sleepTarget} hrs`}
+                    placeholder={`Goal: ${sleepTarget} hrs`}
                     value={sleepInput}
                     onChange={(e) => setSleepInput(e.target.value)}
                     className="input-glass text-xs h-10"
@@ -740,82 +851,18 @@ export default function Dashboard() {
                       setActiveForm("none");
                     }
                   }}
-                  className="btn-primary px-4 py-2.5 h-10 rounded-xl"
+                  className="btn-primary px-4 py-2.5 h-10 rounded-xl cursor-pointer"
                 >
                   Save
                 </button>
               </div>
             )}
 
-            {/* Custom Meal Form */}
-            {activeForm === "meal" && (
-              <div className="p-4 bg-white/2 border border-white/5 rounded-2xl space-y-3 animate-in">
-                <div>
-                  <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
-                    Meal Item Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Lunch Roti Paneer Curry"
-                    value={mealNameInput}
-                    onChange={(e) => setMealNameInput(e.target.value)}
-                    className="input-glass text-xs h-10"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
-                      Calories (kcal)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 600"
-                      value={mealCalInput}
-                      onChange={(e) => setMealCalInput(e.target.value)}
-                      className="input-glass text-xs h-10"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
-                      Protein (g)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 25"
-                      value={mealProtInput}
-                      onChange={(e) => setMealProtInput(e.target.value)}
-                      className="input-glass text-xs h-10"
-                    />
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    const name = mealNameInput.trim() || "Logged Meal";
-                    const calories = parseInt(mealCalInput) || 0;
-                    const protein = parseInt(mealProtInput) || 0;
-                    handleQuickLog("meal", {
-                      name,
-                      totalCalories: calories,
-                      totalProteinG: protein,
-                      foods: [{ name, portionSize: "medium" }],
-                    });
-                    setMealNameInput("");
-                    setMealCalInput("");
-                    setMealProtInput("");
-                    setActiveForm("none");
-                  }}
-                  className="btn-primary w-full py-2.5 rounded-xl text-xs font-bold"
-                >
-                  Save Meal
-                </button>
-              </div>
-            )}
-
-            {/* Quick manual weight */}
-            <div className="flex gap-2 items-end pt-2">
+            {/* Manual Weight Form */}
+            <div className="flex gap-2 items-end pt-2 border-t border-white/5">
               <div className="flex-1">
-                <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
-                  Log Current Weight
+                <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block mb-1 font-mono">
+                  <Scale className="w-3.5 h-3.5 text-zinc-600 mr-1 inline" /> Log Current Weight (kg)
                 </label>
                 <input
                   type="number"
@@ -827,30 +874,33 @@ export default function Dashboard() {
                 />
               </div>
               <button
-                onClick={() => weightInput && handleQuickLog("weight", { weightKg: parseFloat(weightInput) })}
-                className="btn-primary px-4 py-2.5 h-10 rounded-xl"
+                onClick={() => {
+                  if (weightInput) {
+                    handleQuickLog("weight", { weightKg: parseFloat(weightInput) });
+                    setWeightInput("");
+                  }
+                }}
+                className="btn-primary px-4 py-2.5 h-10 rounded-xl cursor-pointer"
               >
                 Log kg
               </button>
             </div>
 
-            {/* Quick manual water */}
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
-                  Log Water Intake
-                </label>
-                <div className="flex gap-2">
-                  {[0.25, 0.5, 1.0].map((liters) => (
-                    <button
-                      key={liters}
-                      onClick={() => handleQuickLog("water", { amountL: liters })}
-                      className="chip flex-1 text-center py-2 h-10 text-xs font-semibold"
-                    >
-                      +{liters}L
-                    </button>
-                  ))}
-                </div>
+            {/* Manual Water Form */}
+            <div className="space-y-1.5 text-left">
+              <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block font-mono">
+                <Droplet className="w-3.5 h-3.5 text-zinc-600 mr-1 inline" /> Quick Log Water
+              </label>
+              <div className="flex gap-2">
+                {[0.25, 0.5, 1.0].map((liters) => (
+                  <button
+                    key={liters}
+                    onClick={() => handleQuickLog("water", { amountL: liters })}
+                    className="chip flex-1 text-center py-2 h-10 text-xs font-semibold cursor-pointer"
+                  >
+                    +{liters}L
+                  </button>
+                ))}
               </div>
             </div>
           </GlassCard>
@@ -858,16 +908,17 @@ export default function Dashboard() {
       )}
       {/* TDEE Calibration Info Drawer Modal */}
       {showTdeeModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in">
-          <GlassCard className="p-6 max-w-sm w-full border border-white/10 relative overflow-hidden space-y-4">
+        <div className="fixed inset-0 bg-[#0c0f0d]/70 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in">
+          <GlassCard className="p-6 max-w-sm w-full border border-white/10 relative overflow-hidden flex flex-col max-h-[80vh] space-y-4">
             <button 
               onClick={() => setShowTdeeModal(false)}
-              className="absolute top-4 right-4 text-zinc-500 hover:text-white text-lg font-bold"
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white text-lg font-bold z-10"
             >
               ×
             </button>
             
-            <div className="space-y-1.5 text-center">
+            {/* Header */}
+            <div className="space-y-1.5 text-center flex-shrink-0">
               <div className="w-12 h-12 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mx-auto text-xl">
                 {tdeeMode === "adaptive" ? "⚡" : "🔋"}
               </div>
@@ -879,7 +930,8 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div className="space-y-2.5 pt-2 border-t border-white/5 text-xs text-zinc-300">
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto flex-1 pr-1 space-y-3 border-t border-white/5 pt-3 text-xs text-zinc-300">
               {tdeeMode === "adaptive" ? (
                 <>
                   <p className="leading-relaxed">
@@ -928,9 +980,10 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* Footer Action Button */}
             <button
               onClick={() => setShowTdeeModal(false)}
-              className="btn-primary w-full py-2.5 font-bold text-xs"
+              className="btn-primary w-full py-2.5 font-bold text-xs flex-shrink-0"
             >
               Understood
             </button>
@@ -940,17 +993,18 @@ export default function Dashboard() {
 
       {/* Target Explanation Guide Modal Overlay */}
       {showGuideModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in">
-          <GlassCard className="p-6 max-w-sm w-full border border-white/10 relative overflow-hidden space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-[#0c0f0d]/70 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in">
+          <GlassCard className="p-6 max-w-sm w-full border border-white/10 relative overflow-hidden flex flex-col max-h-[80vh] space-y-4">
             <button 
               onClick={() => setShowGuideModal(false)}
-              className="absolute top-4 right-4 text-zinc-500 hover:text-white text-lg font-bold"
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white text-lg font-bold z-10"
             >
               ×
             </button>
             
-            <div className="space-y-1.5 text-center">
-              <div className="w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mx-auto text-xl">
+            {/* Header */}
+            <div className="space-y-1.5 text-center flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mx-auto text-xl">
                 🎓
               </div>
               <h3 className="text-base font-bold text-white mt-2">
@@ -961,7 +1015,8 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div className="space-y-3.5 pt-2 border-t border-white/5 text-xs text-zinc-300">
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto flex-1 pr-1 space-y-3.5 border-t border-white/5 pt-3 text-xs text-zinc-300">
               <div className="space-y-1.5">
                 <h4 className="font-bold text-white text-[11px] uppercase tracking-wider text-cyan-400">1. What is Health OS?</h4>
                 <p className="leading-relaxed text-[11px]">
@@ -1035,9 +1090,10 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Footer Action Button */}
             <button
               onClick={() => setShowGuideModal(false)}
-              className="btn-primary w-full py-2.5 font-bold text-xs"
+              className="btn-primary w-full py-2.5 font-bold text-xs flex-shrink-0"
             >
               Start Tracking
             </button>

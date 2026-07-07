@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap");
 
 @tailwind base;
@@ -7,20 +7,20 @@
 
 @layer base {
   :root {
-    --background: #0a0a0f;
-    --foreground: #ededed;
-    --brand: #22c55e;
-    --brand-glow: rgba(34, 197, 94, 0.15);
-    --cyan: #06b6d4;
-    --purple: #8b5cf6;
-    --amber: #f59e0b;
-    --rose: #f43f5e;
-    --glass-bg: rgba(255, 255, 255, 0.04);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-border-hover: rgba(255, 255, 255, 0.15);
-    --text-primary: #ededed;
-    --text-secondary: #a1a1aa;
-    --text-muted: #52525b;
+    --background: #0c0f0d;
+    --foreground: #fcfaf7;
+    --brand: #8ba893;
+    --brand-glow: rgba(139, 168, 147, 0.12);
+    --cyan: #8ba893;
+    --purple: #c87a53;
+    --amber: #c87a53;
+    --rose: #e05a47;
+    --glass-bg: rgba(27, 34, 30, 0.45);
+    --glass-border: rgba(255, 255, 255, 0.05);
+    --glass-border-hover: rgba(139, 168, 147, 0.18);
+    --text-primary: #fcfaf7;
+    --text-secondary: #a9b2ab;
+    --text-muted: #5a645d;
   }
 
   * {
@@ -33,11 +33,14 @@
   }
 
   body {
-    @apply bg-surface-900 text-white font-sans selection:bg-brand-500/30;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Plus Jakarta Sans', sans-serif;
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 197, 94, 0.08), transparent),
-      radial-gradient(ellipse 60% 40% at 80% 50%, rgba(6, 182, 212, 0.04), transparent);
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(139, 168, 147, 0.1), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 50%, rgba(200, 122, 83, 0.04), transparent);
     min-height: 100dvh;
+    @apply selection:bg-[#8ba893]/30;
   }
 
   /* Custom scrollbar */
@@ -48,7 +51,7 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(139, 168, 147, 0.2);
     border-radius: 999px;
   }
 
@@ -63,6 +66,11 @@
 }
 
 @layer components {
+  /* ── Font Heading class ── */
+  .font-heading {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
   /* ── Glass Card ── */
   .glass-card {
     background: var(--glass-bg);
@@ -78,70 +86,70 @@
 
   /* ── Glass Card Elevated ── */
   .glass-card-elevated {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(27, 34, 30, 0.65);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 1.25rem;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   }
 
   /* ── Gradient Text ── */
   .gradient-text {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #22c55e, #06b6d4);
+    background-image: linear-gradient(135deg, #8ba893, #c87a53);
   }
 
   .gradient-text-warm {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #f59e0b, #f43f5e);
+    background-image: linear-gradient(135deg, #c87a53, #e05a47);
   }
 
   .gradient-text-purple {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #8b5cf6, #06b6d4);
+    background-image: linear-gradient(135deg, #8ba893, #c87a53);
   }
 
   /* ── Glow Effects ── */
   .glow-green {
-    box-shadow: 0 0 20px rgba(34, 197, 94, 0.15), 0 0 60px rgba(34, 197, 94, 0.05);
+    box-shadow: 0 0 20px rgba(139, 168, 147, 0.15), 0 0 60px rgba(139, 168, 147, 0.05);
   }
   .glow-cyan {
-    box-shadow: 0 0 20px rgba(6, 182, 212, 0.15), 0 0 60px rgba(6, 182, 212, 0.05);
+    box-shadow: 0 0 20px rgba(139, 168, 147, 0.15), 0 0 60px rgba(139, 168, 147, 0.05);
   }
   .glow-purple {
-    box-shadow: 0 0 20px rgba(139, 92, 246, 0.15), 0 0 60px rgba(139, 92, 246, 0.05);
+    box-shadow: 0 0 20px rgba(200, 122, 83, 0.15), 0 0 60px rgba(200, 122, 83, 0.05);
   }
 
   /* ── Status Badges ── */
   .badge-success {
     @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium;
-    background: rgba(34, 197, 94, 0.12);
-    color: #4ade80;
-    border: 1px solid rgba(34, 197, 94, 0.2);
+    background: rgba(139, 168, 147, 0.12);
+    color: #a8c3af;
+    border: 1px solid rgba(139, 168, 147, 0.2);
   }
   .badge-warning {
     @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium;
-    background: rgba(245, 158, 11, 0.12);
-    color: #fbbf24;
-    border: 1px solid rgba(245, 158, 11, 0.2);
+    background: rgba(200, 122, 83, 0.12);
+    color: #e29b74;
+    border: 1px solid rgba(200, 122, 83, 0.2);
   }
   .badge-info {
     @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium;
-    background: rgba(6, 182, 212, 0.12);
-    color: #22d3ee;
-    border: 1px solid rgba(6, 182, 212, 0.2);
+    background: rgba(139, 168, 147, 0.12);
+    color: #8ba893;
+    border: 1px solid rgba(139, 168, 147, 0.2);
   }
 
   /* ── Button Styles ── */
   .btn-primary {
-    @apply relative px-6 py-3 rounded-xl font-semibold text-sm text-white overflow-hidden;
-    background: linear-gradient(135deg, #22c55e, #16a34a);
+    @apply relative px-6 py-3 rounded-xl font-semibold text-sm text-[#0c0f0d] overflow-hidden;
+    background: linear-gradient(135deg, #8ba893, #7aa085);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .btn-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 8px 25px rgba(34, 197, 94, 0.3);
+    box-shadow: 0 8px 25px rgba(139, 168, 147, 0.25);
   }
   .btn-primary:active {
     transform: translateY(0);
@@ -164,8 +172,8 @@
     transition: all 0.2s ease;
   }
   .input-glass:focus {
-    border-color: rgba(34, 197, 94, 0.4);
-    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+    border-color: rgba(139, 168, 147, 0.4);
+    box-shadow: 0 0 0 3px rgba(139, 168, 147, 0.15);
   }
 
   /* ── Chip ── */
@@ -180,9 +188,9 @@
     color: var(--text-primary);
   }
   .chip-active {
-    background: rgba(34, 197, 94, 0.12) !important;
-    border-color: rgba(34, 197, 94, 0.3) !important;
-    color: #4ade80 !important;
+    background: rgba(139, 168, 147, 0.12) !important;
+    border-color: rgba(139, 168, 147, 0.3) !important;
+    color: #a8c3af !important;
   }
 
   /* ── Shimmer Loading ── */

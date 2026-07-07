@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import MealResultCard from "@/components/MealResultCard";
+import { Camera, Edit3, AlertTriangle, Play, CheckCircle } from "lucide-react";
 
 interface FoodItem {
   name: string;
@@ -316,19 +317,19 @@ export default function MealCapture() {
         <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 animate-in">
           <button
             onClick={() => setMode("photo")}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               mode === "photo" ? "bg-brand-500 text-white shadow-md" : "text-zinc-400 hover:text-white"
             }`}
           >
-            📸 AI Photo Capture
+            <Camera className="w-3.5 h-3.5" /> AI Photo Capture
           </button>
           <button
             onClick={() => setMode("manual")}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               mode === "manual" ? "bg-brand-500 text-white shadow-md" : "text-zinc-400 hover:text-white"
             }`}
           >
-            📝 Manual Meal Log
+            <Edit3 className="w-3.5 h-3.5" /> Manual Meal Log
           </button>
         </div>
       )}
@@ -493,7 +494,7 @@ export default function MealCapture() {
         <div className="space-y-5 animate-in">
           {isMock && (
             <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-center space-y-1">
-              <p className="text-xs font-bold text-yellow-400">⚠️ Demo Result — Not Your Actual Food</p>
+              <p className="text-xs font-bold text-yellow-400 flex items-center justify-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Demo Result — Not Your Actual Food</p>
               <p className="text-[10px] text-yellow-600 leading-snug">
                 Gemini API quota reached (20 req/day on free tier). Resets daily at midnight UTC, or enable billing at{" "}
                 <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline">console.cloud.google.com</a>

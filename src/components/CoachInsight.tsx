@@ -1,5 +1,7 @@
 "use client";
 
+import { CheckCircle2, ShieldAlert, Award, ArrowUpRight } from "lucide-react";
+
 interface CoachInsightProps {
   status: "on_track" | "needs_attention" | "great_job";
   greeting: string;
@@ -12,21 +14,18 @@ interface CoachInsightProps {
 const statusConfig = {
   on_track: {
     badge: "On Track",
-    badgeClass: "badge-info",
-    dot: "bg-cyan-400",
-    icon: "→",
+    color: "#8ba893",
+    Icon: CheckCircle2,
   },
   needs_attention: {
     badge: "Needs Attention",
-    badgeClass: "badge-warning",
-    dot: "bg-amber-400",
-    icon: "!",
+    color: "#c87a53",
+    Icon: ShieldAlert,
   },
   great_job: {
     badge: "Great Job",
-    badgeClass: "badge-success",
-    dot: "bg-brand-400",
-    icon: "★",
+    color: "#8ba893",
+    Icon: Award,
   },
 };
 
@@ -40,7 +39,7 @@ export default function CoachInsight({
 }: CoachInsightProps) {
   if (loading) {
     return (
-      <div className="glass-card p-5 space-y-3">
+      <div className="py-5 border-y border-white/5 space-y-3">
         <div className="shimmer h-4 w-24 rounded-full" />
         <div className="shimmer h-6 w-48 rounded-lg" />
         <div className="shimmer h-4 w-full rounded-lg" />
@@ -49,31 +48,45 @@ export default function CoachInsight({
     );
   }
 
-  const config = statusConfig[status];
+  const config = statusConfig[status] || statusConfig.on_track;
+  const Icon = config.Icon;
 
   return (
-    <div className="glass-card p-5 space-y-4 border border-white/10">
-      {/* Header */}
+    <div className="py-5 border-y border-white/5 space-y-4 animate-in">
+      {/* Header (Left Aligned, Editorial) */}
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <span className={config.badgeClass}>{config.badge}</span>
-          <h3 className="text-base font-semibold text-white mt-2">{greeting}</h3>
+        <div className="text-left">
+          <span 
+            className="text-[8px] font-extrabold uppercase tracking-widest font-mono px-2 py-0.5 rounded"
+            style={{ 
+              color: config.color,
+              background: `${config.color}08` 
+            }}
+          >
+            {config.badge}
+          </span>
+          <h3 className="text-sm font-extrabold text-white mt-2.5 font-heading leading-tight">{greeting}</h3>
         </div>
         <div
-          className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0`}
-          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+          className="w-9 h-9 rounded-tr-lg rounded-bl-lg flex items-center justify-center flex-shrink-0 border"
+          style={{ 
+            background: `${config.color}05`, 
+            borderColor: `${config.color}15` 
+          }}
         >
-          {config.icon}
+          <Icon className="w-4 h-4" style={{ color: config.color }} />
         </div>
       </div>
 
-      {/* Primary Insight */}
-      <p className="text-sm text-zinc-300 leading-relaxed border-l-2 border-brand-500/40 pl-3">
-        {primaryInsight}
-      </p>
+      {/* Primary Pull-Quote Insight */}
+      <div className="border-l-2 pl-3 py-0.5 text-left" style={{ borderColor: `${config.color}50` }}>
+        <p className="text-xs text-zinc-300 leading-relaxed font-medium italic">
+          &ldquo;{primaryInsight}&rdquo;
+        </p>
+      </div>
 
-      {/* Action Items */}
-      <div className="space-y-2">
+      {/* Action Items List */}
+      <div className="space-y-2.5 pt-1 text-left">
         {actionItems.map((item: any, i) => {
           let text = "";
           if (item && typeof item === "object") {
@@ -84,16 +97,18 @@ export default function CoachInsight({
             text = String(item);
           }
           return (
-            <div key={i} className="flex items-start gap-2.5">
-              <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${config.dot}`} />
-              <span className="text-xs text-zinc-400 leading-relaxed">{text}</span>
+            <div key={i} className="flex items-start gap-2 text-xs text-zinc-400">
+              <ArrowUpRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-zinc-600" />
+              <span className="leading-snug">{text}</span>
             </div>
           );
         })}
       </div>
 
       {/* Motivation */}
-      <p className="text-xs text-zinc-500 italic pt-1 border-t border-white/5">{motivation}</p>
+      <p className="text-[10px] text-zinc-600 font-mono tracking-wide text-left pt-1 border-t border-white/5 uppercase">
+        {motivation}
+      </p>
     </div>
   );
 }

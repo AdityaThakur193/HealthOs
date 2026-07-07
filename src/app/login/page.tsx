@@ -49,7 +49,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-dvh bg-[#0a0a0f] text-white p-4 relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center min-h-dvh bg-[#0c0f0d] text-white p-4 relative overflow-hidden">
       {/* Background glow animations */}
       <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-brand-500/10 blur-[100px] rounded-full -z-10 animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-cyan-500/10 blur-[100px] rounded-full -z-10 animate-pulse" />
