@@ -4,6 +4,8 @@ import { UserProfile, TimelineEvent } from "@/lib/db/models";
 import { getLocalProfile, saveLocalProfile, createLocalEvent, deleteLocalEvents, countLocalEvents, deleteLocalProfile } from "@/lib/db/fallback";
 import { calculateAdaptiveTdee } from "@/lib/tdee";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Helper to calculate TDEE, BMR, and targets (deterministic math).
  */

@@ -3,6 +3,8 @@ import connectDB from "@/lib/mongodb";
 import { TimelineEvent } from "@/lib/db/models";
 import { getLocalEvents, createLocalEvent, deleteLocalEventById } from "@/lib/db/fallback";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/timeline
  */

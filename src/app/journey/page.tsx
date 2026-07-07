@@ -38,7 +38,7 @@ export default function Journey() {
     async function loadJourneyData() {
       try {
         // 1. Fetch Profile
-        const profRes = await fetch(`/api/profile?email=${email}`);
+        const profRes = await fetch(`/api/profile?email=${email}&t=${Date.now()}`, { cache: "no-store" });
         if (!profRes.ok) {
           router.push("/onboarding");
           return;
@@ -47,7 +47,7 @@ export default function Journey() {
         setProfile(profData.profile);
 
         // 2. Fetch Timeline Events
-        const timelineRes = await fetch(`/api/timeline?userId=${userId}`);
+        const timelineRes = await fetch(`/api/timeline?userId=${userId}&t=${Date.now()}`, { cache: "no-store" });
         if (timelineRes.ok) {
           const timelineData = await timelineRes.json();
           const events = timelineData.events || [];
@@ -170,7 +170,7 @@ export default function Journey() {
       if (res.ok) {
         const userId = localStorage.getItem("healthos_userId");
         if (userId) {
-          const timelineRes = await fetch(`/api/timeline?userId=${userId}`);
+          const timelineRes = await fetch(`/api/timeline?userId=${userId}&t=${Date.now()}`, { cache: "no-store" });
           if (timelineRes.ok) {
             const data = await timelineRes.json();
             setAllEvents(data.events || []);

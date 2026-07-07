@@ -57,7 +57,7 @@ export default function Dashboard() {
   const fetchDashboardData = async (userId: string) => {
     try {
       // 1. Fetch Today's events
-      const todayRes = await fetch(`/api/timeline?userId=${userId}`);
+      const todayRes = await fetch(`/api/timeline?userId=${userId}&t=${Date.now()}`, { cache: "no-store" });
       if (todayRes.ok) {
         const data = await todayRes.json();
         const events = data.events || [];
@@ -170,7 +170,7 @@ export default function Dashboard() {
         return;
       }
 
-      const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}&t=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || `HTTP error ${res.status}`);

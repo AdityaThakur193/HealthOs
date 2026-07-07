@@ -3,6 +3,8 @@ import connectDB from "@/lib/mongodb";
 import { UserProfile, TimelineEvent } from "@/lib/db/models";
 import { getLocalProfileById, getLocalEvents } from "@/lib/db/fallback";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
