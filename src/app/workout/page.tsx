@@ -412,7 +412,7 @@ export default function WorkoutTracker() {
                         ? "text-brand-400 font-bold" 
                         : "text-zinc-600 font-normal"
                     }`}>
-                      {scheduled ? scheduled.name.replace(" Day", "").replace(" A", "").replace(" B", "") : "Rest"}
+                      {scheduled ? (scheduled.name.includes(" — ") ? scheduled.name.split(" — ")[1] : scheduled.name).replace(" Day", "").replace(" A", "").replace(" B", "") : "Rest"}
                     </span>
                     {isToday && (
                       <span className="absolute -top-1 -right-1 flex h-2 w-2">

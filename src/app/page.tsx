@@ -285,7 +285,7 @@ export default function Dashboard() {
   let workoutLabel = todaysWorkout
     ? todaysWorkout.name === "Rest Day"
       ? "Recovery & Mobility (Rest Day)"
-      : `Complete ${todaysWorkout.name}`
+      : `Complete ${todaysWorkout.name.includes(" — ") ? todaysWorkout.name.split(" — ")[1] : todaysWorkout.name}`
     : "Hit Gym (Workout)";
 
   if (activeEvent) {
