@@ -34,7 +34,7 @@ export function getNotificationPermission(): NotificationPermission {
   return Notification.permission;
 }
 
-export async function sendLocalTestNotification(title: string, body: string, url: string = "/") {
+export async function sendLocalTestNotification(title: string, body: string, url: string = "/", image?: string) {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     return;
   }
@@ -44,12 +44,12 @@ export async function sendLocalTestNotification(title: string, body: string, url
     // Post message to service worker to trigger the notification block
     registration.active.postMessage({
       type: "SHOW_NOTIFICATION",
-      payload: { title, body, url },
+      payload: { title, body, url, image },
     });
   } else {
     // Fallback: Browser notification directly if active service worker isn't loaded yet
     if (Notification.permission === "granted") {
-      new Notification(title, { body });
+      new Notification(title, { body, icon: "/logo.svg" });
     }
   }
 }

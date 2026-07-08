@@ -58,9 +58,35 @@ export default function ProfilePage() {
   };
 
   const handleSendTestNotification = async () => {
+    const userName = profile?.name || "Aditya";
+    
+    // Zomato/Swiggy-style creative notification copy templates
+    const notifications = [
+      {
+        title: `${userName}, your dumbbells are getting lonely... 🥺🏋️‍♂️`,
+        body: "Your gym split is scheduled for today. Don't leave your muscles waiting — hit the gym and crush those targets!",
+        image: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=600&auto=format&fit=crop"
+      },
+      {
+        title: `Did you log that meal, ${userName}? 📸🥣`,
+        body: "Protein check! Missing tracking meals can throw off your macros. Take a quick photo or manually enter it now.",
+        image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=600&auto=format&fit=crop"
+      },
+      {
+        title: `Aditya, is that your stomach rumbling? 🚨`,
+        body: "Time for your post-workout protein window. Check out what is served at your hostel mess menu today!",
+        image: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=600&auto=format&fit=crop"
+      }
+    ];
+
+    // Pick one at random for a fun, personalized experience!
+    const choice = notifications[Math.floor(Math.random() * notifications.length)];
+
     await sendLocalTestNotification(
-      "Health OS Reminder ⚡",
-      "This is what your daily push reminder looks like! Time to hit the gym for your scheduled workout."
+      choice.title,
+      choice.body,
+      "/",
+      choice.image
     );
   };
 

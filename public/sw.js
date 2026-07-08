@@ -8,14 +8,30 @@ self.addEventListener("push", (event) => {
     }
   }
 
+  // Choose a rich motivational/nutritional banner image dynamically if none provided
+  const bannerImage = data.image || "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=600&auto=format&fit=crop";
+
   const options = {
     body: data.body,
-    icon: "/file.svg", // Default icon
-    badge: "/file.svg",
-    vibrate: [100, 50, 100],
+    icon: "/logo.svg", // Premium Logo icon
+    badge: "/logo.svg", // Premium status bar badge icon
+    image: bannerImage, // Large rich content banner image
+    vibrate: [200, 100, 200],
+    tag: data.tag || "healthos-reminder",
+    renotify: true,
     data: {
       url: data.url || "/",
     },
+    actions: [
+      {
+        action: "workout",
+        title: "Log Workout 🏋️‍♂️",
+      },
+      {
+        action: "meal",
+        title: "Track Meal 📸",
+      }
+    ],
   };
 
   event.waitUntil(self.registration.showNotification(data.title, options));
@@ -23,18 +39,26 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const urlToOpen = event.notification.data?.url || "/";
+  
+  let urlToOpen = event.notification.data?.url || "/";
+
+  // Handle action buttons
+  if (event.action === "workout") {
+    urlToOpen = "/workout";
+  } else if (event.action === "meal") {
+    urlToOpen = "/meal";
+  }
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-      // If a tab is already open, focus it
+      // If a tab is already open on this path, focus it
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
         if (client.url === urlToOpen && "focus" in client) {
           return client.focus();
         }
       }
-      // If no tab is open, open a new one
+      // If no tab is open on this path, open a new one
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }
@@ -45,13 +69,28 @@ self.addEventListener("notificationclick", (event) => {
 // Support direct messages to trigger local mock push notifications
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SHOW_NOTIFICATION") {
-    const { title, body, url } = event.data.payload;
+    const { title, body, url, image } = event.data.payload;
+    const bannerImage = image || "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=600&auto=format&fit=crop";
+    
     self.registration.showNotification(title, {
       body,
-      icon: "/file.svg",
-      badge: "/file.svg",
-      vibrate: [200, 100, 200],
+      icon: "/logo.svg",
+      badge: "/logo.svg",
+      image: bannerImage,
+      vibrate: [250, 100, 250],
+      tag: "healthos-reminder",
+      renotify: true,
       data: { url: url || "/" },
+      actions: [
+        {
+          action: "workout",
+          title: "Log Workout 🏋️‍♂️",
+        },
+        {
+          action: "meal",
+          title: "Track Meal 📸",
+        }
+      ],
     });
   }
 });
