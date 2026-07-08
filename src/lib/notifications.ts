@@ -49,7 +49,7 @@ export async function sendLocalTestNotification(title: string, body: string, url
   } else {
     // Fallback: Browser notification directly if active service worker isn't loaded yet
     if (Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/logo-192.png" });
+      new Notification(title, { body, icon: "/logo-notification.png" });
     }
   }
 }
