@@ -446,7 +446,7 @@ export default function WorkoutTracker() {
 
       {/* Weekly Program Split HUD */}
       {profile && (() => {
-        const frequency = profile.gymFrequency || 4;
+        const frequency = profile.gymFrequency ?? 4;
         const schedule = getWeekSchedule(frequency);
         const daysOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
         const currentDay = new Date().getDay();

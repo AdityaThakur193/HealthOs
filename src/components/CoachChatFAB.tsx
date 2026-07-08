@@ -274,7 +274,7 @@ export default function CoachChatFAB() {
 
       {/* Chat Drawer Side Panel */}
       {isOpen && (
-        <div className="fixed bottom-[82px] right-3 left-3 md:left-auto md:right-6 md:bottom-24 z-50 w-auto md:w-[385px] h-[480px] md:h-[520px] bg-[#0c0f0d]/95 border border-white/10 rounded-2xl backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden animate-in">
+        <div className="fixed bottom-[82px] right-3 left-3 md:left-auto md:right-6 md:bottom-24 z-50 w-auto md:w-[385px] bg-[#0c0f0d]/95 border border-white/10 rounded-2xl backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden animate-in" style={{ maxHeight: 'min(480px, calc(100dvh - 160px))' }}>
           {/* Header */}
           <div className="p-4 bg-white/3 border-b border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -302,7 +302,7 @@ export default function CoachChatFAB() {
           </div>
 
           {/* Messages Log */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-4 scrollbar-thin bg-gradient-to-b from-transparent to-white/1">
+          <div className="flex-1 min-h-0 p-4 overflow-y-auto space-y-4 scrollbar-thin bg-gradient-to-b from-transparent to-white/1">
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -362,7 +362,7 @@ export default function CoachChatFAB() {
           )}
 
           {/* Chat Input form */}
-          <form onSubmit={handleSend} className="p-3 bg-white/2 border-t border-white/5 flex gap-2">
+          <form onSubmit={handleSend} className="flex-shrink-0 p-3 bg-white/2 border-t border-white/5 flex gap-2">
             <input
               type="text"
               value={inputValue}
