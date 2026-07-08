@@ -11,8 +11,8 @@ import {
 export default function ProfilePage() {
   const router = useRouter();
   
-  // Tab control: 'specs' | 'calendar' | 'mess'
-  const [activeTab, setActiveTab] = useState<"specs" | "calendar" | "mess">("specs");
+  // Tab control: 'specs' | 'calendar' | 'mess' | 'diet'
+  const [activeTab, setActiveTab] = useState<"specs" | "calendar" | "mess" | "diet">("specs");
 
   // Profile data state
   const [profile, setProfile] = useState<any>(null);
@@ -46,6 +46,11 @@ export default function ProfilePage() {
   const [savingMenu, setSavingMenu] = useState(false);
   const [menuActiveDay, setMenuActiveDay] = useState<string>("monday");
   const [showSuccessMenu, setShowSuccessMenu] = useState(false);
+
+  // Diet Plan States
+  const [dietPlan, setDietPlan] = useState<any>(null);
+  const [generatingDiet, setGeneratingDiet] = useState(false);
+  const [dietActiveDay, setDietActiveDay] = useState<string>("monday");
 
   // Calendar Event Manager States
   const [events, setEvents] = useState<any[]>([]);
@@ -83,6 +88,9 @@ export default function ProfilePage() {
         if (prof.messMenu) {
           setRawMenuInput(prof.messMenu.rawText || "");
           setParsedMenu(prof.messMenu.parsedMenu || null);
+        }
+        if (prof.dietPlan) {
+          setDietPlan(prof.dietPlan.generatedPlan || null);
         }
         
         // Initialize specs form
@@ -372,6 +380,38 @@ export default function ProfilePage() {
     }
   };
 
+  const handleGenerateDietPlan = async () => {
+    const email = localStorage.getItem("healthos_email");
+    if (!email) return;
+
+    setGeneratingDiet(true);
+    try {
+      const res = await fetch("/api/diet/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.dietPlan) {
+          setDietPlan(data.dietPlan);
+          alert("AI custom diet plan generated successfully!");
+        } else {
+          alert("Could not generate diet plan. Please check if your mess menu is uploaded.");
+        }
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Failed to generate diet plan.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error generating diet plan.");
+    } finally {
+      setGeneratingDiet(false);
+    }
+  };
+
   const getEventBadge = (startStr: string, endStr: string) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -449,13 +489,27 @@ export default function ProfilePage() {
         >
           <Soup className="w-3.5 h-3.5" /> Mess Menu
         </button>
+        <button
+          onClick={() => setActiveTab("diet")}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeTab === "diet" ? "bg-[#8ba893] text-[#0c0f0d] shadow-md" : "text-zinc-400 hover:text-white"
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5" /> AI Diet
+        </button>
       </div>
 
       {/* Single Question Indicator */}
       <div className="bg-[#8ba893]/5 border border-[#8ba893]/10 rounded-2xl p-4 animate-in-delay-1 text-center">
         <span className="text-[9px] font-extrabold uppercase tracking-widest text-[#8ba893] block mb-1">Single Core Question</span>
         <h2 className="text-sm font-semibold text-white">
-          {activeTab === "specs" ? '"Who am I today?"' : activeTab === "calendar" ? '"What events affect my plan?"' : '"What is the mess serving today?"'}
+          {activeTab === "specs" 
+            ? '"Who am I today?"' 
+            : activeTab === "calendar" 
+              ? '"What events affect my plan?"' 
+              : activeTab === "mess" 
+                ? '"What is the mess serving today?"' 
+                : '"What, when, and how should I eat?"'}
         </h2>
       </div>
 
@@ -959,6 +1013,150 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </GlassCard>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 4: AI Custom Diet Planner */}
+      {activeTab === "diet" && (
+        <div className="space-y-5 animate-in-delay-1">
+          {!parsedMenu ? (
+            <GlassCard className="p-6 text-center space-y-4 border border-red-500/10 bg-red-950/5">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-white">Hostel Mess Menu Required</h3>
+                <p className="text-xs text-zinc-500 leading-relaxed max-w-sm mx-auto">
+                  Before we can construct your custom diet plan, we need your hostel's mess menu. Please go to the **Mess Menu** tab first to paste or upload it.
+                </p>
+              </div>
+            </GlassCard>
+          ) : (
+            <div className="space-y-5">
+              {/* Generator Card */}
+              <GlassCard className="p-5 space-y-4 border border-white/10 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#8ba893]/5 blur-[50px] rounded-full -z-10" />
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center justify-between">
+                  <span>Custom AI Diet Configurator</span>
+                  <span className="text-[9px] text-[#c87a53] font-mono">Pillar 2 & 4</span>
+                </h3>
+
+                <div className="text-zinc-400 text-xs leading-relaxed space-y-2 bg-white/2 p-3.5 rounded-xl border border-white/5">
+                  <p className="font-semibold text-white flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-[#8ba893]" /> Sports-Science Diet Calibration
+                  </p>
+                  <p className="text-[10px] text-zinc-500 leading-normal">
+                    This engine designs a tailored diet chart combining your biometric stats, target macros, and college schedule with what is actually served in your hostel.
+                  </p>
+                  <ul className="text-[9px] text-zinc-500 list-disc pl-4 space-y-0.5">
+                    <li>Protein spaced into 4-5 meals (~{Math.round((profile?.targetProteinG || 150) / 4.5)}g per sitting) to optimize protein synthesis.</li>
+                    <li>Complex carbohydrates positioned pre-workout to maximize muscle glycogen.</li>
+                    <li>Low-fat windows around training to accelerate digestion and performance.</li>
+                  </ul>
+                </div>
+
+                <button
+                  onClick={handleGenerateDietPlan}
+                  disabled={generatingDiet}
+                  className="w-full py-3 rounded-xl bg-[#8ba893] hover:bg-[#8ba893]/90 text-[#0c0f0d] text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {generatingDiet ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Generating Diet Chart...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" /> {dietPlan ? "Regenerate AI Diet Plan" : "Generate Custom AI Diet Plan"}
+                    </>
+                  )}
+                </button>
+              </GlassCard>
+
+              {/* Diet Plan Timeline */}
+              {dietPlan && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#8ba893]" /> Your Weekly Diet Schedule
+                    </h3>
+                  </div>
+
+                  {/* Day tabs */}
+                  <div className="flex gap-1 overflow-x-auto pb-1.5 scrollbar-thin">
+                    {Object.keys(dietPlan).map((day) => (
+                      <button
+                        key={day}
+                        onClick={() => setDietActiveDay(day)}
+                        className={`px-3.5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider flex-shrink-0 cursor-pointer transition-all ${
+                          dietActiveDay === day
+                            ? "bg-[#8ba893] text-[#0c0f0d] shadow-sm"
+                            : "bg-white/5 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        {day.substring(0, 3)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Meals list */}
+                  <div className="space-y-3">
+                    {(!dietPlan[dietActiveDay] || !dietPlan[dietActiveDay].meals || dietPlan[dietActiveDay].meals.length === 0) ? (
+                      <p className="text-xs text-zinc-500 italic text-center py-4 bg-white/2 border border-white/5 rounded-2xl">
+                        No meals configured for this day. Regenerate to populate.
+                      </p>
+                    ) : (
+                      dietPlan[dietActiveDay].meals.map((meal: any, idx: number) => (
+                        <GlassCard key={idx} className="p-4 border border-white/5 bg-white/1 relative overflow-hidden flex flex-col gap-2.5">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-[#c87a53]/2 blur-[30px] rounded-full -z-10" />
+                          
+                          {/* Meal Header */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#c87a53] px-2 py-0.5 rounded bg-[#c87a53]/10 border border-[#c87a53]/20">
+                                {meal.name}
+                              </span>
+                              <span className="text-[10px] text-zinc-400 font-bold font-mono flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5 text-zinc-500" /> {meal.time}
+                              </span>
+                            </div>
+                            
+                            {/* Macros Badge */}
+                            <div className="flex items-center gap-2 text-[10px] font-bold font-mono">
+                              <span className="text-[#8ba893]">{meal.proteinG}g P</span>
+                              <span className="text-zinc-500">•</span>
+                              <span className="text-zinc-300">{meal.calories} kcal</span>
+                            </div>
+                          </div>
+
+                          {/* Meal Choices */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                            {/* Mess Items Choice */}
+                            <div className="p-2.5 bg-zinc-950/40 rounded-xl border border-white/5">
+                              <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block mb-0.5">🥣 From Hostel Mess</span>
+                              <p className="text-xs text-white leading-relaxed">{meal.messItems || "No mess options suggested"}</p>
+                            </div>
+
+                            {/* Required Additions */}
+                            <div className="p-2.5 bg-[#8ba893]/5 rounded-xl border border-[#8ba893]/15">
+                              <span className="text-[8px] font-bold text-[#8ba893] uppercase tracking-widest block mb-0.5">➕ Custom Additions / Supplements</span>
+                              <p className="text-xs text-[#8ba893] font-semibold leading-relaxed">{meal.additions || "No additions needed"}</p>
+                            </div>
+                          </div>
+
+                          {/* Coach Timing Reason */}
+                          {meal.timingReason && (
+                            <div className="text-[10px] text-zinc-400 bg-white/2 p-2.5 rounded-lg border-l border-[#c87a53]/60 italic leading-relaxed">
+                              &ldquo;{meal.timingReason}&rdquo;
+                            </div>
+                          )}
+                        </GlassCard>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

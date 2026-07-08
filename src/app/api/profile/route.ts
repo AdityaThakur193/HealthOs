@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
     gymExperience,
   });
 
-  const profileData = {
+  const profileData: any = {
     name,
     email,
     age: parseInt(age),
@@ -314,9 +314,15 @@ export async function POST(request: NextRequest) {
     customCalories: customCalories ? parseInt(customCalories) : undefined,
     customProtein: customProtein ? parseInt(customProtein) : undefined,
     useCustomMacros: useCustomMacros || false,
-    messMenu: body.messMenu || undefined,
     ...targets,
   };
+
+  if (body.messMenu !== undefined) {
+    profileData.messMenu = body.messMenu;
+  }
+  if (body.dietPlan !== undefined) {
+    profileData.dietPlan = body.dietPlan;
+  }
 
   let savedProfile: any = null;
   let isNewProfile = false;

@@ -59,6 +59,18 @@ export interface IUserProfile extends Document {
     };
     updatedAt?: string;
   };
+  dietPlan?: {
+    generatedPlan?: {
+      monday?: { meals: Array<{ time: string; name: string; messItems: string; additions: string; proteinG: number; calories: number; timingReason: string }> };
+      tuesday?: { meals: Array<{ time: string; name: string; messItems: string; additions: string; proteinG: number; calories: number; timingReason: string }> };
+      wednesday?: { meals: Array<{ time: string; name: string; messItems: string; additions: string; proteinG: number; calories: number; timingReason: string }> };
+      thursday?: { meals: Array<{ time: string; name: string; messItems: string; additions: string; proteinG: number; calories: number; timingReason: string }> };
+      friday?: { meals: Array<{ time: string; name: string; messItems: string; additions: string; proteinG: number; calories: number; timingReason: string }> };
+      saturday?: { meals: Array<{ time: string; name: string; messItems: string; additions: string; proteinG: number; calories: number; timingReason: string }> };
+      sunday?: { meals: Array<{ time: string; name: string; messItems: string; additions: string; proteinG: number; calories: number; timingReason: string }> };
+    };
+    generatedAt?: string;
+  };
 
   createdAt: Date;
   updatedAt: Date;
@@ -139,6 +151,18 @@ const UserProfileSchema = new Schema<IUserProfile>(
         sunday: { breakfast: String, lunch: String, snacks: String, dinner: String },
       },
       updatedAt: String,
+    },
+    dietPlan: {
+      generatedPlan: {
+        monday: Schema.Types.Mixed,
+        tuesday: Schema.Types.Mixed,
+        wednesday: Schema.Types.Mixed,
+        thursday: Schema.Types.Mixed,
+        friday: Schema.Types.Mixed,
+        saturday: Schema.Types.Mixed,
+        sunday: Schema.Types.Mixed,
+      },
+      generatedAt: String,
     },
   },
   { timestamps: true }
