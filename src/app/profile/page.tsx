@@ -13,6 +13,7 @@ import {
   getNotificationPermission, 
   sendLocalTestNotification 
 } from "@/lib/notifications";
+import CustomPopup from "@/components/CustomPopup";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -61,6 +62,63 @@ export default function ProfilePage() {
       "Health OS Reminder ⚡",
       "This is what your daily push reminder looks like! Time to hit the gym for your scheduled workout."
     );
+  };
+
+  // Custom Popup Alert/Confirm States
+  const [popupState, setPopupState] = useState<{
+    isOpen: boolean;
+    type: "alert" | "confirm" | "error" | "success" | "warning";
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }>({
+    isOpen: false,
+    type: "alert",
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const showCustomAlert = (title: string, message: string, type: "alert" | "error" | "success" | "warning" = "alert") => {
+    return new Promise<void>((resolve) => {
+      setPopupState({
+        isOpen: true,
+        type,
+        title,
+        message,
+        confirmText: "OK",
+        onConfirm: () => {
+          setPopupState((prev) => ({ ...prev, isOpen: false }));
+          resolve();
+        },
+      });
+    });
+  };
+
+  const showCustomConfirm = (title: string, message: string, isDestructive = false) => {
+    return new Promise<boolean>((resolve) => {
+      setPopupState({
+        isOpen: true,
+        type: "confirm",
+        title,
+        message,
+        confirmText: isDestructive ? "Delete" : "Confirm",
+        cancelText: "Cancel",
+        isDestructive,
+        onConfirm: () => {
+          setPopupState((prev) => ({ ...prev, isOpen: false }));
+          resolve(true);
+        },
+        onCancel: () => {
+          setPopupState((prev) => ({ ...prev, isOpen: false }));
+          resolve(false);
+        },
+      });
+    });
   };
 
   const [neckCm, setNeckCm] = useState("");
@@ -291,14 +349,14 @@ export default function ProfilePage() {
         if (data.parsedMenu) {
           setParsedMenu(data.parsedMenu);
         } else {
-          alert("Could not extract menu. Please make sure the text contains days and meals.");
+          showCustomAlert("Extraction Failed", "Could not extract menu. Please make sure the text contains days and meals.", "warning");
         }
       } else {
-        alert("Failed to parse menu. Please verify server connection.");
+        showCustomAlert("Parse Failed", "Failed to parse menu. Please verify server connection.", "error");
       }
     } catch (err) {
       console.error(err);
-      alert("Error parsing mess menu.");
+      showCustomAlert("Connection Error", "Error parsing mess menu.", "error");
     } finally {
       setParsingMenu(false);
     }
@@ -328,14 +386,14 @@ export default function ProfilePage() {
             setParsedMenu(data.parsedMenu);
             setRawMenuInput("");
           } else {
-            alert("Could not extract menu. Try copy-pasting the text menu instead.");
+            showCustomAlert("Extraction Failed", "Could not extract menu. Try copy-pasting the text menu instead.", "warning");
           }
         } else {
-          alert("Failed to parse menu image. Try copy-pasting the text menu.");
+          showCustomAlert("Parse Failed", "Failed to parse menu image. Try copy-pasting the text menu.", "error");
         }
       } catch (err) {
         console.error(err);
-        alert("Error parsing menu image.");
+        showCustomAlert("Connection Error", "Error parsing menu image.", "error");
       } finally {
         setParsingMenu(false);
       }
@@ -403,11 +461,11 @@ export default function ProfilePage() {
         setShowSuccessMenu(true);
         setTimeout(() => setShowSuccessMenu(false), 2000);
       } else {
-        alert("Failed to save mess menu.");
+        showCustomAlert("Save Failed", "Failed to save mess menu.", "error");
       }
     } catch (err) {
       console.error(err);
-      alert("Error saving mess menu.");
+      showCustomAlert("Connection Error", "Error saving mess menu.", "error");
     } finally {
       setSavingMenu(false);
     }
@@ -436,17 +494,17 @@ export default function ProfilePage() {
         const data = await res.json();
         if (data.dietPlan) {
           setDietPlan(data.dietPlan);
-          alert("AI custom diet plan generated successfully!");
+          showCustomAlert("Success! 🎉", "AI custom diet plan generated successfully!", "success");
         } else {
-          alert("Could not generate diet plan. Please check if your mess menu is uploaded.");
+          showCustomAlert("Configuration Needed", "Could not generate diet plan. Please check if your mess menu is uploaded.", "warning");
         }
       } else {
         const errData = await res.json();
-        alert(errData.error || "Failed to generate diet plan.");
+        showCustomAlert("Generation Failed", errData.error || "Failed to generate diet plan.", "error");
       }
     } catch (err) {
       console.error(err);
-      alert("Error generating diet plan.");
+      showCustomAlert("Connection Error", "Error generating diet plan.", "error");
     } finally {
       setGeneratingDiet(false);
     }
@@ -1327,6 +1385,18 @@ export default function ProfilePage() {
           )}
         </div>
       )}
+      {/* Premium Alert/Confirm Toast Popup */}
+      <CustomPopup
+        isOpen={popupState.isOpen}
+        type={popupState.type}
+        title={popupState.title}
+        message={popupState.message}
+        confirmText={popupState.confirmText}
+        cancelText={popupState.cancelText}
+        isDestructive={popupState.isDestructive}
+        onConfirm={popupState.onConfirm}
+        onCancel={popupState.onCancel}
+      />
     </div>
   );
 }
