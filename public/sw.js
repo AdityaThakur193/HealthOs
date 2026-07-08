@@ -13,8 +13,8 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: data.body,
-    icon: "/logo.png", // Raster icon (compatible with Android/Chrome)
-    badge: "/logo.png", // Raster badge icon
+    icon: "/logo-192.png", // Raster icon (optimized 192x192)
+    badge: "/logo-96.png", // Tiny badge for status bar (optimized 96x96)
     image: bannerImage, // Large rich content banner image
     color: "#8ba893", // App color scheme theme accent
     vibrate: [200, 100, 200],
@@ -75,8 +75,8 @@ self.addEventListener("message", (event) => {
     
     self.registration.showNotification(title, {
       body,
-      icon: "/logo.png",
-      badge: "/logo.png",
+      icon: "/logo-192.png",
+      badge: "/logo-96.png",
       image: bannerImage,
       color: "#8ba893",
       vibrate: [250, 100, 250],
