@@ -6,6 +6,7 @@ import GlassCard from "@/components/GlassCard";
 import ProgressRing from "@/components/ProgressRing";
 import MacroBar from "@/components/MacroBar";
 import CoachInsight from "@/components/CoachInsight";
+import CustomPopup from "@/components/CustomPopup";
 import { getTodaysWorkout } from "@/lib/workoutPlans";
 import { Flame, Dumbbell, Droplet, Footprints, Moon, Sparkles, Scale, GraduationCap, Compass, Calendar, Zap, Activity, Camera, Beef } from "lucide-react";
 
@@ -42,6 +43,63 @@ export default function Dashboard() {
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [streak, setStreak] = useState(0);
   const [todayEvents, setTodayEvents] = useState<any[]>([]);
+
+  // Custom Popup Alert/Confirm States
+  const [popupState, setPopupState] = useState<{
+    isOpen: boolean;
+    type: "alert" | "confirm" | "error" | "success" | "warning";
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }>({
+    isOpen: false,
+    type: "alert",
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const showCustomAlert = (title: string, message: string, type: "alert" | "error" | "success" | "warning" = "alert") => {
+    return new Promise<void>((resolve) => {
+      setPopupState({
+        isOpen: true,
+        type,
+        title,
+        message,
+        confirmText: "OK",
+        onConfirm: () => {
+          setPopupState((prev) => ({ ...prev, isOpen: false }));
+          resolve();
+        },
+      });
+    });
+  };
+
+  const showCustomConfirm = (title: string, message: string, isDestructive = false) => {
+    return new Promise<boolean>((resolve) => {
+      setPopupState({
+        isOpen: true,
+        type: "confirm",
+        title,
+        message,
+        confirmText: isDestructive ? "Delete" : "Confirm",
+        cancelText: "Cancel",
+        isDestructive,
+        onConfirm: () => {
+          setPopupState((prev) => ({ ...prev, isOpen: false }));
+          resolve(true);
+        },
+        onCancel: () => {
+          setPopupState((prev) => ({ ...prev, isOpen: false }));
+          resolve(false);
+        },
+      });
+    });
+  };
 
   // Log editing states
   const [editingEvent, setEditingEvent] = useState<any>(null);
@@ -114,11 +172,11 @@ export default function Dashboard() {
         }
         window.dispatchEvent(new Event("profileUpdated"));
       } else {
-        alert("Failed to update log.");
+        showCustomAlert("Update Failed", "We could not save the changes to this log entry. Please try again.", "error");
       }
     } catch (err) {
       console.error(err);
-      alert("Error saving log updates.");
+      showCustomAlert("Connection Error", "An error occurred while saving your log updates.", "error");
     }
   };
 
@@ -218,7 +276,8 @@ export default function Dashboard() {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm("Are you sure you want to delete this log?")) return;
+    const confirmed = await showCustomConfirm("Delete Entry", "Are you sure you want to permanently delete this timeline entry?", true);
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/timeline?eventId=${eventId}`, {
         method: "DELETE",
@@ -229,11 +288,11 @@ export default function Dashboard() {
           await initDashboard();
         }
       } else {
-        alert("Failed to delete log. Please try again.");
+        showCustomAlert("Deletion Failed", "We could not delete the log entry. Please try again.", "error");
       }
     } catch (err) {
       console.error("Delete event error:", err);
-      alert("Error deleting log.");
+      showCustomAlert("Connection Error", "An error occurred while deleting the log entry.", "error");
     }
   };
 
@@ -816,7 +875,7 @@ export default function Dashboard() {
                 onClick={() => {
                   const name = todaysWorkout?.name || "Workout Session";
                   if (todaysWorkout?.name === "Rest Day") {
-                    alert("Today is a scheduled Rest Day! Focus on recovery.");
+                    showCustomAlert("Rest Day Scheduled", "Today is a scheduled Rest Day! Focus on recovery, light mobility, and hydration.", "alert");
                     return;
                   }
                   const vol = todaysWorkout
@@ -1304,8 +1363,9 @@ export default function Dashboard() {
               
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
-                    if (confirm("Are you sure you want to delete this log?")) {
+                  onClick={async () => {
+                    const confirmed = await showCustomConfirm("Delete Log", "Are you sure you want to permanently delete this timeline entry?", true);
+                    if (confirmed) {
                       handleDeleteEvent(editingEvent._id || editingEvent.id);
                       setEditingEvent(null);
                     }
@@ -1325,6 +1385,19 @@ export default function Dashboard() {
           </GlassCard>
         </div>
       )}
+
+      {/* Premium Alert/Confirm Toast Popup */}
+      <CustomPopup
+        isOpen={popupState.isOpen}
+        type={popupState.type}
+        title={popupState.title}
+        message={popupState.message}
+        confirmText={popupState.confirmText}
+        cancelText={popupState.cancelText}
+        isDestructive={popupState.isDestructive}
+        onConfirm={popupState.onConfirm}
+        onCancel={popupState.onCancel}
+      />
     </div>
   );
 }
