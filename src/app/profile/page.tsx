@@ -392,7 +392,14 @@ export default function ProfilePage() {
       const res = await fetch("/api/diet/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ 
+          email,
+          strictMessOnly,
+          targetCalories: profile?.targetCalories || 2000,
+          targetProteinG: profile?.targetProteinG || 150,
+          goal: profile?.goal || "recomp",
+          dietPreference: profile?.dietPreference || "none"
+        }),
       });
 
       if (res.ok) {
@@ -989,45 +996,63 @@ export default function ProfilePage() {
               </div>
 
               {/* Editor Fields */}
-              <GlassCard className="p-4 space-y-3 border border-white/5 bg-white/2 relative">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[9px] text-[#c87a53] font-bold uppercase tracking-wider block mb-1">🌅 Breakfast</label>
+              <GlassCard className="p-4 space-y-4 border border-white/5 bg-white/2 relative">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Breakfast Sub-card */}
+                  <div className="p-3.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
+                    <label className="text-[9px] text-[#c87a53] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🌅</span> Breakfast Menu
+                    </label>
                     <textarea
-                      rows={2}
+                      rows={3}
                       value={parsedMenu[menuActiveDay]?.breakfast || ""}
                       onChange={(e) => updateMealField(menuActiveDay, "breakfast", e.target.value)}
-                      className="input-glass text-xs p-2 font-mono h-16"
+                      placeholder="Enter breakfast items (e.g. Milk Bread, Corn Flakes, Idly)..."
+                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[65px] leading-relaxed font-sans"
                     />
                   </div>
-                  <div>
-                    <label className="text-[9px] text-[#8ba893] font-bold uppercase tracking-wider block mb-1">☀️ Lunch</label>
+
+                  {/* Lunch Sub-card */}
+                  <div className="p-3.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
+                    <label className="text-[9px] text-[#8ba893] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                      <span>☀️</span> Lunch Menu
+                    </label>
                     <textarea
-                      rows={2}
+                      rows={3}
                       value={parsedMenu[menuActiveDay]?.lunch || ""}
                       onChange={(e) => updateMealField(menuActiveDay, "lunch", e.target.value)}
-                      className="input-glass text-xs p-2 font-mono h-16"
+                      placeholder="Enter lunch items (e.g. Plain Curd, Rajma Masala, Chapati)..."
+                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[65px] leading-relaxed font-sans"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[9px] text-[#c87a53] font-bold uppercase tracking-wider block mb-1">☕ Snacks</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Snacks Sub-card */}
+                  <div className="p-3.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
+                    <label className="text-[9px] text-[#c87a53] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                      <span>☕</span> Snacks Menu
+                    </label>
                     <textarea
-                      rows={2}
+                      rows={3}
                       value={parsedMenu[menuActiveDay]?.snacks || ""}
                       onChange={(e) => updateMealField(menuActiveDay, "snacks", e.target.value)}
-                      className="input-glass text-xs p-2 font-mono h-16"
+                      placeholder="Enter snacks items (e.g. Bread, Bournvita, Biscuits)..."
+                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[65px] leading-relaxed font-sans"
                     />
                   </div>
-                  <div>
-                    <label className="text-[9px] text-[#8ba893] font-bold uppercase tracking-wider block mb-1">🌙 Dinner</label>
+
+                  {/* Dinner Sub-card */}
+                  <div className="p-3.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
+                    <label className="text-[9px] text-[#8ba893] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🌙</span> Dinner Menu
+                    </label>
                     <textarea
-                      rows={2}
+                      rows={3}
                       value={parsedMenu[menuActiveDay]?.dinner || ""}
                       onChange={(e) => updateMealField(menuActiveDay, "dinner", e.target.value)}
-                      className="input-glass text-xs p-2 font-mono h-16"
+                      placeholder="Enter dinner items (e.g. Egg Curry, Chapati, Dal Tadka)..."
+                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[65px] leading-relaxed font-sans"
                     />
                   </div>
                 </div>

@@ -13,6 +13,8 @@ import { Flame, Dumbbell, Droplet, Footprints, Moon, Sparkles, Scale, Graduation
 interface TodayState {
   calories: number;
   protein: number;
+  carbs: number;
+  fats: number;
   workoutDone: boolean;
   sleepHours: number;
   steps: number;
@@ -25,6 +27,8 @@ export default function Dashboard() {
   const [today, setToday] = useState<TodayState>({
     calories: 0,
     protein: 0,
+    carbs: 0,
+    fats: 0,
     workoutDone: false,
     sleepHours: 0,
     steps: 0,
@@ -215,6 +219,8 @@ export default function Dashboard() {
         // Aggregate today's stats
         let cal = 0;
         let prot = 0;
+        let carbsVal = 0;
+        let fatsVal = 0;
         let wDone = false;
         let sleep = 0;
         let stepCount = 0;
@@ -228,6 +234,8 @@ export default function Dashboard() {
             if (event.type === "meal") {
               cal += event.payload.totalCalories || 0;
               prot += event.payload.totalProteinG || 0;
+              carbsVal += event.payload.totalCarbsG || event.payload.foods?.reduce((s: number, f: any) => s + (Number(f.carbsG) || 0), 0) || 0;
+              fatsVal += event.payload.totalFatG || event.payload.foods?.reduce((s: number, f: any) => s + (Number(f.fatG) || 0), 0) || 0;
             } else if (event.type === "workout") {
               wDone = true;
             } else if (event.type === "sleep") {
@@ -250,6 +258,8 @@ export default function Dashboard() {
         setToday({
           calories: Math.round(cal),
           protein: Math.round(prot),
+          carbs: Math.round(carbsVal),
+          fats: Math.round(fatsVal),
           workoutDone: wDone,
           sleepHours: sleep,
           steps: stepCount,
@@ -401,6 +411,8 @@ export default function Dashboard() {
 
   const targetCal = profile?.targetCalories || 2200;
   const targetProt = profile?.targetProteinG || 150;
+  const targetFats = Math.round((targetCal * 0.25) / 9);
+  const targetCarbs = Math.round((targetCal - (targetProt * 4) - (targetFats * 9)) / 4);
   const sleepTarget = profile?.sleepTarget || 8;
   
   // Scale steps goal if busy event is active (guilt-free dynamic target scaling)
@@ -637,6 +649,42 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Macronutrient Breakdown (Protein, Carbs, Fats progress) */}
+      <div className="animate-in-delay-1">
+        <GlassCard className="p-4 border border-white/5 bg-white/2 space-y-3">
+          <div className="flex justify-between items-center pb-1.5 border-b border-white/5">
+            <h4 className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+              <span>🥗</span> Macronutrient Breakdown
+            </h4>
+            <span className="text-[9px] text-[#8ba893] font-bold uppercase tracking-wider">Daily Balance</span>
+          </div>
+          
+          <div className="space-y-3">
+            <MacroBar
+              label="Protein"
+              value={today.protein}
+              max={targetProt}
+              unit="g"
+              color="#8ba893"
+            />
+            <MacroBar
+              label="Carbs"
+              value={today.carbs}
+              max={targetCarbs}
+              unit="g"
+              color="#c87a53"
+            />
+            <MacroBar
+              label="Fats"
+              value={today.fats}
+              max={targetFats}
+              unit="g"
+              color="#eab308"
+            />
+          </div>
+        </GlassCard>
       </div>
 
       {/* 2-Column Secondary HUD */}

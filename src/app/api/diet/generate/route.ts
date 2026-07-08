@@ -57,14 +57,16 @@ export async function POST(request: NextRequest) {
     const age = profile.age || 22;
     const height = profile.heightCm || 175;
     const weight = profile.weightKg || 75;
-    const goal = profile.goal || "recomp";
-    const targetCalories = profile.targetCalories || 2000;
-    const targetProtein = profile.targetProteinG || 150;
+    
+    // Prioritize inputs from POST request body over DB record
+    const goal = body.goal || profile.goal || "recomp";
+    const targetCalories = body.targetCalories || profile.targetCalories || 2000;
+    const targetProtein = body.targetProteinG || profile.targetProteinG || 150;
+    const dietPreference = body.dietPreference || profile.dietPreference || "none";
+    const strictMessOnly = typeof body.strictMessOnly === "boolean" ? body.strictMessOnly : (profile.strictMessOnly || false);
+
     const collegeSchedule = profile.collegeSchedule || "8 AM - 4 PM";
     const sleepTarget = profile.sleepTarget || 8;
-    const dietPreference = profile.dietPreference || "none";
-
-    const strictMessOnly = profile.strictMessOnly || false;
 
     let budgetGuideline = "";
     if (strictMessOnly) {

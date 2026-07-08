@@ -78,6 +78,8 @@ export default function MealCapture() {
   const [manualName, setManualName] = useState("");
   const [manualCal, setManualCal] = useState("");
   const [manualProt, setManualProt] = useState("");
+  const [manualCarbs, setManualCarbs] = useState("");
+  const [manualFats, setManualFats] = useState("");
 
   useEffect(() => {
     async function checkProfileAndLoadHistory() {
@@ -238,14 +240,16 @@ export default function MealCapture() {
             name: manualName.trim(),
             totalCalories: parseInt(manualCal) || 0,
             totalProteinG: parseInt(manualProt) || 0,
+            totalCarbsG: parseInt(manualCarbs) || 0,
+            totalFatG: parseInt(manualFats) || 0,
             foods: [
               {
                 name: manualName.trim(),
                 portionSize: "medium",
                 estimatedCalories: parseInt(manualCal) || 0,
                 proteinG: parseInt(manualProt) || 0,
-                carbsG: 0,
-                fatG: 0,
+                carbsG: parseInt(manualCarbs) || 0,
+                fatG: parseInt(manualFats) || 0,
               },
             ],
           },
@@ -258,6 +262,8 @@ export default function MealCapture() {
         setManualName("");
         setManualCal("");
         setManualProt("");
+        setManualCarbs("");
+        setManualFats("");
         
         // Reload today's log history
         const histRes = await fetch(`/api/timeline?userId=${userId}&type=meal`);
@@ -391,29 +397,53 @@ export default function MealCapture() {
                     className="input-glass text-xs h-11"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-4 gap-2">
                   <div>
-                    <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
-                      Calories (kcal)
+                    <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                      Cal (kcal)
                     </label>
                     <input
                       type="number"
-                      placeholder="e.g. 520"
+                      placeholder="520"
                       value={manualCal}
                       onChange={(e) => setManualCal(e.target.value)}
-                      className="input-glass text-xs h-11"
+                      className="input-glass text-xs h-11 px-2"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
-                      Protein (g)
+                    <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                      Prot (g)
                     </label>
                     <input
                       type="number"
-                      placeholder="e.g. 22"
+                      placeholder="22"
                       value={manualProt}
                       onChange={(e) => setManualProt(e.target.value)}
-                      className="input-glass text-xs h-11"
+                      className="input-glass text-xs h-11 px-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                      Carbs (g)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="45"
+                      value={manualCarbs}
+                      onChange={(e) => setManualCarbs(e.target.value)}
+                      className="input-glass text-xs h-11 px-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                      Fats (g)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="12"
+                      value={manualFats}
+                      onChange={(e) => setManualFats(e.target.value)}
+                      className="input-glass text-xs h-11 px-2"
                     />
                   </div>
                 </div>
@@ -447,7 +477,9 @@ export default function MealCapture() {
                     </div>
                     <div className="text-right">
                       <span className="text-xs font-bold text-brand-400">{h.payload.totalCalories} kcal</span>
-                      <p className="text-[10px] text-zinc-500 mt-0.5">{h.payload.totalProteinG}g protein</p>
+                      <p className="text-[9px] text-zinc-500 mt-0.5 font-mono">
+                        P: {h.payload.totalProteinG || 0}g | C: {h.payload.totalCarbsG || h.payload.foods?.reduce((s: number, f: any) => s + (Number(f.carbsG) || 0), 0) || 0}g | F: {h.payload.totalFatG || h.payload.foods?.reduce((s: number, f: any) => s + (Number(f.fatG) || 0), 0) || 0}g
+                      </p>
                     </div>
                   </GlassCard>
                 ))}
