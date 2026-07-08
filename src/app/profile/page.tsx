@@ -5,8 +5,14 @@ import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import { 
   User, Calendar, Soup, Sparkles, Upload, Trash2, 
-  Settings, AlertTriangle, Clock, ArrowRight, Save, Loader2 
+  Settings, AlertTriangle, Clock, ArrowRight, Save, Loader2, Bell
 } from "lucide-react";
+import { 
+  registerServiceWorker, 
+  requestNotificationPermission, 
+  getNotificationPermission, 
+  sendLocalTestNotification 
+} from "@/lib/notifications";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -33,6 +39,30 @@ export default function ProfilePage() {
   const [gymExperience, setGymExperience] = useState("beginner");
   const [collegeSchedule, setCollegeSchedule] = useState("");
   const [strictMessOnly, setStrictMessOnly] = useState(false);
+
+  // Notification States
+  const [notificationPermission, setNotificationPermission] = useState<string>("default");
+  const [morningReminders, setMorningReminders] = useState(true);
+  const [workoutReminders, setWorkoutReminders] = useState(true);
+  const [eveningReminders, setEveningReminders] = useState(true);
+
+  useEffect(() => {
+    registerServiceWorker();
+    setNotificationPermission(getNotificationPermission());
+  }, []);
+
+  const handleRequestPermission = async () => {
+    const perm = await requestNotificationPermission();
+    setNotificationPermission(perm);
+  };
+
+  const handleSendTestNotification = async () => {
+    await sendLocalTestNotification(
+      "Health OS Reminder ⚡",
+      "This is what your daily push reminder looks like! Time to hit the gym for your scheduled workout."
+    );
+  };
+
   const [neckCm, setNeckCm] = useState("");
   const [waistCm, setWaistCm] = useState("");
   const [hipCm, setHipCm] = useState("");
@@ -525,7 +555,8 @@ export default function ProfilePage() {
 
       {/* Tab 1: Biometric Specs Form */}
       {activeTab === "specs" && (
-        <form onSubmit={handleUpdateProfile} className="space-y-4 animate-in-delay-1">
+        <>
+          <form onSubmit={handleUpdateProfile} className="space-y-4 animate-in-delay-1">
           <GlassCard className="p-5 space-y-4 border border-white/10 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/5 blur-[50px] rounded-full -z-10" />
             <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-white/5 pb-2">Specs</h3>
@@ -781,7 +812,98 @@ export default function ProfilePage() {
             {savingSpecs ? "Saving..." : "Update Specifications"}
           </button>
         </form>
-      )}
+
+        {/* PWA Web Push Notification Settings */}
+        <GlassCard className="p-5 mt-5 border border-white/5 bg-white/2 space-y-4 text-left">
+          <div className="flex justify-between items-center pb-2 border-b border-white/5">
+            <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+              <Bell className="w-4 h-4 text-[#8ba893]" /> Web Push Notification Center
+            </h3>
+            <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${
+              notificationPermission === "granted" 
+                ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                : "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+            }`}>
+              {notificationPermission === "granted" ? "Active" : "Disabled"}
+            </span>
+          </div>
+
+          <p className="text-[10px] text-zinc-500 leading-relaxed">
+            Enable native push reminders to keep you updated on mess menu choices, scheduled gym workouts, and bedtime calorie/protein logs even when your browser is closed.
+          </p>
+
+          {notificationPermission !== "granted" ? (
+            <button
+              type="button"
+              onClick={handleRequestPermission}
+              className="w-full py-2.5 rounded-xl bg-[#8ba893] hover:bg-[#8ba893]/90 text-[#0c0f0d] font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              🔔 Enable Push Reminders
+            </button>
+          ) : (
+            <div className="space-y-3.5">
+              <div className="space-y-2">
+                {/* Morning checkin */}
+                <div className="flex items-center justify-between p-2.5 bg-zinc-950/30 border border-white/5 rounded-xl">
+                  <div className="text-left space-y-0.5 pr-2">
+                    <span className="font-bold text-zinc-300 block text-xs">🌅 Morning Nutrition Check (8:00 AM)</span>
+                    <span className="text-[9px] text-zinc-500 block leading-normal">
+                      Reminds you to check breakfast choices from mess menu and log your sleep duration.
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={morningReminders}
+                    onChange={(e) => setMorningReminders(e.target.checked)}
+                    className="w-4 h-4 accent-[#8ba893] cursor-pointer flex-shrink-0"
+                  />
+                </div>
+
+                {/* Workout checkin */}
+                <div className="flex items-center justify-between p-2.5 bg-zinc-950/30 border border-white/5 rounded-xl">
+                  <div className="text-left space-y-0.5 pr-2">
+                    <span className="font-bold text-zinc-300 block text-xs">🏋️‍♂️ Workout Accountability Nudge (6:00 PM)</span>
+                    <span className="text-[9px] text-zinc-500 block leading-normal">
+                      Checks on your scheduled workout status and nudges you to log sets.
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={workoutReminders}
+                    onChange={(e) => setWorkoutReminders(e.target.checked)}
+                    className="w-4 h-4 accent-[#8ba893] cursor-pointer flex-shrink-0"
+                  />
+                </div>
+
+                {/* Evening checkin */}
+                <div className="flex items-center justify-between p-2.5 bg-zinc-950/30 border border-white/5 rounded-xl">
+                  <div className="text-left space-y-0.5 pr-2">
+                    <span className="font-bold text-zinc-300 block text-xs">🌙 Bedtime Macro Review (10:00 PM)</span>
+                    <span className="text-[9px] text-zinc-500 block leading-normal">
+                      Reviews remaining water intake and warns you if protein/calories are lagging.
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={eveningReminders}
+                    onChange={(e) => setEveningReminders(e.target.checked)}
+                    className="w-4 h-4 accent-[#8ba893] cursor-pointer flex-shrink-0"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSendTestNotification}
+                className="w-full py-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white font-bold text-xs border border-white/5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                ⚡ Send Test Push Reminder
+              </button>
+            </div>
+          )}
+        </GlassCard>
+      </>
+    )}
 
       {/* Tab 2: Calendar Busy Event Manager */}
       {activeTab === "calendar" && (
