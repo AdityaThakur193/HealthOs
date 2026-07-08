@@ -64,7 +64,16 @@ export async function POST(request: NextRequest) {
     const sleepTarget = profile.sleepTarget || 8;
     const dietPreference = profile.dietPreference || "none";
 
-    const prompt = `You are an elite sports dietitian and bodybuilding nutrition coach. Your goal is to design a highly personalized week-long diet plan (Monday to Sunday) mapping out meal timings, mess food choices, necessary additions (curd, eggs, whey), and carbohydrate-fat distribution, optimized for the user's specific biometrics and schedule.
+    const strictMessOnly = profile.strictMessOnly || false;
+
+    let budgetGuideline = "";
+    if (strictMessOnly) {
+      budgetGuideline = `CRITICAL BUDGET CONSTRAINT (Strict Mess Only Mode): The user is on a strict budget and CAN ONLY eat food provided by their hostel mess menu. You MUST NOT suggest any external additions, purchases, or supplements (e.g., NO whey protein powder, NO eggs bought outside, NO store-bought curd or paneer). Set "additions" to "None (Strict Mess Only Mode)" for all meals. Prioritize and suggest the highest protein options available directly from the mess menu items served that day. If they cannot meet the protein goal due to low protein in the mess, accept this restriction and maximize what they can get from the mess without forcing external purchases.`;
+    } else {
+      budgetGuideline = `Since mess food is typically low in protein, suggest specific supplements or additions (e.g., scoop of whey, egg whites, paneer, double curd) and exact quantities to hit the protein target for that meal.`;
+    }
+
+    const prompt = `You are an elite sports dietitian and bodybuilding nutrition coach. Your goal is to design a highly personalized week-long diet plan (Monday to Sunday) mapping out meal timings, mess food choices, necessary additions, and carbohydrate-fat distribution, optimized for the user's specific biometrics and schedule.
 
 User Context:
 - Name: ${name}
@@ -72,6 +81,7 @@ User Context:
 - Goals: Goal is "${goal}". Daily targets are ${targetCalories} kcal and ${targetProtein}g of protein.
 - Schedule: College classes are ${collegeSchedule}. Sleep target is ${sleepTarget} hours.
 - Diet preference: ${dietPreference}.
+- Strict Mess/Budget Mode: ${strictMessOnly ? "ACTIVE (Strictly Mess Items Only, NO additions)" : "INACTIVE (Allows additions/whey/eggs)"}
 
 Active Hostel Mess Menu:
 ${JSON.stringify(profile.messMenu.parsedMenu, null, 2)}
@@ -81,7 +91,8 @@ You MUST design the weekly diet plan following these strict scientific principle
 2. Carbohydrate Positioning (Peri-workout): Position complex carbohydrates 2-3 hours pre-workout to load glycogen. Position simple, fast-acting carbohydrates 30-60 minutes pre-workout for instant performance energy. Position high-glycemic carbohydrates post-workout to accelerate recovery.
 3. Fat Digestion Timing: Minimize fat intake in the peri-workout window (2 hours before to 2 hours after training) to avoid slowing down digestion. Consolidate healthy fats in breakfast and pre-sleep meals.
 4. College Schedule Integration: Align meal timings with the user's college schedule (${collegeSchedule}). Schedule a quick lunch at 1:00 PM and a pre-workout meal right after classes.
-5. Mess Menu Adaptations: Look at what is served in the mess for each meal of each day. Suggest EXACTLY what to eat from the mess. Since mess food is typically low in protein, suggest specific supplements or additions (e.g., scoop of whey, egg whites, paneer, double curd) and exact quantities to hit the protein target for that meal.
+5. Mess Menu & Budget Adaptations: Look at what is served in the mess for each meal of each day. Suggest EXACTLY what to eat from the mess.
+   ${budgetGuideline}
 
 Return a JSON object matching this exact structure:
 {

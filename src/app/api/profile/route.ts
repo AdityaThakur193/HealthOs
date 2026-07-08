@@ -261,6 +261,7 @@ export async function POST(request: NextRequest) {
     customCalories,
     customProtein,
     useCustomMacros,
+    strictMessOnly,
   } = body;
 
   if (!name || !email || !age || !gender || !heightCm || !weightKg || !goal || !activityLevel || !gymExperience) {
@@ -308,6 +309,7 @@ export async function POST(request: NextRequest) {
     medicalConditions: medicalConditions || [],
     sleepTarget: parseInt(sleepTarget || "8"),
     collegeSchedule: collegeSchedule || "",
+    strictMessOnly: strictMessOnly || false,
     neckCm: neckCm ? parseFloat(neckCm) : undefined,
     waistCm: waistCm ? parseFloat(waistCm) : undefined,
     hipCm: hipCm ? parseFloat(hipCm) : undefined,

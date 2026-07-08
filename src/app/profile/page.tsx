@@ -32,6 +32,7 @@ export default function ProfilePage() {
   const [dietPreference, setDietPreference] = useState("none");
   const [gymExperience, setGymExperience] = useState("beginner");
   const [collegeSchedule, setCollegeSchedule] = useState("");
+  const [strictMessOnly, setStrictMessOnly] = useState(false);
   const [neckCm, setNeckCm] = useState("");
   const [waistCm, setWaistCm] = useState("");
   const [hipCm, setHipCm] = useState("");
@@ -104,6 +105,7 @@ export default function ProfilePage() {
         setActivityLevel(prof.activityLevel || "moderate");
         setDietPreference(prof.dietPreference || "none");
         setGymExperience(prof.gymExperience || "beginner");
+        setStrictMessOnly(prof.strictMessOnly || false);
         setCollegeSchedule(prof.collegeSchedule || "");
         setNeckCm(prof.neckCm ? String(prof.neckCm) : "");
         setWaistCm(prof.waistCm ? String(prof.waistCm) : "");
@@ -159,6 +161,7 @@ export default function ProfilePage() {
           customCalories: useCustomMacros && customCalories ? parseInt(customCalories) : undefined,
           customProtein: useCustomMacros && customProtein ? parseInt(customProtein) : undefined,
           useCustomMacros,
+          strictMessOnly,
         }),
       });
 
@@ -742,6 +745,22 @@ export default function ProfilePage() {
                   value={collegeSchedule}
                   onChange={(e) => setCollegeSchedule(e.target.value)}
                   className="input-glass text-xs h-11"
+                />
+              </div>
+
+              <div className="p-3.5 bg-white/2 border border-white/5 rounded-xl flex items-center justify-between">
+                <div className="text-left space-y-0.5 pr-2">
+                  <span className="font-bold text-zinc-200 block text-xs">Strict Budget / Mess Food Only</span>
+                  <span className="text-[9px] text-zinc-500 block leading-normal">
+                    AI will not suggest external purchases or expensive supplements (e.g. no whey, paneer, eggs bought outside). Rebuilds plan relying strictly on hostel mess items.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  id="strictMessOnlyToggle"
+                  checked={strictMessOnly}
+                  onChange={(e) => setStrictMessOnly(e.target.checked)}
+                  className="w-4 h-4 accent-[#8ba893] cursor-pointer flex-shrink-0"
                 />
               </div>
             </div>

@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     const targetProtein = profile?.targetProteinG || 150;
     const collegeSchedule = profile?.collegeSchedule || "8 AM - 4 PM";
     const goal = profile?.goal || "recomp";
+    const strictMessOnly = profile?.strictMessOnly || false;
     
     const activeDietPlan = profile?.dietPlan?.generatedPlan || null;
     const activeWorkoutPlan = profile?.workouts || null; // Workouts stored in profile or timeline
@@ -53,6 +54,7 @@ User Context:
 - Biometrics: ${age} years old, ${height}cm height, ${weight}kg weight.
 - Goals: Goal is "${goal}". Daily targets are ${targetCalories} kcal and ${targetProtein}g of protein.
 - Schedule: College classes are ${collegeSchedule}.
+- Strict Mess/Budget Mode: ${strictMessOnly ? "ACTIVE (Rely 100% strictly on mess menu items. NO external additions/purchases like whey, egg whites, paneer are allowed.)" : "INACTIVE (Additions allowed)"}
 - Active Hostel Mess Menu:
 ${JSON.stringify(activeMessMenu, null, 2)}
 
@@ -64,7 +66,8 @@ ${JSON.stringify(activeWorkoutPlan, null, 2)}
 
 Instruction Guidelines:
 1. Strict Boundary Constraint: You are ONLY allowed to discuss topics related to health, fitness, gym, sports science, nutrition, recovery, sleep, and hostel diet/workout customization. If the user asks anything unrelated (e.g. general knowledge, programming, history, pop culture, non-health advice), you must politely decline to answer, stating that you are strictly calibrated to be their Health OS Fitness Coach, and guide them back to fitness.
-2. Beautiful Formatting: Your replies must be highly readable, visual, and beautifully formatted:
+2. Diet Plan Modifications: If the user asks you to tweak, replace, or customize foods in their weekly diet plan, make sure you strictly respect the "Strict Mess/Budget Mode" constraint if active. Do not suggest or add any external purchases, supplements, or costly foods (e.g. no whey, external paneer, external eggs) if active. Rely strictly on what is served in the mess menu for that day.
+3. Beautiful Formatting: Your replies must be highly readable, visual, and beautifully formatted:
    - Use clean, short paragraphs. Avoid dense blocks of text.
    - Use bold markdown (e.g. **Breakfast**) for emphasis.
    - Use bullet points (starting with "* ") for lists or outline items.
