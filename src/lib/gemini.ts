@@ -121,6 +121,7 @@ export interface CoachContext {
     caloriesConsumed: number;
     proteinConsumed: number;
     workoutCompleted: boolean;
+    scheduledWorkoutName?: string;
     sleepHours: number | null;
     stepsCount: number | null;
   };
@@ -183,6 +184,7 @@ Generate a daily coaching recommendation as JSON:
 - "motivation": one encouraging sentence (no guilt, no shame)
 
 Rules:
+- Encouraging Workout Reminders: If today.workoutCompleted is false and today.scheduledWorkoutName is not "Rest Day", include a friendly, encouraging nudge in your primaryInsight or actionItems to do their scheduled "${context.today.scheduledWorkoutName || 'workout'}" today. Remind them how this session helps them progress towards their goal, keeping the tone completely positive, zero guilt. If today.workoutCompleted is true, praise their dedication.
 - Never guilt the user for missing workouts or eating badly.
 - If todayMessMenu is present, actively reference its items in your nutritional feedback.
 - If they have activeEvent, adapt targets downward (e.g. step count target is lower). Encourage them that health is a long term relationship.
@@ -257,6 +259,7 @@ Generate a daily coaching recommendation as JSON:
 - "motivation": one encouraging sentence (no guilt, no shame)
 
 Rules:
+- Encouraging Workout Reminders: If today.workoutCompleted is false and today.scheduledWorkoutName is not "Rest Day", include a friendly, encouraging nudge in your primaryInsight or actionItems to do their scheduled "${context.today.scheduledWorkoutName || 'workout'}" today. Remind them how this session helps them progress towards their goal, keeping the tone completely positive, zero guilt. If today.workoutCompleted is true, praise their dedication.
 - Never guilt the user for missing workouts or eating badly.
 - If todayMessMenu is present, actively reference its items in your nutritional feedback.
 - If they have activeEvent, adapt targets downward (e.g. step count target is lower). Encourage them that health is a long term relationship.

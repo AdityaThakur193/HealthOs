@@ -184,6 +184,9 @@ export async function POST(request: NextRequest) {
       todayMessMenu = (profile.messMenu.parsedMenu as any)[todayWeekday] || null;
     }
 
+    const scheduledWorkout = getTodaysWorkout(profile);
+    const scheduledWorkoutName = scheduledWorkout?.name || "Rest Day";
+
     const context: CoachContext = {
       profile: {
         name: profile.name,
@@ -196,6 +199,7 @@ export async function POST(request: NextRequest) {
         caloriesConsumed,
         proteinConsumed,
         workoutCompleted: !!todayWorkout,
+        scheduledWorkoutName,
         sleepHours: todaySleep
           ? (todaySleep.payload as Record<string, number>)?.hours
           : null,
