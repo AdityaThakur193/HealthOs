@@ -760,7 +760,8 @@ export default function Journey() {
                         <span className="text-zinc-500 text-[10px] mr-1.5">L</span>
                         <button
                           onClick={async () => {
-                            if (confirm("Delete this entry?")) {
+                            const confirmed = await showCustomConfirm("Delete Sub-entry", "Are you sure you want to permanently delete this sub-entry?", true);
+                            if (confirmed) {
                               await fetch(`/api/timeline?eventId=${sub._id || sub.id}`, { method: "DELETE" });
                               editingEvent.payload.subEvents = editingEvent.payload.subEvents.filter((item: any) => (item._id || item.id) !== (sub._id || sub.id));
                               const total = editingEvent.payload.subEvents.reduce((sum: number, item: any) => sum + (Number(item.payload.amountL) || 0), 0);

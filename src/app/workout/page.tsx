@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ExerciseCard from "@/components/ExerciseCard";
+import CustomPopup from "@/components/CustomPopup";
 import { getTodaysWorkout, getWeekSchedule, type WorkoutPlan } from "@/lib/workoutPlans";
 import { Dumbbell, Flame, Lightbulb, Plus, Activity, BookOpen, Compass, ChevronDown, CheckCircle, Info } from "lucide-react";
 
@@ -30,6 +31,63 @@ export default function WorkoutTracker() {
   const [customExName, setCustomExName] = useState("");
   const [customExMuscle, setCustomExMuscle] = useState("");
   const [showAddCustomForm, setShowAddCustomForm] = useState(false);
+
+  // Custom Popup Alert/Confirm States
+  const [popupState, setPopupState] = useState<{
+    isOpen: boolean;
+    type: "alert" | "confirm" | "error" | "success" | "warning";
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }>({
+    isOpen: false,
+    type: "alert",
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const showCustomAlert = (title: string, message: string, type: "alert" | "error" | "success" | "warning" = "alert") => {
+    return new Promise<void>((resolve) => {
+      setPopupState({
+        isOpen: true,
+        type,
+        title,
+        message,
+        confirmText: "OK",
+        onConfirm: () => {
+          setPopupState((prev) => ({ ...prev, isOpen: false }));
+          resolve();
+        },
+      });
+    });
+  };
+
+  const showCustomConfirm = (title: string, message: string, isDestructive = false) => {
+    return new Promise<boolean>((resolve) => {
+      setPopupState({
+        isOpen: true,
+        type: "confirm",
+        title,
+        message,
+        confirmText: isDestructive ? "Delete" : "Yes",
+        cancelText: "No",
+        isDestructive,
+        onConfirm: () => {
+          setPopupState((prev) => ({ ...prev, isOpen: false }));
+          resolve(true);
+        },
+        onCancel: () => {
+          setPopupState((prev) => ({ ...prev, isOpen: false }));
+          resolve(false);
+        },
+      });
+    });
+  };
 
   useEffect(() => {
     async function checkProfileAndLoadHistory() {
@@ -225,7 +283,11 @@ export default function WorkoutTracker() {
 
     const testLoggedCount = exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0);
     if (testLoggedCount === 0) {
-      const confirmLogEmpty = confirm("⚠️ You haven't checked off any completed sets today! Do you want to log this as an empty workout session?");
+      const confirmLogEmpty = await showCustomConfirm(
+        "Empty Workout ⚠️",
+        "You haven't checked off any completed sets today! Do you want to log this as an empty workout session?",
+        false
+      );
       if (!confirmLogEmpty) {
         return;
       }
@@ -590,6 +652,19 @@ export default function WorkoutTracker() {
       )}
       {/* How To Log Guide Modal */}
       <HowToLogModal open={showHowToLog} onClose={() => setShowHowToLog(false)} />
+
+      {/* Premium Alert/Confirm Toast Popup */}
+      <CustomPopup
+        isOpen={popupState.isOpen}
+        type={popupState.type}
+        title={popupState.title}
+        message={popupState.message}
+        confirmText={popupState.confirmText}
+        cancelText={popupState.cancelText}
+        isDestructive={popupState.isDestructive}
+        onConfirm={popupState.onConfirm}
+        onCancel={popupState.onCancel}
+      />
     </div>
   );
 }
