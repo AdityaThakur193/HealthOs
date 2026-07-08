@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
+import CoachChatFAB from "@/components/CoachChatFAB";
 
 import type { Viewport } from "next";
 
@@ -30,6 +31,7 @@ export default function RootLayout({
             {children}
           </main>
           <BottomNav />
+          <CoachChatFAB />
         </div>
       </body>
     </html>
