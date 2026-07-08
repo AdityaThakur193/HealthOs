@@ -43,6 +43,85 @@ export default function Dashboard() {
   const [streak, setStreak] = useState(0);
   const [todayEvents, setTodayEvents] = useState<any[]>([]);
 
+  // Log editing states
+  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [editMealName, setEditMealName] = useState("");
+  const [editMealCalories, setEditMealCalories] = useState("");
+  const [editMealProtein, setEditMealProtein] = useState("");
+  const [editWeight, setEditWeight] = useState("");
+  const [editSteps, setEditSteps] = useState("");
+  const [editSleep, setEditSleep] = useState("");
+  const [editWater, setEditWater] = useState("");
+
+  const handleStartEditEvent = (event: any) => {
+    setEditingEvent(event);
+    if (event.type === "meal") {
+      const mealName = event.payload.mealName || event.payload.foods?.map((f: any) => f.name).join(", ") || "Meal";
+      setEditMealName(mealName);
+      setEditMealCalories(String(event.payload.totalCalories || 0));
+      setEditMealProtein(String(event.payload.totalProteinG || 0));
+    } else if (event.type === "weight") {
+      setEditWeight(String(event.payload.weightKg || ""));
+    } else if (event.type === "steps") {
+      setEditSteps(String(event.payload.count || ""));
+    } else if (event.type === "sleep") {
+      setEditSleep(String(event.payload.hours || ""));
+    } else if (event.type === "water") {
+      setEditWater(String(event.payload.amountL || ""));
+    }
+  };
+
+  const handleSaveEditEvent = async () => {
+    if (!editingEvent) return;
+    const payload: any = { ...editingEvent.payload };
+    const timestamp = editingEvent.timestamp;
+
+    if (editingEvent.type === "meal") {
+      payload.mealName = editMealName;
+      payload.totalCalories = Number(editMealCalories) || 0;
+      payload.totalProteinG = Number(editMealProtein) || 0;
+      if (payload.foods && payload.foods.length > 0) {
+        payload.foods[0].name = editMealName;
+        payload.foods[0].calories = Number(editMealCalories) || 0;
+        payload.foods[0].proteinG = Number(editMealProtein) || 0;
+      }
+    } else if (editingEvent.type === "weight") {
+      payload.weightKg = Number(editWeight) || 0;
+    } else if (editingEvent.type === "steps") {
+      payload.count = Number(editSteps) || 0;
+    } else if (editingEvent.type === "sleep") {
+      payload.hours = Number(editSleep) || 0;
+    } else if (editingEvent.type === "water") {
+      payload.amountL = Number(editWater) || 0;
+    }
+
+    try {
+      const res = await fetch("/api/timeline", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId: editingEvent._id || editingEvent.id,
+          payload,
+          timestamp
+        })
+      });
+
+      if (res.ok) {
+        setEditingEvent(null);
+        const userId = localStorage.getItem("healthos_userId");
+        if (userId) {
+          fetchDashboardData(userId);
+        }
+        window.dispatchEvent(new Event("profileUpdated"));
+      } else {
+        alert("Failed to update log.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving log updates.");
+    }
+  };
+
   // Quick log states
   const [weightInput, setWeightInput] = useState("");
   const [stepsInput, setStepsInput] = useState("");
@@ -661,17 +740,21 @@ export default function Dashboard() {
                 details = `${event.payload.title || "Busy schedule note"}`;
               }
 
-              return (
+               return (
                 <div 
                   key={event._id || event.id} 
-                  className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/2 hover:bg-white/5 transition-all text-xs"
+                  onClick={() => handleStartEditEvent(event)}
+                  className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/2 hover:bg-white/5 hover:border-[#8ba893]/30 transition-all text-xs cursor-pointer"
                 >
                   <div className="text-left">
                     <span className="font-bold text-zinc-300 block">{title}</span>
                     <span className="text-[10px] text-zinc-500 mt-0.5 block capitalize">{details}</span>
                   </div>
                   <button
-                    onClick={() => handleDeleteEvent(event._id || event.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteEvent(event._id || event.id);
+                    }}
                     className="w-6 h-6 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center font-bold text-xs select-none cursor-pointer"
                     title="Delete log"
                   >
@@ -1097,6 +1180,148 @@ export default function Dashboard() {
             >
               Start Tracking
             </button>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* Log Editor Modal Overlay */}
+      {editingEvent && (
+        <div className="fixed inset-0 bg-[#0c0f0d]/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in">
+          <GlassCard className="p-6 max-w-sm w-full border border-white/10 relative overflow-hidden flex flex-col space-y-4">
+            <button 
+              onClick={() => setEditingEvent(null)}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white text-lg font-bold z-10"
+            >
+              ×
+            </button>
+            
+            <div className="space-y-1.5 text-center flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-[#8ba893]/10 border border-[#8ba893]/20 flex items-center justify-center mx-auto text-xl">
+                ✏️
+              </div>
+              <h3 className="text-base font-bold text-white mt-2">
+                Edit {editingEvent.type.toUpperCase()} Log
+              </h3>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
+                Update or delete your timeline entry
+              </p>
+            </div>
+
+            <div className="space-y-3 pt-3 border-t border-white/5 text-xs">
+              {editingEvent.type === "meal" && (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-500 font-bold uppercase">Meal Name</label>
+                    <input
+                      type="text"
+                      value={editMealName}
+                      onChange={(e) => setEditMealName(e.target.value)}
+                      className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#8ba893] transition-all"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-zinc-500 font-bold uppercase">Calories (kcal)</label>
+                      <input
+                        type="number"
+                        value={editMealCalories}
+                        onChange={(e) => setEditMealCalories(e.target.value)}
+                        className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#8ba893] transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-zinc-500 font-bold uppercase">Protein (g)</label>
+                      <input
+                        type="number"
+                        value={editMealProtein}
+                        onChange={(e) => setEditMealProtein(e.target.value)}
+                        className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#8ba893] transition-all"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {editingEvent.type === "weight" && (
+                <div className="space-y-1">
+                  <label className="text-[10px] text-zinc-500 font-bold uppercase">Weight (kg)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editWeight}
+                    onChange={(e) => setEditWeight(e.target.value)}
+                    className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#8ba893] transition-all"
+                  />
+                </div>
+              )}
+
+              {editingEvent.type === "steps" && (
+                <div className="space-y-1">
+                  <label className="text-[10px] text-zinc-500 font-bold uppercase">Steps Count</label>
+                  <input
+                    type="number"
+                    value={editSteps}
+                    onChange={(e) => setEditSteps(e.target.value)}
+                    className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#8ba893] transition-all"
+                  />
+                </div>
+              )}
+
+              {editingEvent.type === "sleep" && (
+                <div className="space-y-1">
+                  <label className="text-[10px] text-zinc-500 font-bold uppercase">Sleep Hours</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={editSleep}
+                    onChange={(e) => setEditSleep(e.target.value)}
+                    className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#8ba893] transition-all"
+                  />
+                </div>
+              )}
+
+              {editingEvent.type === "water" && (
+                <div className="space-y-1">
+                  <label className="text-[10px] text-zinc-500 font-bold uppercase">Water Consumed (L)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editWater}
+                    onChange={(e) => setEditWater(e.target.value)}
+                    className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#8ba893] transition-all"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-white/5 space-y-2 flex-shrink-0">
+              <button
+                onClick={handleSaveEditEvent}
+                className="w-full py-2.5 rounded-xl bg-[#8ba893] hover:bg-[#8ba893]/90 text-[#0c0f0d] font-bold text-xs transition-all cursor-pointer"
+              >
+                Save Changes
+              </button>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (confirm("Are you sure you want to delete this log?")) {
+                      handleDeleteEvent(editingEvent._id || editingEvent.id);
+                      setEditingEvent(null);
+                    }
+                  }}
+                  className="flex-1 py-2 rounded-xl bg-red-500/10 border border-red-500/20 hover:bg-red-500 hover:text-white text-red-400 font-bold text-[10px] transition-all cursor-pointer"
+                >
+                  Delete Log
+                </button>
+                <button
+                  onClick={() => setEditingEvent(null)}
+                  className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white font-bold text-[10px] transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </GlassCard>
         </div>
       )}

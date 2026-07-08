@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { TimelineEvent } from "@/lib/db/models";
-import { getLocalEvents, createLocalEvent, deleteLocalEventById } from "@/lib/db/fallback";
+import { getLocalEvents, createLocalEvent, deleteLocalEventById, updateLocalEvent } from "@/lib/db/fallback";
 
 export const dynamic = "force-dynamic";
 
@@ -130,6 +130,49 @@ export async function DELETE(request: NextRequest) {
     return Response.json({ success: true });
   } catch (error) {
     console.error("Timeline DELETE error:", error);
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+/**
+ * PUT /api/timeline
+ */
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { eventId, payload, timestamp } = body;
+
+    if (!eventId || !payload) {
+      return Response.json({ error: "eventId and payload are required" }, { status: 400 });
+    }
+
+    try {
+      await connectDB();
+      const updateDoc: any = { payload };
+      if (timestamp) {
+        updateDoc.timestamp = new Date(timestamp);
+      }
+      
+      const updatedEvent = await TimelineEvent.findOneAndUpdate(
+        { _id: eventId },
+        { $set: updateDoc },
+        { new: true }
+      );
+      
+      console.log(`✅ Updated MongoDB timeline event: ${eventId}`);
+      return Response.json({ event: updatedEvent });
+    } catch (dbError) {
+      console.warn("⚠️ MongoDB offline. Updating local JSON record.");
+      if (process.env.NODE_ENV === "production") {
+        return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
+      }
+      
+      const updatedEvent = await updateLocalEvent(eventId, { payload, timestamp });
+      console.log(`✅ Updated local JSON event: ${eventId}`);
+      return Response.json({ event: updatedEvent });
+    }
+  } catch (error) {
+    console.error("Timeline PUT error:", error);
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }

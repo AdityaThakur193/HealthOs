@@ -126,4 +126,20 @@ export async function deleteLocalEventById(eventId: string) {
   saveDB(db);
 }
 
+export async function updateLocalEvent(eventId: string, updateData: any) {
+  const db = initDB();
+  const idx = db.events.findIndex((e) => e._id === eventId);
+  if (idx !== -1) {
+    db.events[idx] = {
+      ...db.events[idx],
+      payload: { ...db.events[idx].payload, ...updateData.payload },
+      timestamp: updateData.timestamp || db.events[idx].timestamp,
+      updatedAt: new Date().toISOString()
+    };
+    saveDB(db);
+    return db.events[idx];
+  }
+  return null;
+}
+
 
