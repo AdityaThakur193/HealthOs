@@ -47,14 +47,63 @@ export default function ProfilePage() {
   const [workoutReminders, setWorkoutReminders] = useState(true);
   const [eveningReminders, setEveningReminders] = useState(true);
 
+  // PWA Install Prompt States
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
   useEffect(() => {
     registerServiceWorker();
     setNotificationPermission(getNotificationPermission());
+
+    // Listen for PWA install prompt
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    // Detect iOS and verify display mode
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+    setIsIOS(isIosDevice);
+
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
+    if (isStandalone) {
+      setIsInstallable(false);
+    } else if (isIosDevice) {
+      // iOS doesn't support beforeinstallprompt but is always installable via share menu
+      setIsInstallable(true);
+    }
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
   }, []);
 
   const handleRequestPermission = async () => {
     const perm = await requestNotificationPermission();
     setNotificationPermission(perm);
+  };
+
+  const handleInstallApp = async () => {
+    if (isIOS) {
+      showCustomAlert(
+        "Install on iPhone 📲",
+        "Tap the Share button (📤) in Safari, then select 'Add to Home Screen' (➕) to install the app on your home screen!",
+        "alert"
+      );
+      return;
+    }
+
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User installation choice outcome: ${outcome}`);
+    setDeferredPrompt(null);
+    setIsInstallable(false);
   };
 
   const handleSendTestNotification = async () => {
@@ -986,6 +1035,29 @@ export default function ProfilePage() {
             </div>
           )}
         </GlassCard>
+
+        {/* PWA Home Screen Installation Card */}
+        {isInstallable && (
+          <GlassCard className="p-5 mt-5 border border-[#8ba893]/20 bg-[#8ba893]/5 space-y-3.5 text-left animate-in duration-300">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📲</span>
+              <div>
+                <h3 className="text-xs font-bold text-white">Add Health OS to Home Screen</h3>
+                <p className="text-[9px] text-[#8ba893] font-bold uppercase tracking-wider">Fast Standalone Access</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-zinc-500 leading-relaxed">
+              Install this app directly on your device's home screen. Enjoy full-screen standalone view, offline tracking support, and direct access from your app library.
+            </p>
+            <button
+              type="button"
+              onClick={handleInstallApp}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-tr from-[#8ba893] to-[#9cbda5] text-[#0c0f0d] font-bold text-xs shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              📥 {isIOS ? "Show iOS Install Guide" : "Install Health OS App"}
+            </button>
+          </GlassCard>
+        )}
       </>
     )}
 

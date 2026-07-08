@@ -8,6 +8,7 @@ import type { Viewport } from "next";
 export const metadata: Metadata = {
   title: "Health OS — Personal Intelligence Engine",
   description: "An AI-powered personal health operating system that reduces manual tracking and makes active health decisions.",
+  manifest: "/manifest.json",
 };
 
 export const viewport: Viewport = {
