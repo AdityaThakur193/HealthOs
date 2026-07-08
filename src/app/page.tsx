@@ -818,7 +818,7 @@ export default function Dashboard() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1 scrollbar-thin">
             {todayEvents.map((event) => {
               let details = "";
               let title = event.type.toUpperCase();
