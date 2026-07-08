@@ -15,7 +15,36 @@ interface Message {
 function formatMessageContent(content: string, isUser = false) {
   return content.split("\n").map((line, lineIdx) => {
     let cleanLine = line.trim();
-    if (!cleanLine) return <div key={lineIdx} className="h-1.5" />;
+    if (!cleanLine) return <div key={lineIdx} className="h-2" />;
+
+    // Handle headers (### or ## or #)
+    let isHeader = false;
+    let headerText = cleanLine;
+    if (cleanLine.startsWith("### ")) {
+      headerText = cleanLine.substring(4);
+      isHeader = true;
+    } else if (cleanLine.startsWith("## ")) {
+      headerText = cleanLine.substring(3);
+      isHeader = true;
+    } else if (cleanLine.startsWith("# ")) {
+      headerText = cleanLine.substring(2);
+      isHeader = true;
+    }
+
+    if (isHeader) {
+      // Strip any inner bold markings inside header
+      const title = headerText.replace(/\*\*/g, "");
+      return (
+        <h5 
+          key={lineIdx} 
+          className={`font-bold text-[10px] uppercase tracking-wider mt-3 mb-1.5 ${
+            isUser ? "text-zinc-950" : "text-[#8ba893]"
+          }`}
+        >
+          {title}
+        </h5>
+      );
+    }
 
     // Handle bullet points
     let isBullet = false;
