@@ -1202,11 +1202,11 @@ export default function ProfilePage() {
               </div>
 
               {/* Editor Fields */}
-              <GlassCard className="p-4 space-y-4 border border-white/5 bg-white/2 relative">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <GlassCard className="p-5 space-y-4.5 border border-white/5 bg-white/2 relative">
+                <div className="space-y-4.5">
                   {/* Breakfast Sub-card */}
-                  <div className="p-3.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
-                    <label className="text-[9px] text-[#c87a53] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                  <div className="p-4.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
+                    <label className="text-[10px] text-[#c87a53] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
                       <span>🌅</span> Breakfast Menu
                     </label>
                     <textarea
@@ -1214,13 +1214,13 @@ export default function ProfilePage() {
                       value={parsedMenu[menuActiveDay]?.breakfast || ""}
                       onChange={(e) => updateMealField(menuActiveDay, "breakfast", e.target.value)}
                       placeholder="Enter breakfast items (e.g. Milk Bread, Corn Flakes, Idly)..."
-                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[65px] leading-relaxed font-sans"
+                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[70px] leading-relaxed font-sans"
                     />
                   </div>
 
                   {/* Lunch Sub-card */}
-                  <div className="p-3.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
-                    <label className="text-[9px] text-[#8ba893] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                  <div className="p-4.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
+                    <label className="text-[10px] text-[#8ba893] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
                       <span>☀️</span> Lunch Menu
                     </label>
                     <textarea
@@ -1228,15 +1228,13 @@ export default function ProfilePage() {
                       value={parsedMenu[menuActiveDay]?.lunch || ""}
                       onChange={(e) => updateMealField(menuActiveDay, "lunch", e.target.value)}
                       placeholder="Enter lunch items (e.g. Plain Curd, Rajma Masala, Chapati)..."
-                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[65px] leading-relaxed font-sans"
+                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[70px] leading-relaxed font-sans"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Snacks Sub-card */}
-                  <div className="p-3.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
-                    <label className="text-[9px] text-[#c87a53] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                  <div className="p-4.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
+                    <label className="text-[10px] text-[#c87a53] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
                       <span>☕</span> Snacks Menu
                     </label>
                     <textarea
@@ -1244,13 +1242,13 @@ export default function ProfilePage() {
                       value={parsedMenu[menuActiveDay]?.snacks || ""}
                       onChange={(e) => updateMealField(menuActiveDay, "snacks", e.target.value)}
                       placeholder="Enter snacks items (e.g. Bread, Bournvita, Biscuits)..."
-                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[65px] leading-relaxed font-sans"
+                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[70px] leading-relaxed font-sans"
                     />
                   </div>
 
                   {/* Dinner Sub-card */}
-                  <div className="p-3.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
-                    <label className="text-[9px] text-[#8ba893] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                  <div className="p-4.5 bg-zinc-950/40 border border-white/5 rounded-xl space-y-2 focus-within:border-[#8ba893]/30 hover:border-white/10 transition-all duration-300">
+                    <label className="text-[10px] text-[#8ba893] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
                       <span>🌙</span> Dinner Menu
                     </label>
                     <textarea
@@ -1258,7 +1256,7 @@ export default function ProfilePage() {
                       value={parsedMenu[menuActiveDay]?.dinner || ""}
                       onChange={(e) => updateMealField(menuActiveDay, "dinner", e.target.value)}
                       placeholder="Enter dinner items (e.g. Egg Curry, Chapati, Dal Tadka)..."
-                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[65px] leading-relaxed font-sans"
+                      className="w-full bg-transparent border-0 p-0 text-xs text-white placeholder-zinc-600 focus:ring-0 focus:outline-none resize-none min-h-[70px] leading-relaxed font-sans"
                     />
                   </div>
                 </div>
