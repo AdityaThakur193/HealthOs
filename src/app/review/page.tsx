@@ -213,7 +213,7 @@ export default function WeeklyReview() {
     loadReview();
   }, [router]);
 
-  const totalSlides = 5;
+  const totalSlides = 6;
 
   const nextSlide = () => {
     if (slide < totalSlides - 1) setSlide(slide + 1);
@@ -297,27 +297,82 @@ export default function WeeklyReview() {
       : "No weight data logged this week";
 
   return (
-    <div className="page-container flex flex-col justify-between min-h-dvh pb-10">
-      {/* Header */}
-      <div className="flex items-center justify-between py-2 border-b border-white/5 animate-in">
-        <div>
-          <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 font-mono">
-            Pillar 5
-          </span>
-          <h1 className="text-xl font-bold text-white mt-0.5 font-heading">
-            Weekly Report
-          </h1>
-        </div>
-        <span className="badge-success">Week {review.weekNumber}</span>
+    <div className="page-container flex flex-col justify-between min-h-dvh pb-10 pt-4">
+      {/* Spotify Wrapped Top Segment Progress Bars */}
+      <div className="flex gap-1.5 w-full px-1 animate-in">
+        {Array.from({ length: totalSlides }).map((_, i) => (
+          <div key={i} className="h-1 flex-1 bg-white/10 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-[#8ba893] rounded-full transition-all duration-300"
+              style={{ 
+                width: i < slide ? "100%" : i === slide ? "100%" : "0%",
+                transitionDuration: i === slide ? "300ms" : "0ms"
+              }}
+            />
+          </div>
+        ))}
       </div>
 
-      {/* Swipeable Carousel Slides */}
+      {/* Header */}
+      <div className="flex items-center justify-between py-4 border-b border-white/5 animate-in">
+        <div>
+          <span className="text-[9px] font-bold uppercase tracking-widest text-[#c87a53] font-mono">
+            Pillar 5 • Weekly Story
+          </span>
+          <h1 className="text-base font-bold text-white mt-0.5 font-heading">
+            {slide === 0 ? "Your Weekly Wrapped" : `Story ${slide} of ${totalSlides - 1}`}
+          </h1>
+        </div>
+        <span className="px-2 py-0.5 rounded bg-[#8ba893]/10 border border-[#8ba893]/20 text-[#8ba893] text-[9px] font-bold uppercase tracking-wider font-mono">
+          Week {review.weekNumber}
+        </span>
+      </div>
+
+      {/* Swipeable Carousel Slides Container */}
       <div className="flex-1 flex flex-col justify-center my-6 relative min-h-[350px]">
-        {/* ── Slide 0: Weight ─────────────── */}
+        {/* Tap areas for navigation (left 30% / right 70%) */}
+        <div className="absolute inset-0 flex z-30 select-none pointer-events-none">
+          <div 
+            onClick={prevSlide} 
+            className="w-[30%] h-full cursor-w-resize pointer-events-auto" 
+            title="Previous slide"
+          />
+          <div 
+            onClick={nextSlide} 
+            className="w-[70%] h-full cursor-e-resize pointer-events-auto" 
+            title="Next slide"
+          />
+        </div>
+
+        {/* ── Slide 0: The Hook (Cover Slide) ────────── */}
         {slide === 0 && (
+          <div className="animate-in text-center space-y-6 max-w-sm mx-auto py-8">
+            <div className="w-16 h-16 rounded-full bg-[#8ba893]/10 border border-[#8ba893]/20 flex items-center justify-center mx-auto animate-pulse">
+              <BarChart2 className="w-8 h-8 text-[#8ba893]" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-black text-white font-heading tracking-tight leading-tight">
+                Hey {review.profile.name},<br />
+                Your Weekly Wrapped is Ready.
+              </h2>
+              <p className="text-[10px] text-zinc-500 leading-relaxed uppercase tracking-wider font-mono">
+                {review.dateRange.start} — {review.dateRange.end}
+              </p>
+            </div>
+            <div className="p-4 bg-white/2 border border-white/5 rounded-2xl text-xs text-zinc-400 leading-relaxed">
+              We tracked your weight, workouts, sleep, and mess intake to structure your body's metabolic report.
+            </div>
+            <div className="text-[9px] text-[#c87a53] font-bold uppercase tracking-widest font-mono animate-bounce pt-4">
+              Tap right side of screen to start →
+            </div>
+          </div>
+        )}
+
+        {/* ── Slide 1: Weight ─────────────── */}
+        {slide === 1 && (
           <div className="animate-in">
             <ReviewCard
-              title="Weight Journey"
+              title="Weight Progress"
               subtitle={weightSubtitle}
               accentColor="#8ba893"
               icon={<Scale className="w-5 h-5 text-[#8ba893]" />}
@@ -343,7 +398,7 @@ export default function WeeklyReview() {
                     </div>
                   </div>
                   
-                  <div className="col-span-7 p-4 bg-white/2 border border-white/5 rounded-2xl text-center flex flex-col justify-center min-h-[110px]">
+                  <div className="col-span-7 p-4 bg-white/2 border border-white/5 rounded-tl-2xl rounded-br-2xl text-center flex flex-col justify-center min-h-[110px]">
                     <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono">
                       Weekly Delta
                     </span>
@@ -351,7 +406,7 @@ export default function WeeklyReview() {
                       {deltaDisplay}
                     </h2>
                     {review.weight.deltaKg !== null && (
-                      <span className="inline-flex items-center justify-center gap-0.5 mt-1.5 px-2 py-0.5 rounded-full bg-white/5 text-[9px] font-semibold text-zinc-400">
+                      <span className="inline-flex items-center justify-center gap-0.5 mt-1.5 px-2 py-0.5 rounded-full bg-white/5 text-[9px] font-semibold text-zinc-400 mx-auto">
                         {review.weight.deltaKg <= 0 ? (
                           <>
                             <ArrowDown className="w-3.5 h-3.5 text-[#8ba893]" />
@@ -378,8 +433,8 @@ export default function WeeklyReview() {
           </div>
         )}
 
-        {/* ── Slide 1: Nutrition ──────────── */}
-        {slide === 1 && (
+        {/* ── Slide 2: Nutrition ──────────── */}
+        {slide === 2 && (
           <div className="animate-in">
             <ReviewCard
               title="Nutrition & Fuel"
@@ -389,7 +444,7 @@ export default function WeeklyReview() {
             >
               <div className="space-y-4 pt-2 text-left">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-center">
+                  <div className="p-3 bg-white/2 border border-white/5 rounded-tl-xl rounded-br-xl text-center">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-mono font-bold block">
                       Daily Average
                     </span>
@@ -397,7 +452,7 @@ export default function WeeklyReview() {
                       {fmtNum(review.nutrition.avgCalories)} kcal
                     </p>
                   </div>
-                  <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-center">
+                  <div className="p-3 bg-white/2 border border-white/5 rounded-tl-xl rounded-br-xl text-center">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-mono font-bold block">
                       Avg Protein
                     </span>
@@ -441,22 +496,22 @@ export default function WeeklyReview() {
           </div>
         )}
 
-        {/* ── Slide 2: Training ───────────── */}
-        {slide === 2 && (
+        {/* ── Slide 3: Training ───────────── */}
+        {slide === 3 && (
           <div className="animate-in">
             <ReviewCard
-              title="Gym Adherence"
+              title="Training & Iron"
               subtitle="Progression and overload achievements"
               accentColor="#c87a53"
               icon={<Zap className="w-5 h-5 text-[#c87a53]" />}
             >
               <div className="space-y-4 pt-2 text-left">
-                <div className="p-4 bg-[#c87a53]/5 border border-[#c87a53]/20 rounded-2xl text-center">
+                <div className="p-4 bg-[#c87a53]/5 border border-[#c87a53]/20 rounded-tl-2xl rounded-br-2xl text-center">
                   <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono">
                     Workouts Logged
                   </span>
-                  <h2 className="text-2xl font-black text-[#c87a53] mt-1 font-heading">
-                    {review.training.sessionsCompleted} / {review.profile.gymFrequency} sessions
+                  <h2 className="text-xl font-black text-[#c87a53] mt-1 font-heading">
+                    {review.training.sessionsCompleted} sessions completed
                   </h2>
                 </div>
 
@@ -483,8 +538,8 @@ export default function WeeklyReview() {
           </div>
         )}
 
-        {/* ── Slide 3: Recovery ───────────── */}
-        {slide === 3 && (
+        {/* ── Slide 4: Recovery ───────────── */}
+        {slide === 4 && (
           <div className="animate-in">
             <ReviewCard
               title="Sleep & Recovery"
@@ -494,7 +549,7 @@ export default function WeeklyReview() {
             >
               <div className="space-y-4 pt-2 text-left">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-center">
+                  <div className="p-3 bg-white/2 border border-white/5 rounded-tl-xl rounded-br-xl text-center">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-mono font-bold block">
                       Avg Sleep
                     </span>
@@ -504,7 +559,7 @@ export default function WeeklyReview() {
                         : "— hrs"}
                     </p>
                   </div>
-                  <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-center">
+                  <div className="p-3 bg-white/2 border border-white/5 rounded-tl-xl rounded-br-xl text-center">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-mono font-bold block">
                       Avg Steps
                     </span>
@@ -528,11 +583,11 @@ export default function WeeklyReview() {
           </div>
         )}
 
-        {/* ── Slide 4: Coach Summary ─────── */}
-        {slide === 4 && (
+        {/* ── Slide 5: Coach Summary (Final Slide) ─────── */}
+        {slide === 5 && (
           <div className="animate-in">
             <ReviewCard
-              title="Coach Insight"
+              title="Coach Verdict"
               subtitle="Your personalized weekly feedback"
               accentColor="#c87a53"
               icon={<Lightbulb className="w-5 h-5 text-[#c87a53]" />}
@@ -555,30 +610,15 @@ export default function WeeklyReview() {
             </ReviewCard>
           </div>
         )}
-
-        {/* Slide Indicators */}
-        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
-          {Array.from({ length: totalSlides }).map((_, i) => (
-            <div
-              key={i}
-              className="w-1.5 h-1.5 rounded-full transition-all duration-300"
-              style={{
-                background:
-                  i === slide ? "#8ba893" : "rgba(255,255,255,0.15)",
-                transform: i === slide ? "scale(1.3)" : "scale(1)",
-              }}
-            />
-          ))}
-        </div>
       </div>
 
       {/* Footer Navigation */}
-      <div className="flex items-center gap-3 pt-6 border-t border-white/5">
+      <div className="flex items-center gap-3 pt-6 border-t border-white/5 animate-in">
         {slide > 0 ? (
           <button
             onClick={prevSlide}
             type="button"
-            className="btn-ghost flex-1 py-3 text-center text-xs font-bold"
+            className="btn-ghost flex-1 py-3 text-center text-xs font-bold cursor-pointer"
           >
             Prev
           </button>
@@ -590,15 +630,15 @@ export default function WeeklyReview() {
           <button
             onClick={() => router.push("/")}
             type="button"
-            className="btn-primary flex-[2] py-3 text-center font-bold text-xs"
+            className="btn-primary flex-[2] py-3 text-center font-bold text-xs cursor-pointer bg-[#8ba893] text-[#0c0f0d]"
           >
-            Done
+            Go to Dashboard
           </button>
         ) : (
           <button
             onClick={nextSlide}
             type="button"
-            className="btn-primary flex-[2] py-3 text-center font-bold text-xs"
+            className="btn-primary flex-[2] py-3 text-center font-bold text-xs cursor-pointer"
           >
             Next Slide
           </button>

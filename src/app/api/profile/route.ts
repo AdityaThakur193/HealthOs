@@ -314,6 +314,7 @@ export async function POST(request: NextRequest) {
     customCalories: customCalories ? parseInt(customCalories) : undefined,
     customProtein: customProtein ? parseInt(customProtein) : undefined,
     useCustomMacros: useCustomMacros || false,
+    messMenu: body.messMenu || undefined,
     ...targets,
   };
 

@@ -3,12 +3,16 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
+import { 
+  User, Calendar, Soup, Sparkles, Upload, Trash2, 
+  Settings, AlertTriangle, Clock, ArrowRight, Save, Loader2 
+} from "lucide-react";
 
 export default function ProfilePage() {
   const router = useRouter();
   
-  // Tab control: 'specs' | 'calendar'
-  const [activeTab, setActiveTab] = useState<"specs" | "calendar">("specs");
+  // Tab control: 'specs' | 'calendar' | 'mess'
+  const [activeTab, setActiveTab] = useState<"specs" | "calendar" | "mess">("specs");
 
   // Profile data state
   const [profile, setProfile] = useState<any>(null);
@@ -34,6 +38,14 @@ export default function ProfilePage() {
   const [customCalories, setCustomCalories] = useState("");
   const [customProtein, setCustomProtein] = useState("");
   const [useCustomMacros, setUseCustomMacros] = useState(false);
+
+  // Mess Menu States
+  const [rawMenuInput, setRawMenuInput] = useState("");
+  const [parsedMenu, setParsedMenu] = useState<any>(null);
+  const [parsingMenu, setParsingMenu] = useState(false);
+  const [savingMenu, setSavingMenu] = useState(false);
+  const [menuActiveDay, setMenuActiveDay] = useState<string>("monday");
+  const [showSuccessMenu, setShowSuccessMenu] = useState(false);
 
   // Calendar Event Manager States
   const [events, setEvents] = useState<any[]>([]);
@@ -68,6 +80,10 @@ export default function ProfilePage() {
 
         const prof = data.profile;
         setProfile(prof);
+        if (prof.messMenu) {
+          setRawMenuInput(prof.messMenu.rawText || "");
+          setParsedMenu(prof.messMenu.parsedMenu || null);
+        }
         
         // Initialize specs form
         setName(prof.name || "");
@@ -119,6 +135,7 @@ export default function ProfilePage() {
           email,
           name: name.trim(),
           age: parseInt(age),
+          gender: profile?.gender,
           heightCm: parseFloat(heightCm),
           weightKg: parseFloat(weightKg),
           targetWeightKg: targetWeightKg ? parseFloat(targetWeightKg) : undefined,
@@ -216,6 +233,145 @@ export default function ProfilePage() {
     }
   };
 
+  const handleParseMessMenu = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rawMenuInput.trim()) return;
+
+    setParsingMenu(true);
+    try {
+      const res = await fetch("/api/mess-menu/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: rawMenuInput }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.parsedMenu) {
+          setParsedMenu(data.parsedMenu);
+        } else {
+          alert("Could not extract menu. Please make sure the text contains days and meals.");
+        }
+      } else {
+        alert("Failed to parse menu. Please verify server connection.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error parsing mess menu.");
+    } finally {
+      setParsingMenu(false);
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      setParsingMenu(true);
+      try {
+        const res = await fetch("/api/mess-menu/parse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image: base64String,
+            mimeType: file.type,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.parsedMenu) {
+            setParsedMenu(data.parsedMenu);
+            setRawMenuInput("");
+          } else {
+            alert("Could not extract menu. Try copy-pasting the text menu instead.");
+          }
+        } else {
+          alert("Failed to parse menu image. Try copy-pasting the text menu.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error parsing menu image.");
+      } finally {
+        setParsingMenu(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const updateMealField = (day: string, meal: string, value: string) => {
+    setParsedMenu((prev: any) => ({
+      ...prev,
+      [day]: {
+        ...prev?.[day],
+        [meal]: value,
+      },
+    }));
+  };
+
+  const handleSaveMessMenu = async () => {
+    const email = localStorage.getItem("healthos_email");
+    if (!email || !profile) return;
+
+    setSavingMenu(true);
+    try {
+      const menuPayload = {
+        rawText: rawMenuInput,
+        parsedMenu: parsedMenu,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          name: profile.name,
+          age: profile.age,
+          gender: profile.gender,
+          heightCm: profile.heightCm,
+          weightKg: profile.weightKg,
+          targetWeightKg: profile.targetWeightKg,
+          goal: profile.goal,
+          activityLevel: profile.activityLevel,
+          gymExperience: profile.gymExperience,
+          gymFrequency: profile.gymFrequency,
+          gymAccess: profile.gymAccess,
+          messAccess: profile.messAccess,
+          dietPreference: profile.dietPreference,
+          foodAllergies: profile.foodAllergies,
+          medicalConditions: profile.medicalConditions,
+          sleepTarget: profile.sleepTarget,
+          collegeSchedule: profile.collegeSchedule,
+          neckCm: profile.neckCm,
+          waistCm: profile.waistCm,
+          hipCm: profile.hipCm,
+          customCalories: profile.customCalories,
+          customProtein: profile.customProtein,
+          useCustomMacros: profile.useCustomMacros,
+          messMenu: menuPayload,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data.profile);
+        setShowSuccessMenu(true);
+        setTimeout(() => setShowSuccessMenu(false), 2000);
+      } else {
+        alert("Failed to save mess menu.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving mess menu.");
+    } finally {
+      setSavingMenu(false);
+    }
+  };
+
   const getEventBadge = (startStr: string, endStr: string) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -253,11 +409,17 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {showSuccessMenu && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-green-500/20 border border-green-500/30 backdrop-blur-xl shadow-lg animate-in">
+          <span className="text-sm font-bold text-green-400">✓ Mess menu saved!</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between py-2 border-b border-white/5 animate-in">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Pillar 1</span>
-          <h1 className="text-xl font-bold text-white mt-0.5">Settings & Planner</h1>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[#c87a53]">Pillar 1 & 2</span>
+          <h1 className="text-xl font-bold text-white mt-0.5 font-heading">Settings & Mess</h1>
         </div>
       </div>
 
@@ -265,27 +427,35 @@ export default function ProfilePage() {
       <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 animate-in">
         <button
           onClick={() => setActiveTab("specs")}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-            activeTab === "specs" ? "bg-brand-500 text-white shadow-md" : "text-zinc-400 hover:text-white"
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeTab === "specs" ? "bg-[#8ba893] text-[#0c0f0d] shadow-md" : "text-zinc-400 hover:text-white"
           }`}
         >
-          ⚙️ Biometric Specs
+          <User className="w-3.5 h-3.5" /> Specs
         </button>
         <button
           onClick={() => setActiveTab("calendar")}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-            activeTab === "calendar" ? "bg-brand-500 text-white shadow-md" : "text-zinc-400 hover:text-white"
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeTab === "calendar" ? "bg-[#8ba893] text-[#0c0f0d] shadow-md" : "text-zinc-400 hover:text-white"
           }`}
         >
-          📅 Busy Schedule
+          <Calendar className="w-3.5 h-3.5" /> Schedule
+        </button>
+        <button
+          onClick={() => setActiveTab("mess")}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeTab === "mess" ? "bg-[#8ba893] text-[#0c0f0d] shadow-md" : "text-zinc-400 hover:text-white"
+          }`}
+        >
+          <Soup className="w-3.5 h-3.5" /> Mess Menu
         </button>
       </div>
 
       {/* Single Question Indicator */}
-      <div className="bg-brand-500/5 border border-brand-500/10 rounded-2xl p-4 animate-in-delay-1 text-center">
-        <span className="text-[9px] font-extrabold uppercase tracking-widest text-brand-400 block mb-1">Single Core Question</span>
+      <div className="bg-[#8ba893]/5 border border-[#8ba893]/10 rounded-2xl p-4 animate-in-delay-1 text-center">
+        <span className="text-[9px] font-extrabold uppercase tracking-widest text-[#8ba893] block mb-1">Single Core Question</span>
         <h2 className="text-sm font-semibold text-white">
-          {activeTab === "specs" ? '"Who am I today?"' : '"What events affect my plan?"'}
+          {activeTab === "specs" ? '"Who am I today?"' : activeTab === "calendar" ? '"What events affect my plan?"' : '"What is the mess serving today?"'}
         </h2>
       </div>
 
@@ -642,6 +812,155 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Tab 3: Hostel Mess Menu Parser */}
+      {activeTab === "mess" && (
+        <div className="space-y-5 animate-in-delay-1">
+          {/* Paste Menu Card */}
+          <GlassCard className="p-5 space-y-4 border border-white/10 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#8ba893]/5 blur-[50px] rounded-full -z-10" />
+            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center justify-between">
+              <span>Hostel Mess Menu Upload</span>
+              <span className="text-[9px] text-zinc-500 font-mono">Pillar 2</span>
+            </h3>
+
+            <div className="space-y-4">
+              <div className="text-zinc-400 text-xs leading-relaxed space-y-1.5 bg-white/2 p-3.5 rounded-xl border border-white/5">
+                <p className="font-semibold text-white flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-[#8ba893]" /> Mess-Diet Auto-Calibration</p>
+                <p className="text-[10px] text-zinc-500">Provide your mess menu below. Our AI Daily Coach will automatically study the dishes served and suggest custom protein additions or adjustments so you never miss your targets.</p>
+              </div>
+
+              {/* Image upload block */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Option A: Upload Menu Photo</label>
+                <div className="flex items-center justify-center w-full">
+                  <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-xl cursor-pointer hover:bg-white/2 border-white/10 hover:border-[#8ba893]/40 transition-all bg-zinc-950/30">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-6 h-6 text-zinc-500 mb-2" />
+                      <p className="text-[10px] text-zinc-500 font-bold">Upload screenshot or photo (JPG/PNG)</p>
+                      <p className="text-[8px] text-zinc-600 mt-1 font-mono">Or paste text menu below</p>
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageUpload} 
+                      className="hidden" 
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Text area paste block */}
+              <form onSubmit={handleParseMessMenu} className="space-y-3">
+                <div>
+                  <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Option B: Paste Menu Text</label>
+                  <textarea
+                    rows={4}
+                    value={rawMenuInput}
+                    onChange={(e) => setRawMenuInput(e.target.value)}
+                    placeholder="e.g.&#10;Monday Lunch: Rajma Chawal, Roti, Curd&#10;Monday Dinner: Mix Veg, Dal Fry, Roti&#10;Tuesday Lunch: Kadhi Chawal, Sabzi..."
+                    className="input-glass text-xs p-3 font-mono leading-relaxed"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={parsingMenu || !rawMenuInput.trim()}
+                  className="w-full py-3 rounded-xl bg-[#8ba893] hover:bg-[#8ba893]/90 text-[#0c0f0d] text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {parsingMenu ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Structuring Menu...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" /> AI Parse pasted Menu
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          </GlassCard>
+
+          {/* Parsed / Editor Panel */}
+          {parsedMenu && (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Active Mess Calendar</h3>
+                <button
+                  onClick={handleSaveMessMenu}
+                  disabled={savingMenu}
+                  className="px-4 py-1.5 rounded-lg bg-[#c87a53] hover:bg-[#c87a53]/90 text-white text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <Save className="w-3.5 h-3.5" /> {savingMenu ? "Saving..." : "Save Menu"}
+                </button>
+              </div>
+
+              {/* Day Tabs */}
+              <div className="flex gap-1 overflow-x-auto pb-1.5 scrollbar-thin">
+                {Object.keys(parsedMenu).map((day) => (
+                  <button
+                    key={day}
+                    onClick={() => setMenuActiveDay(day)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider flex-shrink-0 cursor-pointer transition-all ${
+                      menuActiveDay === day
+                        ? "bg-[#8ba893] text-[#0c0f0d]"
+                        : "bg-white/5 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {day.substring(0, 3)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Editor Fields */}
+              <GlassCard className="p-4 space-y-3 border border-white/5 bg-white/2 relative">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[9px] text-[#c87a53] font-bold uppercase tracking-wider block mb-1">🌅 Breakfast</label>
+                    <textarea
+                      rows={2}
+                      value={parsedMenu[menuActiveDay]?.breakfast || ""}
+                      onChange={(e) => updateMealField(menuActiveDay, "breakfast", e.target.value)}
+                      className="input-glass text-xs p-2 font-mono h-16"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-[#8ba893] font-bold uppercase tracking-wider block mb-1">☀️ Lunch</label>
+                    <textarea
+                      rows={2}
+                      value={parsedMenu[menuActiveDay]?.lunch || ""}
+                      onChange={(e) => updateMealField(menuActiveDay, "lunch", e.target.value)}
+                      className="input-glass text-xs p-2 font-mono h-16"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[9px] text-[#c87a53] font-bold uppercase tracking-wider block mb-1">☕ Snacks</label>
+                    <textarea
+                      rows={2}
+                      value={parsedMenu[menuActiveDay]?.snacks || ""}
+                      onChange={(e) => updateMealField(menuActiveDay, "snacks", e.target.value)}
+                      className="input-glass text-xs p-2 font-mono h-16"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-[#8ba893] font-bold uppercase tracking-wider block mb-1">🌙 Dinner</label>
+                    <textarea
+                      rows={2}
+                      value={parsedMenu[menuActiveDay]?.dinner || ""}
+                      onChange={(e) => updateMealField(menuActiveDay, "dinner", e.target.value)}
+                      className="input-glass text-xs p-2 font-mono h-16"
+                    />
+                  </div>
+                </div>
+              </GlassCard>
+            </div>
+          )}
         </div>
       )}
     </div>

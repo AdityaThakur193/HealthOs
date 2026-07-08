@@ -175,6 +175,15 @@ export async function POST(request: NextRequest) {
     // Calculate Adaptive TDEE for AI Coach Context
     const tdeeResult = calculateAdaptiveTdee(profile, tdeeEvents);
 
+    const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    const todayIndex = new Date().getDay();
+    const todayWeekday = weekdays[todayIndex];
+
+    let todayMessMenu = null;
+    if (profile.messMenu && profile.messMenu.parsedMenu) {
+      todayMessMenu = (profile.messMenu.parsedMenu as any)[todayWeekday] || null;
+    }
+
     const context: CoachContext = {
       profile: {
         name: profile.name,
@@ -182,6 +191,7 @@ export async function POST(request: NextRequest) {
         targetCalories: profile.targetCalories || 2200,
         targetProteinG: profile.targetProteinG || 150,
       },
+      todayMessMenu,
       today: {
         caloriesConsumed,
         proteinConsumed,

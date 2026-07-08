@@ -46,6 +46,19 @@ export interface IUserProfile extends Document {
   customCalories?: number;
   customProtein?: number;
   useCustomMacros?: boolean;
+  messMenu?: {
+    rawText?: string;
+    parsedMenu?: {
+      monday?: { breakfast: string; lunch: string; snacks: string; dinner: string };
+      tuesday?: { breakfast: string; lunch: string; snacks: string; dinner: string };
+      wednesday?: { breakfast: string; lunch: string; snacks: string; dinner: string };
+      thursday?: { breakfast: string; lunch: string; snacks: string; dinner: string };
+      friday?: { breakfast: string; lunch: string; snacks: string; dinner: string };
+      saturday?: { breakfast: string; lunch: string; snacks: string; dinner: string };
+      sunday?: { breakfast: string; lunch: string; snacks: string; dinner: string };
+    };
+    updatedAt?: string;
+  };
 
   createdAt: Date;
   updatedAt: Date;
@@ -114,6 +127,19 @@ const UserProfileSchema = new Schema<IUserProfile>(
     customCalories: Number,
     customProtein: Number,
     useCustomMacros: { type: Boolean, default: false },
+    messMenu: {
+      rawText: String,
+      parsedMenu: {
+        monday: { breakfast: String, lunch: String, snacks: String, dinner: String },
+        tuesday: { breakfast: String, lunch: String, snacks: String, dinner: String },
+        wednesday: { breakfast: String, lunch: String, snacks: String, dinner: String },
+        thursday: { breakfast: String, lunch: String, snacks: String, dinner: String },
+        friday: { breakfast: String, lunch: String, snacks: String, dinner: String },
+        saturday: { breakfast: String, lunch: String, snacks: String, dinner: String },
+        sunday: { breakfast: String, lunch: String, snacks: String, dinner: String },
+      },
+      updatedAt: String,
+    },
   },
   { timestamps: true }
 );

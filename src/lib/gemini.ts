@@ -141,6 +141,12 @@ export interface CoachContext {
   daysRemaining?: number;
   avgCalories14d?: number;
   weightDeltaKg14d?: number;
+  todayMessMenu?: {
+    breakfast?: string;
+    lunch?: string;
+    snacks?: string;
+    dinner?: string;
+  } | null;
 }
 
 export interface CoachRecommendation {
@@ -173,10 +179,12 @@ Generate a daily coaching recommendation as JSON:
   * If in "calibrating" mode, encourage them to stay consistent with logs: "We are calibrating your metabolic engine. Need X more days of logs."
   * If an activeEvent (like exams, travel, or sickness) is present, adapt immediately: suggest active recovery or rest, explain that targets are lowered, and comfort them.
 - "actionItems": array of 2-3 specific next actions. If activeEvent is present, keep actions simple (e.g. hydration, rest, gentle walks).
+  * If todayMessMenu is present, include exactly ONE action item with a recommendation on what to eat or adjust based on today's mess menu to hit calorie/protein targets (e.g., "Add double curd to your dinner dal" or "Mess lunch is Rajma Chawal, add 3 boiled eggs for protein").
 - "motivation": one encouraging sentence (no guilt, no shame)
 
 Rules:
 - Never guilt the user for missing workouts or eating badly.
+- If todayMessMenu is present, actively reference its items in your nutritional feedback.
 - If they have activeEvent, adapt targets downward (e.g. step count target is lower). Encourage them that health is a long term relationship.
 - If they return after days off, say "Welcome back. Let's focus on today."
 - Every recommendation must explain WHY, WHAT, and EXPECTED OUTCOME.
@@ -245,10 +253,12 @@ Generate a daily coaching recommendation as JSON:
   * If in "calibrating" mode, encourage them to stay consistent with logs: "We are calibrating your metabolic engine. Need X more days of logs."
   * If an activeEvent (like exams, travel, or sickness) is present, adapt immediately: suggest active recovery or rest, explain that targets are lowered, and comfort them.
 - "actionItems": array of 2-3 specific next actions. If activeEvent is present, keep actions simple (e.g. hydration, rest, gentle walks).
+  * If todayMessMenu is present, include exactly ONE action item with a recommendation on what to eat or adjust based on today's mess menu to hit calorie/protein targets (e.g., "Add double curd to your dinner dal" or "Mess lunch is Rajma Chawal, add 3 boiled eggs for protein").
 - "motivation": one encouraging sentence (no guilt, no shame)
 
 Rules:
 - Never guilt the user for missing workouts or eating badly.
+- If todayMessMenu is present, actively reference its items in your nutritional feedback.
 - If they have activeEvent, adapt targets downward (e.g. step count target is lower). Encourage them that health is a long term relationship.
 - If they return after days off, say "Welcome back. Let's focus on today."
 - Every recommendation must explain WHY, WHAT, and EXPECTED OUTCOME.
