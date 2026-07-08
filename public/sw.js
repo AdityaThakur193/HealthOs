@@ -13,9 +13,10 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: data.body,
-    icon: "/logo.svg", // Premium Logo icon
-    badge: "/logo.svg", // Premium status bar badge icon
+    icon: "/logo.png", // Raster icon (compatible with Android/Chrome)
+    badge: "/logo.png", // Raster badge icon
     image: bannerImage, // Large rich content banner image
+    color: "#8ba893", // App color scheme theme accent
     vibrate: [200, 100, 200],
     tag: data.tag || "healthos-reminder",
     renotify: true,
@@ -74,9 +75,10 @@ self.addEventListener("message", (event) => {
     
     self.registration.showNotification(title, {
       body,
-      icon: "/logo.svg",
-      badge: "/logo.svg",
+      icon: "/logo.png",
+      badge: "/logo.png",
       image: bannerImage,
+      color: "#8ba893",
       vibrate: [250, 100, 250],
       tag: "healthos-reminder",
       renotify: true,
