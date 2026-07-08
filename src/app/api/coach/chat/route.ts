@@ -95,9 +95,45 @@ Do not add any text before or after the JSON response. Return ONLY valid JSON.`;
 
     const fullPrompt = `${systemPrompt}\n\nChat History:\n${formattedHistory}\n\nUser: ${message}\n\nCoach:`;
 
-    console.log(`💬 Chatbot processing message from ${email}...`);
-    const result = await model.generateContent(fullPrompt);
-    const responseText = result.response.text();
+    const groqApiKey = process.env.GROQ_API_KEY;
+    let responseText = "";
+
+    try {
+      console.log(`💬 Chatbot processing message from ${email} using Gemini...`);
+      const result = await model.generateContent(fullPrompt);
+      responseText = result.response.text();
+    } catch (geminiError) {
+      console.warn("⚠️ Gemini chatbot request failed, attempting Groq fallback:", geminiError);
+      
+      if (groqApiKey && groqApiKey !== "your_groq_api_key_here") {
+        const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${groqApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+              { role: "user", content: fullPrompt }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.7
+          })
+        });
+
+        if (groqRes.ok) {
+          const groqData = await groqRes.json();
+          responseText = groqData.choices[0]?.message?.content || "";
+          console.log("✅ Successfully fell back to Groq Llama-3.3 for chatbot response.");
+        } else {
+          const errText = await groqRes.text();
+          throw new Error(`Groq fallback failed (${groqRes.status}): ${errText}`);
+        }
+      } else {
+        throw geminiError;
+      }
+    }
 
     const sanitized = sanitizeJsonOutput(responseText);
     const parsed = JSON.parse(sanitized);
