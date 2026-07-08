@@ -259,7 +259,7 @@ export default function CoachChatFAB() {
       {/* Floating Action Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-20 md:bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#0c0f0d] border border-[#8ba893] flex items-center justify-center shadow-lg cursor-pointer hover:scale-105 transition-all group overflow-hidden"
+        className="fixed bottom-24 left-6 md:left-auto md:right-6 md:bottom-6 z-50 w-14 h-14 rounded-full bg-[#0c0f0d] border border-[#8ba893] flex items-center justify-center shadow-lg cursor-pointer hover:scale-105 transition-all group overflow-hidden"
         style={{ boxShadow: "0 0 15px rgba(139, 168, 147, 0.25)" }}
       >
         <div className="absolute inset-0 bg-[#8ba893]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
