@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import MealResultCard from "@/components/MealResultCard";
+import CustomPopup from "@/components/CustomPopup";
 import { Camera, Edit3, AlertTriangle, Play, CheckCircle } from "lucide-react";
 
 interface FoodItem {
@@ -73,6 +74,38 @@ export default function MealCapture() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isMock, setIsMock] = useState(false);
+
+  // Custom Popup Alert States
+  const [popupState, setPopupState] = useState<{
+    isOpen: boolean;
+    type: "alert" | "confirm" | "error" | "success" | "warning";
+    title: string;
+    message: string;
+    confirmText?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    type: "alert",
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const showCustomAlert = (title: string, message: string, type: "alert" | "error" | "success" | "warning" = "alert") => {
+    return new Promise<void>((resolve) => {
+      setPopupState({
+        isOpen: true,
+        type,
+        title,
+        message,
+        confirmText: "OK",
+        onConfirm: () => {
+          setPopupState((prev) => ({ ...prev, isOpen: false }));
+          resolve();
+        },
+      });
+    });
+  };
 
   // Manual meal form states
   const [manualName, setManualName] = useState("");
@@ -146,15 +179,15 @@ export default function MealCapture() {
         setState("results");
       } else if (res.status === 429) {
         const data = await res.json();
-        alert(`⏳ Gemini API quota reached.\n\n${data.message}`);
+        showCustomAlert("Quota Reached ⏳", `Gemini API quota reached.\n\n${data.message}`, "warning");
         setState("idle");
       } else {
-        alert("Analysis failed. Try again.");
+        showCustomAlert("Analysis Failed", "Analysis failed. Please try again.", "error");
         setState("idle");
       }
     } catch (err) {
       console.error("Compression/Upload error:", err);
-      alert("Failed to analyze image. Ensure it is a valid photo.");
+      showCustomAlert("Upload Error", "Failed to analyze image. Ensure it is a valid photo.", "error");
       setState("idle");
     }
   };
@@ -587,6 +620,15 @@ export default function MealCapture() {
           </div>
         </div>
       )}
+      {/* Premium Alert/Confirm Toast Popup */}
+      <CustomPopup
+        isOpen={popupState.isOpen}
+        type={popupState.type}
+        title={popupState.title}
+        message={popupState.message}
+        confirmText={popupState.confirmText}
+        onConfirm={popupState.onConfirm}
+      />
     </div>
   );
 }
