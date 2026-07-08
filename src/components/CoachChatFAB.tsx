@@ -274,7 +274,7 @@ export default function CoachChatFAB() {
 
       {/* Chat Drawer Side Panel */}
       {isOpen && (
-        <div className="fixed bottom-0 right-0 left-0 md:left-auto md:right-6 md:bottom-24 z-50 w-full md:w-[385px] h-[520px] bg-[#0c0f0d]/95 border-t md:border border-white/10 rounded-t-3xl md:rounded-2xl backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden animate-in">
+        <div className="fixed bottom-[82px] right-3 left-3 md:left-auto md:right-6 md:bottom-24 z-50 w-auto md:w-[385px] h-[480px] md:h-[520px] bg-[#0c0f0d]/95 border border-white/10 rounded-2xl backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden animate-in">
           {/* Header */}
           <div className="p-4 bg-white/3 border-b border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -317,10 +317,10 @@ export default function CoachChatFAB() {
                 )}
                 
                 <div
-                  className={`max-w-[75%] p-3 rounded-2xl text-xs leading-relaxed ${
+                  className={`max-w-[75%] p-3 rounded-2xl text-xs leading-relaxed animate-in duration-300 fade-in slide-in-from-bottom-2 ${
                     msg.role === "user"
-                      ? "bg-[#8ba893] text-[#0c0f0d] rounded-tr-none font-medium"
-                      : "bg-white/5 text-zinc-300 border border-white/5 rounded-tl-none"
+                      ? "bg-gradient-to-tr from-[#8ba893] to-[#9cbda5] text-[#0c0f0d] rounded-tr-none font-bold shadow-lg shadow-[#8ba893]/10"
+                      : "bg-white/5 text-zinc-300 border border-white/10 rounded-tl-none backdrop-blur-sm"
                   }`}
                 >
                   {formatMessageContent(msg.content, msg.role === "user")}
