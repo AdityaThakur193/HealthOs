@@ -229,7 +229,7 @@ const TimelineEventSchema = new Schema<ITimelineEvent>(
     tags: { type: [String], default: [] },
     source: {
       type: String,
-      enum: ["manual", "ai_vision", "wearable", "import"],
+      enum: ["manual", "ai_vision", "wearable", "import", "chatbot"],
       default: "manual",
     },
   },

@@ -203,20 +203,33 @@ export default function CoachChatFAB() {
   const saveUpdatedPlan = async (action: string, updatedData: any, currentProfile: any) => {
     const email = localStorage.getItem("healthos_email");
     if (!email || !currentProfile) return;
-    const userId = currentProfile._id || email;
+    // Use the stored ObjectId string from localStorage (same format as handleQuickLog)
+    const userId = localStorage.getItem("healthos_userId") || String(currentProfile._id || email);
 
     // Helper: post a timeline event
     const postTimeline = async (type: string, payload: object, tags: string[] = []) => {
-      const res = await fetch("/api/timeline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, type, timestamp: new Date().toISOString(), payload, tags, source: "chatbot" }),
-      });
-      return res.ok;
+      try {
+        const res = await fetch("/api/timeline", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, type, timestamp: new Date().toISOString(), payload, tags, source: "chatbot" }),
+        });
+        if (!res.ok) {
+          const err = await res.text();
+          console.error(`❌ Timeline POST failed (${res.status}):`, err);
+        }
+        return res.ok;
+      } catch (e) {
+        console.error("❌ Timeline POST network error:", e);
+        return false;
+      }
     };
 
-    // Helper: append confirm message in chat
-    const confirm = (msg: string) => setMessages((prev) => [...prev, { role: "model", content: msg }]);
+    // Helper: append confirm message AND trigger dashboard refresh
+    const confirm = (msg: string) => {
+      setMessages((prev) => [...prev, { role: "model", content: msg }]);
+      window.dispatchEvent(new Event("chatbotDataLogged"));
+    };
 
     try {
       // ── 1. LOG MEAL ──────────────────────────────────────────────────────
