@@ -13,7 +13,7 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: data.body,
-    icon: "/logo-notification.png", // Branded icon with solid bg (like LinkedIn rounded square)
+    icon: "/logo-192.png", // Transparent branded icon
     badge: "/logo-badge.png", // Monochrome badge for Android status bar
     image: bannerImage, // Large rich content banner image
     color: "#8ba893", // App color scheme theme accent
@@ -75,7 +75,7 @@ self.addEventListener("message", (event) => {
     
     self.registration.showNotification(title, {
       body,
-      icon: "/logo-notification.png",
+      icon: "/logo-192.png",
       badge: "/logo-badge.png",
       image: bannerImage,
       color: "#8ba893",
