@@ -225,9 +225,9 @@ export default function CoachChatFAB() {
           mealType: updatedData.mealType || "meal",
           foods: updatedData.items || [],
           totalCalories: updatedData.totalCalories || 0,
-          totalProtein: updatedData.totalProtein || 0,
-          totalCarbs: updatedData.totalCarbs || (updatedData.items || []).reduce((s: number, f: any) => s + (f.carbsG || 0), 0),
-          totalFat: updatedData.totalFat || (updatedData.items || []).reduce((s: number, f: any) => s + (f.fatG || 0), 0),
+          totalProteinG: updatedData.totalProtein || 0,
+          totalCarbsG: updatedData.totalCarbs || (updatedData.items || []).reduce((s: number, f: any) => s + (f.carbsG || 0), 0),
+          totalFatG: updatedData.totalFat || (updatedData.items || []).reduce((s: number, f: any) => s + (f.fatG || 0), 0),
           notes: updatedData.notes || "",
           loggedVia: "chatbot",
         }, [updatedData.mealType || "meal", "chatbot"]);
@@ -243,7 +243,7 @@ export default function CoachChatFAB() {
         const steps = updatedData.steps || 0;
         const distKm = updatedData.distanceKm || parseFloat((steps * 0.00075).toFixed(2));
         const kcal = updatedData.caloriesBurned || Math.round(steps * 0.04);
-        const ok = await postTimeline("steps", { steps, distanceKm: distKm, caloriesBurned: kcal, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["steps", "chatbot"]);
+        const ok = await postTimeline("steps", { count: steps, steps, distanceKm: distKm, caloriesBurned: kcal, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["steps", "chatbot"]);
         if (ok) {
           confirm(`✅ **Steps Logged!** ${steps.toLocaleString()} steps · ${distKm}km · ~${kcal} kcal burned 👟`);
           window.dispatchEvent(new Event("stepsLogged"));
@@ -255,7 +255,7 @@ export default function CoachChatFAB() {
       if (action === "log_water") {
         const glasses = updatedData.glasses || Math.round((updatedData.amountMl || 0) / 250);
         const ml = updatedData.amountMl || glasses * 250;
-        const ok = await postTimeline("water", { amountMl: ml, glasses, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["water", "chatbot"]);
+        const ok = await postTimeline("water", { amountL: +(ml / 1000).toFixed(2), amountMl: ml, glasses, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["water", "chatbot"]);
         if (ok) {
           confirm(`✅ **Water Logged!** ${glasses} glass${glasses !== 1 ? "es" : ""} (${ml}ml) 💧`);
           window.dispatchEvent(new Event("waterLogged"));

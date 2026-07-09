@@ -824,15 +824,15 @@ export default function Dashboard() {
               let title = event.type.toUpperCase();
               
               if (event.type === "meal") {
-                title = "Meal Capture";
-                const foodsList = event.payload.foods?.map((f: any) => f.name).join(", ") || "Meal Log";
-                details = `${foodsList} (${event.payload.totalCalories || 0} kcal, ${event.payload.totalProteinG || 0}g protein)`;
+                title = event.payload.loggedVia === "chatbot" ? "Meal Log" : "Meal Capture";
+                const foodsList = event.payload.foods?.map((f: any) => f.name).join(", ") || event.payload.mealType || "Meal";
+                details = `${foodsList} (${event.payload.totalCalories || 0} kcal, ${event.payload.totalProteinG || event.payload.totalProtein || 0}g protein)`;
               } else if (event.type === "weight") {
                 title = "Weight Log";
                 details = `${event.payload.weightKg || 0} kg logged`;
               } else if (event.type === "steps") {
                 title = "Daily Steps";
-                details = `${event.payload.count?.toLocaleString() || 0} steps`;
+                details = `${(event.payload.count || event.payload.steps || 0).toLocaleString()} steps`;
               } else if (event.type === "sleep") {
                 title = "Sleep Log";
                 details = `${event.payload.hours || 0} hours of sleep`;
