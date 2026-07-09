@@ -75,8 +75,16 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
+    // Convert string userId to ObjectId (chatbot sends string, schema needs ObjectId)
+    let userObjectId: any = userId;
+    try {
+      userObjectId = new (require("mongoose").Types.ObjectId)(userId);
+    } catch {
+      // If userId is not a valid ObjectId hex string, keep as-is
+    }
+
     const event = await TimelineEvent.create({
-      userId,
+      userId: userObjectId,
       type,
       timestamp: timestamp ? new Date(timestamp) : new Date(),
       payload,
@@ -85,7 +93,17 @@ export async function POST(request: NextRequest) {
     });
 
     return Response.json({ event }, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
+    // Log the REAL error so we can debug it
+    console.error("❌ Timeline POST error:", error?.message || error);
+
+    // Validation/cast errors are NOT connection errors — surface them immediately
+    if (error?.name === "ValidationError" || error?.name === "CastError") {
+      console.error("❌ Mongoose validation/cast error (not a connection issue):", JSON.stringify(error?.errors));
+      return Response.json({ error: `Validation failed: ${error.message}` }, { status: 400 });
+    }
+
+    // Actual connection failures fall back to local file in dev
     console.warn("⚠️ MongoDB connection failed on timeline POST. Saving to local file DB.");
     if (process.env.NODE_ENV === "production") {
       return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
