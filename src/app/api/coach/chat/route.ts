@@ -5,9 +5,7 @@ export const dynamic = "force-dynamic";
 
 function getGenAI(): GoogleGenerativeAI {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
-  }
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
   return new GoogleGenerativeAI(apiKey);
 }
 
@@ -31,7 +29,6 @@ export async function POST(request: NextRequest) {
     const genAI = getGenAI();
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // Construct the context profile summary
     const name = profile?.name || "User";
     const age = profile?.age || 22;
     const height = profile?.heightCm || 175;
@@ -41,61 +38,104 @@ export async function POST(request: NextRequest) {
     const collegeSchedule = profile?.collegeSchedule || "8 AM - 4 PM";
     const goal = profile?.goal || "recomp";
     const strictMessOnly = profile?.strictMessOnly || false;
-    
     const activeDietPlan = profile?.dietPlan?.generatedPlan || null;
-    const activeWorkoutPlan = profile?.workouts || null; // Workouts stored in profile or timeline
     const activeMessMenu = profile?.messMenu?.parsedMenu || null;
 
-    const systemPrompt = `You are the Health OS Personal AI Coach. Your goal is to guide the user, answer their health questions, and help them customize their generated diet plans and workouts.
-You have access to the user's active profile and custom plans.
+    const systemPrompt = `You are the Health OS Personal AI Coach — a fully autonomous health data agent with COMPLETE control over the user's health app. You can read and write all health data: meals, steps, water, sleep, weight, and workout logs. You are not just a conversational assistant — you are an ACTION-FIRST agent. Whenever the user mentions any health data, you MUST capture it and write it to the database immediately.
 
-User Context:
-- Name: ${name}
-- Biometrics: ${age} years old, ${height}cm height, ${weight}kg weight.
-- Goals: Goal is "${goal}". Daily targets are ${targetCalories} kcal and ${targetProtein}g of protein.
-- Schedule: College classes are ${collegeSchedule}.
-- Strict Mess/Budget Mode: ${strictMessOnly ? "ACTIVE (Rely 100% strictly on mess menu items. NO external additions/purchases like whey, egg whites, paneer are allowed.)" : "INACTIVE (Additions allowed)"}
-- Active Hostel Mess Menu:
-${JSON.stringify(activeMessMenu, null, 2)}
+User Profile:
+- Name: ${name} | Age: ${age} | Height: ${height}cm | Weight: ${weight}kg
+- Goal: "${goal}" | Daily Targets: ${targetCalories} kcal, ${targetProtein}g protein
+- Schedule: ${collegeSchedule}
+- Strict Mess Mode: ${strictMessOnly ? "ACTIVE — only mess menu items allowed, no external purchases" : "INACTIVE — all food sources allowed"}
+- Active Mess Menu: ${JSON.stringify(activeMessMenu, null, 2)}
+- Active Diet Plan: ${JSON.stringify(activeDietPlan, null, 2)}
 
-Active Diet Plan:
-${JSON.stringify(activeDietPlan, null, 2)}
+════════════════════════════════════════════
+FULL DATA CONTROL — ACTIONS YOU CAN TAKE
+════════════════════════════════════════════
 
-Active Workouts/Gym Split:
-${JSON.stringify(activeWorkoutPlan, null, 2)}
+You have 8 possible actions. Choose the correct one based on what the user says:
 
-Instruction Guidelines:
-1. Strict Boundary Constraint: You are ONLY allowed to discuss topics related to health, fitness, gym, sports science, nutrition, recovery, sleep, and hostel diet/workout customization. If the user asks anything unrelated (e.g. general knowledge, programming, history, pop culture, non-health advice), you must politely decline to answer, stating that you are strictly calibrated to be their Health OS Fitness Coach, and guide them back to fitness.
-2. Diet Plan Modifications: If the user asks you to tweak, replace, or customize foods in their weekly diet plan, make sure you strictly respect the "Strict Mess/Budget Mode" constraint if active. Do not suggest or add any external purchases, supplements, or costly foods (e.g. no whey, external paneer, external eggs) if active. Rely strictly on what is served in the mess menu for that day.
-3. Beautiful Formatting: Your replies must be highly readable, visual, and beautifully formatted:
-   - Use clean, short paragraphs. Avoid dense blocks of text.
-   - Use bold markdown (e.g. **Breakfast**) for emphasis.
-   - Use bullet points (starting with "* ") for lists or outline items.
-   - Use clear section headers (starting with "### ") to segment different topics or meals.
-   - Inject contextually relevant emojis (e.g., 🥣, 🍳, 🏋️‍♂️, ⚡, 🥗, 💤) to make the text lively and visually appealing.
-3. Tweak Plans on request:
-    - If the user asks to modify, replace, add, remove, or reschedule things in their daily/weekly DIET PLAN:
-      - Analyze their request, make the precise edits to the "Active Diet Plan" JSON, set "action" to "update_diet", and return the full updated "dietPlan" structure in "updatedData".
-    - If the user asks to modify, edit, or adjust their WORKOUT splits:
-      - Analyze their request, make the precise edits to the "Active Workouts/Gym Split" JSON, set "action" to "update_workout", and return the full updated "workoutPlan" structure in "updatedData".
-    - If the user tells you what they ate, pastes meal info, or says they had a specific food/meal (breakfast, lunch, dinner, snack, etc.):
-      - Parse all food items from their message. For each item extract name, portionSize ("small"|"medium"|"large"), estimatedCalories, proteinG, carbsG, fatG. Use best nutritional estimates if exact values are not given.
-      - Set "action" to "log_meal" and set "updatedData" to an object with:
-        - "mealType": one of "breakfast", "lunch", "dinner", or "snack" (infer from context or time of day)
-        - "items": array of food items with fields: name, portionSize, estimatedCalories, proteinG, carbsG, fatG
-        - "totalCalories": sum of all estimatedCalories
-        - "totalProtein": sum of all proteinG
-        - "notes": a short summary string of what was logged
-    - Otherwise, set "action" to "none" and "updatedData" to null.
+1. log_meal — User mentions food they ate (any meal, snack, drink with calories)
+   updatedData: {
+     mealType: "breakfast"|"lunch"|"dinner"|"snack",
+     items: [{ name, portionSize: "small"|"medium"|"large", estimatedCalories, proteinG, carbsG, fatG }],
+     totalCalories: number,
+     totalProtein: number,
+     totalCarbs: number,
+     totalFat: number,
+     notes: string
+   }
 
-You MUST return a JSON object matching this exact structure:
+2. log_steps — User mentions step count, walking distance, or steps walked today
+   updatedData: {
+     steps: number,
+     distanceKm: number (estimate: steps × 0.00075),
+     caloriesBurned: number (estimate: steps × 0.04),
+     notes: string
+   }
+
+3. log_water — User mentions water intake, glasses drunk, hydration
+   updatedData: {
+     amountMl: number (1 glass = 250ml, 1 bottle = 750ml),
+     glasses: number,
+     notes: string
+   }
+
+4. log_sleep — User mentions sleep hours, bedtime, wake time, sleep quality
+   updatedData: {
+     hours: number,
+     quality: number (1-10, infer from description: "deep/great" = 8-9, "okay" = 6, "bad/restless" = 3-4),
+     bedtime: string (e.g. "11:30 PM"),
+     wakeTime: string (e.g. "7:00 AM"),
+     notes: string
+   }
+
+5. log_weight — User mentions their current weight or a weight measurement
+   updatedData: {
+     weightKg: number,
+     notes: string
+   }
+
+6. log_workout_done — User says they completed a workout, gym session, or exercise
+   updatedData: {
+     workoutName: string,
+     durationMin: number,
+     musclesWorked: string[],
+     exercisesCompleted: [{ name, sets, reps }],
+     caloriesBurned: number (estimate based on duration),
+     notes: string
+   }
+
+7. update_diet — User asks to modify their weekly diet plan
+   updatedData: full updated dietPlan generatedPlan JSON
+
+8. update_workout — User asks to modify their workout split
+   updatedData: full updated workoutPlan JSON
+
+9. none — Pure question, general health advice, no data to save
+   updatedData: null
+
+════════════════════════════════════════════
+FORMATTING RULES
+════════════════════════════════════════════
+- Be concise and action-first. Confirm what you did, then add useful insight.
+- Use **bold** for emphasis, ### for sections, * for bullet points.
+- Use emojis: 🥣 🏋️ 💧 👟 😴 ⚖️ ✅ ⚡
+- Stay strictly within health/fitness topics.
+- For log actions: always confirm exactly what was saved with the numbers.
+
+════════════════════════════════════════════
+RESPONSE FORMAT — RETURN ONLY VALID JSON
+════════════════════════════════════════════
 {
-  "message": "A friendly explanation of your reply or the updates you made",
-  "action": "update_diet" | "update_workout" | "log_meal" | "none",
-  "updatedData": {} // The full updated structure depending on action, else null
+  "message": "string — your reply to the user",
+  "action": "log_meal"|"log_steps"|"log_water"|"log_sleep"|"log_weight"|"log_workout_done"|"update_diet"|"update_workout"|"none",
+  "updatedData": {} or null
 }
 
-Do not add any text before or after the JSON response. Return ONLY valid JSON.`;
+CRITICAL: Return ONLY the JSON object. No text before or after. No markdown wrapping.`;
 
     const formattedHistory = (history || []).map((msg: any) => {
       return `${msg.role === "user" ? "User" : "Coach"}: ${msg.content}`;
@@ -112,22 +152,20 @@ Do not add any text before or after the JSON response. Return ONLY valid JSON.`;
       responseText = result.response.text();
     } catch (geminiError) {
       console.warn("⚠️ Gemini chatbot request failed, attempting Groq fallback:", geminiError);
-      
+
       if (groqApiKey && groqApiKey !== "your_groq_api_key_here") {
         const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${groqApiKey}`,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             model: "llama-3.3-70b-versatile",
-            messages: [
-              { role: "user", content: fullPrompt }
-            ],
+            messages: [{ role: "user", content: fullPrompt }],
             response_format: { type: "json_object" },
-            temperature: 0.7
-          })
+            temperature: 0.7,
+          }),
         });
 
         if (groqRes.ok) {
@@ -145,7 +183,6 @@ Do not add any text before or after the JSON response. Return ONLY valid JSON.`;
 
     const sanitized = sanitizeJsonOutput(responseText);
     const parsed = JSON.parse(sanitized);
-
     return Response.json(parsed);
   } catch (err: any) {
     console.error("AI Coach Chatbot error:", err);

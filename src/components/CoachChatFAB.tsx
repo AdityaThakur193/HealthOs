@@ -203,99 +203,143 @@ export default function CoachChatFAB() {
   const saveUpdatedPlan = async (action: string, updatedData: any, currentProfile: any) => {
     const email = localStorage.getItem("healthos_email");
     if (!email || !currentProfile) return;
+    const userId = currentProfile._id || email;
+
+    // Helper: post a timeline event
+    const postTimeline = async (type: string, payload: object, tags: string[] = []) => {
+      const res = await fetch("/api/timeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, type, timestamp: new Date().toISOString(), payload, tags, source: "chatbot" }),
+      });
+      return res.ok;
+    };
+
+    // Helper: append confirm message in chat
+    const confirm = (msg: string) => setMessages((prev) => [...prev, { role: "model", content: msg }]);
 
     try {
-      // ── Log Meal to Timeline ──────────────────────────────────────────────
+      // ── 1. LOG MEAL ──────────────────────────────────────────────────────
       if (action === "log_meal") {
-        const userId = currentProfile._id || email;
-        const mealPayload = {
-          userId,
-          type: "meal",
-          timestamp: new Date().toISOString(),
-          source: "chatbot",
-          tags: [updatedData.mealType || "meal", "chatbot"],
-          payload: {
-            mealType: updatedData.mealType || "meal",
-            foods: updatedData.items || [],
-            totalCalories: updatedData.totalCalories || 0,
-            totalProtein: updatedData.totalProtein || 0,
-            totalCarbs: (updatedData.items || []).reduce((s: number, f: any) => s + (f.carbsG || 0), 0),
-            totalFat: (updatedData.items || []).reduce((s: number, f: any) => s + (f.fatG || 0), 0),
-            notes: updatedData.notes || "",
-            loggedVia: "chatbot",
-          },
-        };
-
-        const logRes = await fetch("/api/timeline", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(mealPayload),
-        });
-
-        if (logRes.ok) {
-          console.log("✅ Meal logged to timeline via chatbot!");
-          // Append a confirmation badge message in chat
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "model",
-              content: `✅ **Meal Logged!** ${updatedData.mealType ? updatedData.mealType.charAt(0).toUpperCase() + updatedData.mealType.slice(1) : "Meal"} saved to your timeline — **${updatedData.totalCalories || 0} kcal · ${updatedData.totalProtein || 0}g protein**. Check your Meal page to see it! 🍽️`,
-            },
-          ]);
+        const ok = await postTimeline("meal", {
+          mealType: updatedData.mealType || "meal",
+          foods: updatedData.items || [],
+          totalCalories: updatedData.totalCalories || 0,
+          totalProtein: updatedData.totalProtein || 0,
+          totalCarbs: updatedData.totalCarbs || (updatedData.items || []).reduce((s: number, f: any) => s + (f.carbsG || 0), 0),
+          totalFat: updatedData.totalFat || (updatedData.items || []).reduce((s: number, f: any) => s + (f.fatG || 0), 0),
+          notes: updatedData.notes || "",
+          loggedVia: "chatbot",
+        }, [updatedData.mealType || "meal", "chatbot"]);
+        if (ok) {
+          confirm(`✅ **${(updatedData.mealType || "meal").replace(/^\w/, (c: string) => c.toUpperCase())} Logged!** ${updatedData.totalCalories || 0} kcal · ${updatedData.totalProtein || 0}g protein saved to your timeline 🍽️`);
           window.dispatchEvent(new Event("mealLogged"));
-        } else {
-          console.error("Failed to log meal via chatbot");
         }
         return;
       }
 
-      // ── Update Diet / Workout Plan ────────────────────────────────────────
-      const payload: any = {
-        email,
-        name: currentProfile.name,
-        age: currentProfile.age,
-        gender: currentProfile.gender,
-        heightCm: currentProfile.heightCm,
-        weightKg: currentProfile.weightKg,
-        targetWeightKg: currentProfile.targetWeightKg,
-        goal: currentProfile.goal,
-        activityLevel: currentProfile.activityLevel,
-        gymExperience: currentProfile.gymExperience,
-        gymFrequency: currentProfile.gymFrequency,
-        gymAccess: currentProfile.gymAccess,
-        messAccess: currentProfile.messAccess,
-        dietPreference: currentProfile.dietPreference,
-        foodAllergies: currentProfile.foodAllergies,
-        medicalConditions: currentProfile.medicalConditions,
-        sleepTarget: currentProfile.sleepTarget,
-        collegeSchedule: currentProfile.collegeSchedule,
-        neckCm: currentProfile.neckCm,
-        waistCm: currentProfile.waistCm,
-        hipCm: currentProfile.hipCm,
-        customCalories: currentProfile.customCalories,
-        customProtein: currentProfile.customProtein,
-        useCustomMacros: currentProfile.useCustomMacros,
-      };
-
-      if (action === "update_diet") {
-        payload.dietPlan = {
-          generatedPlan: updatedData,
-          generatedAt: new Date().toISOString(),
-        };
+      // ── 2. LOG STEPS ─────────────────────────────────────────────────────
+      if (action === "log_steps") {
+        const steps = updatedData.steps || 0;
+        const distKm = updatedData.distanceKm || parseFloat((steps * 0.00075).toFixed(2));
+        const kcal = updatedData.caloriesBurned || Math.round(steps * 0.04);
+        const ok = await postTimeline("steps", { steps, distanceKm: distKm, caloriesBurned: kcal, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["steps", "chatbot"]);
+        if (ok) {
+          confirm(`✅ **Steps Logged!** ${steps.toLocaleString()} steps · ${distKm}km · ~${kcal} kcal burned 👟`);
+          window.dispatchEvent(new Event("stepsLogged"));
+        }
+        return;
       }
 
-      const updateRes = await fetch("/api/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      // ── 3. LOG WATER ─────────────────────────────────────────────────────
+      if (action === "log_water") {
+        const glasses = updatedData.glasses || Math.round((updatedData.amountMl || 0) / 250);
+        const ml = updatedData.amountMl || glasses * 250;
+        const ok = await postTimeline("water", { amountMl: ml, glasses, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["water", "chatbot"]);
+        if (ok) {
+          confirm(`✅ **Water Logged!** ${glasses} glass${glasses !== 1 ? "es" : ""} (${ml}ml) 💧`);
+          window.dispatchEvent(new Event("waterLogged"));
+        }
+        return;
+      }
 
-      if (updateRes.ok) {
-        console.log("Plan updated successfully via chatbot!");
+      // ── 4. LOG SLEEP ─────────────────────────────────────────────────────
+      if (action === "log_sleep") {
+        const ok = await postTimeline("sleep", {
+          hours: updatedData.hours || 0,
+          quality: updatedData.quality || 7,
+          bedtime: updatedData.bedtime || "",
+          wakeTime: updatedData.wakeTime || "",
+          notes: updatedData.notes || "",
+          loggedVia: "chatbot",
+        }, ["sleep", "chatbot"]);
+        if (ok) {
+          confirm(`✅ **Sleep Logged!** ${updatedData.hours}h · quality ${updatedData.quality}/10${updatedData.bedtime ? ` · ${updatedData.bedtime} → ${updatedData.wakeTime}` : ""} 😴`);
+          window.dispatchEvent(new Event("sleepLogged"));
+        }
+        return;
+      }
+
+      // ── 5. LOG WEIGHT ────────────────────────────────────────────────────
+      if (action === "log_weight") {
+        await postTimeline("weight", { weightKg: updatedData.weightKg, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["weight", "chatbot"]);
+        await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...currentProfile, email, weightKg: updatedData.weightKg }),
+        });
+        const diff = (updatedData.weightKg - (currentProfile.weightKg || updatedData.weightKg)).toFixed(1);
+        const diffStr = parseFloat(diff) !== 0 ? ` (${parseFloat(diff) > 0 ? "+" : ""}${diff}kg from last)` : "";
+        confirm(`✅ **Weight Logged!** ${updatedData.weightKg}kg${diffStr} — profile updated ⚖️`);
         window.dispatchEvent(new Event("profileUpdated"));
+        window.dispatchEvent(new Event("weightLogged"));
+        return;
       }
+
+      // ── 6. LOG WORKOUT DONE ──────────────────────────────────────────────
+      if (action === "log_workout_done") {
+        const dur = updatedData.durationMin || 60;
+        const kcal = updatedData.caloriesBurned || Math.round(dur * 7);
+        const ok = await postTimeline("workout", {
+          workoutName: updatedData.workoutName || "Gym Session",
+          durationMin: dur,
+          musclesWorked: updatedData.musclesWorked || [],
+          exercisesCompleted: updatedData.exercisesCompleted || [],
+          caloriesBurned: kcal,
+          notes: updatedData.notes || "",
+          loggedVia: "chatbot",
+        }, ["workout", "chatbot"]);
+        if (ok) {
+          confirm(`✅ **Workout Logged!** ${updatedData.workoutName || "Session"} · ${dur}min · ~${kcal} kcal 🏋️`);
+          window.dispatchEvent(new Event("workoutLogged"));
+        }
+        return;
+      }
+
+      // ── 7. UPDATE DIET PLAN ──────────────────────────────────────────────
+      if (action === "update_diet") {
+        const res = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...currentProfile, email, dietPlan: { generatedPlan: updatedData, generatedAt: new Date().toISOString() } }),
+        });
+        if (res.ok) window.dispatchEvent(new Event("profileUpdated"));
+        return;
+      }
+
+      // ── 8. UPDATE WORKOUT PLAN ───────────────────────────────────────────
+      if (action === "update_workout") {
+        const res = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...currentProfile, email, workouts: updatedData }),
+        });
+        if (res.ok) window.dispatchEvent(new Event("profileUpdated"));
+        return;
+      }
+
     } catch (err) {
-      console.error("Failed to sync chatbot plan edits:", err);
+      console.error("Failed to sync chatbot action:", err);
     }
   };
 
