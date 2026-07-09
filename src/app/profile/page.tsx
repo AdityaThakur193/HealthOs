@@ -122,7 +122,7 @@ export default function ProfilePage() {
         image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=600&auto=format&fit=crop"
       },
       {
-        title: `Aditya, is that your stomach rumbling? 🚨`,
+        title: `${userName}, is that your stomach rumbling? 🚨`,
         body: "Time for your post-workout protein window. Check out what is served at your hostel mess menu today!",
         image: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=600&auto=format&fit=crop"
       }
