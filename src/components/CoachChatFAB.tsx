@@ -97,6 +97,46 @@ export default function CoachChatFAB() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Free Draggable Position state
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const startPosRef = useRef({ x: 0, y: 0 });
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isDraggingRef.current = false;
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    startPosRef.current = { ...position };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (dragStartRef.current.x === 0 && dragStartRef.current.y === 0) return;
+
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      isDraggingRef.current = true;
+    }
+
+    if (isDraggingRef.current) {
+      setPosition({
+        x: startPosRef.current.x + dx,
+        y: startPosRef.current.y + dy,
+      });
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    dragStartRef.current = { x: 0, y: 0 };
+    
+    if (!isDraggingRef.current) {
+      setIsOpen((prev) => !prev);
+    }
+  };
+
   // Pre-load profile stats for coach context
   const loadProfile = async () => {
     const email = localStorage.getItem("healthos_email");
@@ -360,9 +400,14 @@ export default function CoachChatFAB() {
     <>
       {/* Floating Action Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-24 left-6 md:left-auto md:right-6 md:bottom-6 z-50 w-14 h-14 rounded-full bg-[#0c0f0d] border border-[#8ba893] flex items-center justify-center shadow-lg cursor-pointer hover:scale-105 transition-all group overflow-hidden"
-        style={{ boxShadow: "0 0 15px rgba(139, 168, 147, 0.25)" }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        className="fixed bottom-24 left-6 md:left-auto md:right-6 md:bottom-6 z-50 w-14 h-14 rounded-full bg-[#0c0f0d] border border-[#8ba893] flex items-center justify-center shadow-lg cursor-pointer hover:scale-105 transition-all group overflow-hidden touch-none select-none"
+        style={{ 
+          boxShadow: "0 0 15px rgba(139, 168, 147, 0.25)",
+          transform: `translate3d(${position.x}px, ${position.y}px, 0)`
+        }}
       >
         <div className="absolute inset-0 bg-[#8ba893]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
         <img 
