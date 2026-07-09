@@ -205,6 +205,51 @@ export default function CoachChatFAB() {
     if (!email || !currentProfile) return;
 
     try {
+      // ── Log Meal to Timeline ──────────────────────────────────────────────
+      if (action === "log_meal") {
+        const userId = currentProfile._id || email;
+        const mealPayload = {
+          userId,
+          type: "meal",
+          timestamp: new Date().toISOString(),
+          source: "chatbot",
+          tags: [updatedData.mealType || "meal", "chatbot"],
+          payload: {
+            mealType: updatedData.mealType || "meal",
+            foods: updatedData.items || [],
+            totalCalories: updatedData.totalCalories || 0,
+            totalProtein: updatedData.totalProtein || 0,
+            totalCarbs: (updatedData.items || []).reduce((s: number, f: any) => s + (f.carbsG || 0), 0),
+            totalFat: (updatedData.items || []).reduce((s: number, f: any) => s + (f.fatG || 0), 0),
+            notes: updatedData.notes || "",
+            loggedVia: "chatbot",
+          },
+        };
+
+        const logRes = await fetch("/api/timeline", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(mealPayload),
+        });
+
+        if (logRes.ok) {
+          console.log("✅ Meal logged to timeline via chatbot!");
+          // Append a confirmation badge message in chat
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "model",
+              content: `✅ **Meal Logged!** ${updatedData.mealType ? updatedData.mealType.charAt(0).toUpperCase() + updatedData.mealType.slice(1) : "Meal"} saved to your timeline — **${updatedData.totalCalories || 0} kcal · ${updatedData.totalProtein || 0}g protein**. Check your Meal page to see it! 🍽️`,
+            },
+          ]);
+          window.dispatchEvent(new Event("mealLogged"));
+        } else {
+          console.error("Failed to log meal via chatbot");
+        }
+        return;
+      }
+
+      // ── Update Diet / Workout Plan ────────────────────────────────────────
       const payload: any = {
         email,
         name: currentProfile.name,
