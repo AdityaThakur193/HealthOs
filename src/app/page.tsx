@@ -8,7 +8,7 @@ import MacroBar from "@/components/MacroBar";
 import CoachInsight from "@/components/CoachInsight";
 import CustomPopup from "@/components/CustomPopup";
 import { getTodaysWorkout } from "@/lib/workoutPlans";
-import { Flame, Dumbbell, Droplet, Footprints, Moon, Sparkles, Scale, GraduationCap, Compass, Calendar, Zap, Activity, Camera, Beef } from "lucide-react";
+import { Flame, Dumbbell, Droplet, Footprints, Moon, Sparkles, Scale, GraduationCap, Compass, Calendar, Zap, Activity, Camera, Beef, X } from "lucide-react";
 
 interface TodayState {
   calories: number;
@@ -872,10 +872,10 @@ export default function Dashboard() {
                       e.stopPropagation();
                       handleDeleteEvent(event._id || event.id);
                     }}
-                    className="w-6 h-6 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center font-bold text-xs select-none cursor-pointer"
+                    className="w-6 h-6 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center select-none cursor-pointer flex-shrink-0"
                     title="Delete log"
                   >
-                    ×
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               );
