@@ -355,6 +355,16 @@ export default function Dashboard() {
     initDashboard();
   }, [router]);
 
+  // Re-fetch dashboard whenever chatbot logs health data
+  useEffect(() => {
+    const refresh = () => {
+      const uid = localStorage.getItem("healthos_userId");
+      if (uid) fetchDashboardData(uid);
+    };
+    window.addEventListener("chatbotDataLogged", refresh);
+    return () => window.removeEventListener("chatbotDataLogged", refresh);
+  }, []);
+
   const handleQuickLog = async (type: string, payload: any) => {
     const userId = localStorage.getItem("healthos_userId");
     if (!userId) return;
