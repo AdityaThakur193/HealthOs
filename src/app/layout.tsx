@@ -10,6 +10,16 @@ export const metadata: Metadata = {
   title: "Health OS — Personal Intelligence Engine",
   description: "An AI-powered personal health operating system that reduces manual tracking and makes active health decisions.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+    shortcut: "/logo.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Health OS",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
