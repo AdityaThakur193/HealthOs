@@ -14,7 +14,7 @@ self.addEventListener("push", (event) => {
   const options = {
     body: data.body,
     icon: "/logo.png", // Transparent branded icon
-    badge: "/logo.png", // Monochrome badge for Android status bar
+    badge: "/logo-badge.png", // Monochrome badge for Android status bar
     image: bannerImage, // Large rich content banner image
     color: "#8ba893", // App color scheme theme accent
     vibrate: [200, 100, 200],
@@ -76,7 +76,7 @@ self.addEventListener("message", (event) => {
     self.registration.showNotification(title, {
       body,
       icon: "/logo.png",
-      badge: "/logo.png",
+      badge: "/logo-badge.png",   // Monochrome white-on-transparent for Android status bar
       image: bannerImage,
       color: "#8ba893",
       vibrate: [250, 100, 250],
