@@ -7,6 +7,7 @@ import ProgressRing from "@/components/ProgressRing";
 import MacroBar from "@/components/MacroBar";
 import CoachInsight from "@/components/CoachInsight";
 import CustomPopup from "@/components/CustomPopup";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { getTodaysWorkout } from "@/lib/workoutPlans";
 import { Flame, Dumbbell, Droplet, Footprints, Moon, Sparkles, Scale, GraduationCap, Compass, Calendar, Zap, Activity, Camera, Beef, X } from "lucide-react";
 
@@ -48,62 +49,7 @@ export default function Dashboard() {
   const [streak, setStreak] = useState(0);
   const [todayEvents, setTodayEvents] = useState<any[]>([]);
 
-  // Custom Popup Alert/Confirm States
-  const [popupState, setPopupState] = useState<{
-    isOpen: boolean;
-    type: "alert" | "confirm" | "error" | "success" | "warning";
-    title: string;
-    message: string;
-    confirmText?: string;
-    cancelText?: string;
-    isDestructive?: boolean;
-    onConfirm: () => void;
-    onCancel?: () => void;
-  }>({
-    isOpen: false,
-    type: "alert",
-    title: "",
-    message: "",
-    onConfirm: () => {},
-  });
-
-  const showCustomAlert = (title: string, message: string, type: "alert" | "error" | "success" | "warning" = "alert") => {
-    return new Promise<void>((resolve) => {
-      setPopupState({
-        isOpen: true,
-        type,
-        title,
-        message,
-        confirmText: "OK",
-        onConfirm: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve();
-        },
-      });
-    });
-  };
-
-  const showCustomConfirm = (title: string, message: string, isDestructive = false) => {
-    return new Promise<boolean>((resolve) => {
-      setPopupState({
-        isOpen: true,
-        type: "confirm",
-        title,
-        message,
-        confirmText: isDestructive ? "Delete" : "Confirm",
-        cancelText: "Cancel",
-        isDestructive,
-        onConfirm: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve(true);
-        },
-        onCancel: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve(false);
-        },
-      });
-    });
-  };
+  const { popupState, showCustomAlert, showCustomConfirm } = useConfirmDialog();
 
   // Log editing states
   const [editingEvent, setEditingEvent] = useState<any>(null);
@@ -385,9 +331,13 @@ export default function Dashboard() {
       if (res.ok) {
         await fetchDashboardData(userId);
         setQuickLogOpen(false);
+      } else {
+        const errText = await res.text().catch(() => "Unknown error");
+        showCustomAlert("Logging Failed", `Could not save entry: ${errText || "Please try again."}`, "error");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Quick log error", err);
+      showCustomAlert("Logging Failed", err.message || "An unexpected error occurred. Please try again.", "error");
     }
   };
 

@@ -120,10 +120,13 @@ export async function deleteLocalProfile(email: string) {
   saveDB(db);
 }
 
-export async function deleteLocalEventById(eventId: string) {
+export async function deleteLocalEventById(eventId: string): Promise<boolean> {
   const db = initDB();
+  const initialLength = db.events.length;
   db.events = db.events.filter((e) => e._id !== eventId);
+  const deleted = db.events.length < initialLength;
   saveDB(db);
+  return deleted;
 }
 
 export async function updateLocalEvent(eventId: string, updateData: any) {

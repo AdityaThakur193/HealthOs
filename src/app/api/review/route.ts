@@ -213,6 +213,7 @@ export async function GET(request: NextRequest) {
         targetCalories: profile.targetCalories,
         targetProteinG: profile.targetProteinG,
         goal: profile.goal,
+        gymFrequency: profile.gymFrequency || 4,
       },
     };
 

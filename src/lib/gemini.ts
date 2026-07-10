@@ -43,7 +43,7 @@ function getCoachModel() {
 /**
  * Sanitize Gemini output that may be wrapped in markdown code fences.
  */
-function sanitizeJsonOutput(text: string): string {
+export function sanitizeJsonOutput(text: string): string {
   let cleaned = text.trim();
   // Strip ```json ... ``` or ``` ... ``` wrappers
   if (cleaned.startsWith("```")) {

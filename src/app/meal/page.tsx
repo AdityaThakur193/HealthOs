@@ -6,6 +6,8 @@ import GlassCard from "@/components/GlassCard";
 import MealResultCard from "@/components/MealResultCard";
 import CustomPopup from "@/components/CustomPopup";
 import { Camera, Edit3, AlertTriangle, Play, CheckCircle } from "lucide-react";
+import { compressImage } from "@/lib/imageUtils";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface FoodItem {
   name: string;
@@ -16,48 +18,6 @@ interface FoodItem {
   fatG: number;
 }
 
-function compressImage(file: File, maxWidth: number = 800, maxHeight: number = 800, quality: number = 0.7): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          reject(new Error("Could not get canvas context"));
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL("image/jpeg", quality);
-        resolve(dataUrl);
-      };
-      img.onerror = (err) => reject(err);
-    };
-    reader.onerror = (err) => reject(err);
-  });
-}
 
 export default function MealCapture() {
   const router = useRouter();
@@ -75,37 +35,7 @@ export default function MealCapture() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [isMock, setIsMock] = useState(false);
 
-  // Custom Popup Alert States
-  const [popupState, setPopupState] = useState<{
-    isOpen: boolean;
-    type: "alert" | "confirm" | "error" | "success" | "warning";
-    title: string;
-    message: string;
-    confirmText?: string;
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    type: "alert",
-    title: "",
-    message: "",
-    onConfirm: () => {},
-  });
-
-  const showCustomAlert = (title: string, message: string, type: "alert" | "error" | "success" | "warning" = "alert") => {
-    return new Promise<void>((resolve) => {
-      setPopupState({
-        isOpen: true,
-        type,
-        title,
-        message,
-        confirmText: "OK",
-        onConfirm: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve();
-        },
-      });
-    });
-  };
+  const { popupState, showCustomAlert } = useConfirmDialog();
 
   // Manual meal form states
   const [manualName, setManualName] = useState("");
@@ -251,9 +181,13 @@ export default function MealCapture() {
       if (res.ok) {
         setShowSuccess(true);
         setTimeout(() => router.push("/"), 1500);
+      } else {
+        const errText = await res.text().catch(() => "Unknown error");
+        showCustomAlert("Save Failed", `We could not save the meal: ${errText || "Please try again."}`, "error");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      showCustomAlert("Save Failed", err.message || "An unexpected error occurred. Please try again.", "error");
     }
   };
 
