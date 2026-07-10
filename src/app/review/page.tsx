@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import ReviewCard from "@/components/ReviewCard";
 import GlassCard from "@/components/GlassCard";
-import { Scale, Utensils, Zap, Moon, Lightbulb, BarChart2, Calendar, TrendingDown, ArrowDown, ArrowUp } from "lucide-react";
+import { Scale, Utensils, Zap, Moon, Lightbulb, BarChart2, Calendar, ArrowDown, ArrowUp } from "lucide-react";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 /* ─────────────────────────────────────────────
  * Types (mirrors API response)
@@ -168,50 +169,35 @@ export default function WeeklyReview() {
   const [review, setReview] = useState<WeeklyReview | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadReview() {
-      try {
-        // Step 1: Check profile
-        const email = localStorage.getItem("healthos_email");
-        if (!email) {
-          router.push("/login");
-          return;
-        }
+  const { userId, loading: authLoading } = useAuthGuard();
 
-        const profileRes = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
-        const profileData = await profileRes.json();
-
-        if (profileData.notInitialized) {
-          router.push(`/onboarding?email=${encodeURIComponent(email)}`);
-          return;
-        }
-
-        const userId =
-          profileData.profile?._id ?? profileData.profile?.id ?? null;
-        if (!userId) {
-          setError("Could not determine user ID");
-          return;
-        }
-
-        // Step 2: Fetch review
-        const reviewRes = await fetch(`/api/review?userId=${userId}`);
-        if (!reviewRes.ok) {
-          const errData = await reviewRes.json().catch(() => ({}));
-          setError(errData.error ?? "Failed to load review");
-          return;
-        }
-
-        const reviewData = await reviewRes.json();
-        setReview(reviewData.review);
-      } catch (err) {
-        console.error("Failed to load weekly review:", err);
-        setError("Something went wrong loading your review.");
-      } finally {
-        setLoading(false);
+  const loadReview = useCallback(async () => {
+    if (!userId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const reviewRes = await fetch(`/api/review?userId=${userId}`);
+      if (!reviewRes.ok) {
+        const errData = await reviewRes.json().catch(() => ({}));
+        setError(errData.error ?? "Failed to load review");
+        return;
       }
+
+      const reviewData = await reviewRes.json();
+      setReview(reviewData.review);
+    } catch (err) {
+      console.error("Failed to load weekly review:", err);
+      setError("Something went wrong loading your review.");
+    } finally {
+      setLoading(false);
     }
-    loadReview();
-  }, [router]);
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId) {
+      loadReview();
+    }
+  }, [userId, loadReview]);
 
   const totalSlides = 6;
 
@@ -224,7 +210,7 @@ export default function WeeklyReview() {
   };
 
   /* ── Loading State ─────────────────────── */
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
         <div className="w-8 h-8 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-4" />
