@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ExerciseCard from "@/components/ExerciseCard";
 import CustomPopup from "@/components/CustomPopup";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { getTodaysWorkout, getWeekSchedule, type WorkoutPlan } from "@/lib/workoutPlans";
 import { Dumbbell, Flame, Lightbulb, Plus, Activity, BookOpen, Compass, ChevronDown, CheckCircle, Info } from "lucide-react";
 
@@ -21,204 +23,124 @@ interface ExerciseState {
 
 export default function WorkoutTracker() {
   const router = useRouter();
+  const { profile, userId, loading: authLoading } = useAuthGuard();
   const [loading, setLoading] = useState(false);
   const [fetchingHistory, setFetchingHistory] = useState(true);
   const [exercises, setExercises] = useState<ExerciseState[]>([]);
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [pastWorkouts, setPastWorkouts] = useState<any[]>([]);
-  const [profile, setProfile] = useState<any>(null);
   const [showHowToLog, setShowHowToLog] = useState(false);
   const [customExName, setCustomExName] = useState("");
   const [customExMuscle, setCustomExMuscle] = useState("");
   const [showAddCustomForm, setShowAddCustomForm] = useState(false);
 
-  // Custom Popup Alert/Confirm States
-  const [popupState, setPopupState] = useState<{
-    isOpen: boolean;
-    type: "alert" | "confirm" | "error" | "success" | "warning";
-    title: string;
-    message: string;
-    confirmText?: string;
-    cancelText?: string;
-    isDestructive?: boolean;
-    onConfirm: () => void;
-    onCancel?: () => void;
-  }>({
-    isOpen: false,
-    type: "alert",
-    title: "",
-    message: "",
-    onConfirm: () => {},
-  });
+  const { popupState, showCustomAlert, showCustomConfirm } = useConfirmDialog();
 
-  const showCustomAlert = (title: string, message: string, type: "alert" | "error" | "success" | "warning" = "alert") => {
-    return new Promise<void>((resolve) => {
-      setPopupState({
-        isOpen: true,
-        type,
-        title,
-        message,
-        confirmText: "OK",
-        onConfirm: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve();
-        },
+  const loadWorkoutData = useCallback(async () => {
+    if (!userId || !profile) return;
+    setFetchingHistory(true);
+    try {
+      const todaysPlan = getTodaysWorkout({
+        gymFrequency: profile.gymFrequency,
+        gymExperience: profile.gymExperience,
+        goal: profile.goal,
       });
-    });
-  };
+      setPlan(todaysPlan);
 
-  const showCustomConfirm = (title: string, message: string, isDestructive = false) => {
-    return new Promise<boolean>((resolve) => {
-      setPopupState({
-        isOpen: true,
-        type: "confirm",
-        title,
-        message,
-        confirmText: isDestructive ? "Delete" : "Yes",
-        cancelText: "No",
-        isDestructive,
-        onConfirm: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve(true);
-        },
-        onCancel: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve(false);
-        },
-      });
-    });
-  };
+      // If rest day, no exercises to load
+      if (todaysPlan.exercises.length === 0) {
+        setFetchingHistory(false);
+        return;
+      }
+
+      // Initialize exercises state from plan
+      const initialExercises: ExerciseState[] = todaysPlan.exercises.map((ex) => ({
+        id: ex.id,
+        name: ex.name,
+        muscleGroup: ex.muscle,
+        targetSets: ex.targetSets,
+        targetReps: ex.targetReps,
+        sets: Array.from({ length: ex.targetSets }, () => ({
+          weight: 0,
+          reps: 0,
+          completed: false,
+        })),
+      }));
+
+      // Fetch timeline workout events to find previous history
+      const res = await fetch(`/api/timeline?userId=${userId}&type=workout&limit=5`);
+      if (res.ok) {
+        const data = await res.json();
+        const pastEvents = data.events || [];
+        setPastWorkouts(pastEvents);
+
+        // Match exercises by ID across all recent workouts to find previous weights
+        const updatedExercises = initialExercises.map((currentEx) => {
+          for (const workout of pastEvents) {
+            const prevExercises = workout.payload?.exercises;
+            if (!prevExercises) continue;
+
+            const prevEx = prevExercises.find(
+              (pe: any) => pe.id === currentEx.id || pe.name === currentEx.name
+            );
+
+            if (prevEx && prevEx.sets && prevEx.sets.length > 0) {
+              const completedSets = prevEx.sets.filter((s: any) => s.completed);
+              const activeSets = completedSets.length > 0 ? completedSets : prevEx.sets;
+
+              const maxWeight = Math.max(...activeSets.map((s: any) => s.weight || 0));
+
+              const setsAtMaxWeight = activeSets.filter((s: any) => s.weight === maxWeight);
+              const maxRepsAtMaxWeight = setsAtMaxWeight.length > 0
+                ? Math.max(...setsAtMaxWeight.map((s: any) => s.reps || 0))
+                : 0;
+
+              const targetRepParts = currentEx.targetReps.split("-");
+              const maxTargetReps = parseInt(targetRepParts[targetRepParts.length - 1]);
+
+              let suggestedWeight = maxWeight;
+
+              if (maxRepsAtMaxWeight >= maxTargetReps && maxWeight > 0) {
+                const isDumbbell =
+                  currentEx.id.includes("dumbbell") ||
+                  currentEx.id.includes("db") ||
+                  currentEx.id.includes("lateral");
+                const increment = isDumbbell ? 2 : 2.5;
+                suggestedWeight = maxWeight + increment;
+              }
+
+              return {
+                ...currentEx,
+                previousWeight: maxWeight > 0 ? maxWeight : undefined,
+                suggestedWeight: suggestedWeight > 0 ? suggestedWeight : undefined,
+                sets: currentEx.sets.map(() => ({
+                  weight: suggestedWeight,
+                  reps: 0,
+                  completed: false,
+                })),
+              };
+            }
+          }
+
+          return currentEx;
+        });
+
+        setExercises(updatedExercises);
+      } else {
+        setExercises(initialExercises);
+      }
+    } catch (err) {
+      console.error("Failed to load progressive overload context:", err);
+    } finally {
+      setFetchingHistory(false);
+    }
+  }, [userId, profile]);
 
   useEffect(() => {
-    async function checkProfileAndLoadHistory() {
-      try {
-        const email = localStorage.getItem("healthos_email");
-        if (!email) {
-          router.push("/login");
-          return;
-        }
-
-        const profileRes = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
-        const profileData = await profileRes.json();
-        if (profileData.notInitialized) {
-          router.push(`/onboarding?email=${encodeURIComponent(email)}`);
-          return;
-        }
-
-        const userId = profileData.profile._id;
-        localStorage.setItem("healthos_userId", userId);
-
-        // Generate today's workout from profile
-        const profile = profileData.profile;
-        setProfile(profile);
-        const todaysPlan = getTodaysWorkout({
-          gymFrequency: profile.gymFrequency,
-          gymExperience: profile.gymExperience,
-          goal: profile.goal,
-        });
-        setPlan(todaysPlan);
-
-        // If rest day, no exercises to load
-        if (todaysPlan.exercises.length === 0) {
-          setFetchingHistory(false);
-          return;
-        }
-
-        // Initialize exercises state from plan
-        const initialExercises: ExerciseState[] = todaysPlan.exercises.map((ex) => ({
-          id: ex.id,
-          name: ex.name,
-          muscleGroup: ex.muscle,
-          targetSets: ex.targetSets,
-          targetReps: ex.targetReps,
-          sets: Array.from({ length: ex.targetSets }, () => ({
-            weight: 0,
-            reps: 0,
-            completed: false,
-          })),
-        }));
-
-        // Fetch timeline workout events to find previous history
-        const res = await fetch(`/api/timeline?userId=${userId}&type=workout&limit=5`);
-        if (res.ok) {
-          const data = await res.json();
-          const pastEvents = data.events || [];
-          setPastWorkouts(pastEvents);
-
-          // Match exercises by ID across all recent workouts to find previous weights
-          const updatedExercises = initialExercises.map((currentEx) => {
-            // Search through recent workouts for matching exercise
-            for (const workout of pastEvents) {
-              const prevExercises = workout.payload?.exercises;
-              if (!prevExercises) continue;
-
-              const prevEx = prevExercises.find(
-                (pe: any) => pe.id === currentEx.id || pe.name === currentEx.name
-              );
-
-              if (prevEx && prevEx.sets && prevEx.sets.length > 0) {
-                console.log(`📊 Found history for ${currentEx.name}. Calculating progressive overload...`);
-
-                // Filter completed sets to determine their maximum lifting weight & reps
-                const completedSets = prevEx.sets.filter((s: any) => s.completed);
-                const activeSets = completedSets.length > 0 ? completedSets : prevEx.sets;
-
-                // Find maximum weight lifted
-                const maxWeight = Math.max(...activeSets.map((s: any) => s.weight || 0));
-
-                // Find sets completed at that max weight
-                const setsAtMaxWeight = activeSets.filter((s: any) => s.weight === maxWeight);
-                const maxRepsAtMaxWeight = setsAtMaxWeight.length > 0
-                  ? Math.max(...setsAtMaxWeight.map((s: any) => s.reps || 0))
-                  : 0;
-
-                // ── Progressive Overload Logic (Double Progression) ──
-                // Parse rep range (e.g. "8-10" -> max target is 10)
-                const targetRepParts = currentEx.targetReps.split("-");
-                const maxTargetReps = parseInt(targetRepParts[targetRepParts.length - 1]);
-
-                let suggestedWeight = maxWeight;
-
-                if (maxRepsAtMaxWeight >= maxTargetReps && maxWeight > 0) {
-                  // If they hit the ceiling reps last time, increase the load
-                  const isDumbbell =
-                    currentEx.id.includes("dumbbell") ||
-                    currentEx.id.includes("db") ||
-                    currentEx.id.includes("lateral");
-                  const increment = isDumbbell ? 2 : 2.5;
-                  suggestedWeight = maxWeight + increment;
-                }
-
-                return {
-                  ...currentEx,
-                  previousWeight: maxWeight > 0 ? maxWeight : undefined,
-                  suggestedWeight: suggestedWeight > 0 ? suggestedWeight : undefined,
-                  // Pre-fill fields with recommended suggestion values to reduce friction
-                  sets: currentEx.sets.map(() => ({
-                    weight: suggestedWeight,
-                    reps: 0,
-                    completed: false,
-                  })),
-                };
-              }
-            }
-
-            // If no history exists for this specific exercise, start blank
-            return currentEx;
-          });
-
-          setExercises(updatedExercises);
-        } else {
-          setExercises(initialExercises);
-        }
-      } catch (err) {
-        console.error("Failed to load progressive overload context:", err);
-      } finally {
-        setFetchingHistory(false);
-      }
+    if (userId && profile) {
+      loadWorkoutData();
     }
-    checkProfileAndLoadHistory();
-  }, [router]);
+  }, [userId, profile, loadWorkoutData]);
 
   const handleLogSet = (exerciseId: string, setIndex: number, weight: number, reps: number) => {
     const safeWeight = isNaN(weight) ? 0 : weight;
@@ -352,7 +274,7 @@ export default function WorkoutTracker() {
       }, 0)
     : 0;
 
-  if (fetchingHistory) {
+  if (authLoading || fetchingHistory) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
         <div className="w-8 h-8 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-4" />
