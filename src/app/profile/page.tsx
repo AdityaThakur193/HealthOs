@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import { 
@@ -14,6 +14,8 @@ import {
   sendLocalTestNotification 
 } from "@/lib/notifications";
 import CustomPopup from "@/components/CustomPopup";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -21,8 +23,7 @@ export default function ProfilePage() {
   // Tab control: 'specs' | 'calendar' | 'mess' | 'diet'
   const [activeTab, setActiveTab] = useState<"specs" | "calendar" | "mess" | "diet">("specs");
 
-  // Profile data state
-  const [profile, setProfile] = useState<any>(null);
+  const { profile, setProfile, userId, loading: authLoading } = useAuthGuard();
   const [loading, setLoading] = useState(true);
   const [savingSpecs, setSavingSpecs] = useState(false);
   const [showSuccessSpecs, setShowSuccessSpecs] = useState(false);
@@ -139,62 +140,7 @@ export default function ProfilePage() {
     );
   };
 
-  // Custom Popup Alert/Confirm States
-  const [popupState, setPopupState] = useState<{
-    isOpen: boolean;
-    type: "alert" | "confirm" | "error" | "success" | "warning";
-    title: string;
-    message: string;
-    confirmText?: string;
-    cancelText?: string;
-    isDestructive?: boolean;
-    onConfirm: () => void;
-    onCancel?: () => void;
-  }>({
-    isOpen: false,
-    type: "alert",
-    title: "",
-    message: "",
-    onConfirm: () => {},
-  });
-
-  const showCustomAlert = (title: string, message: string, type: "alert" | "error" | "success" | "warning" = "alert") => {
-    return new Promise<void>((resolve) => {
-      setPopupState({
-        isOpen: true,
-        type,
-        title,
-        message,
-        confirmText: "OK",
-        onConfirm: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve();
-        },
-      });
-    });
-  };
-
-  const showCustomConfirm = (title: string, message: string, isDestructive = false) => {
-    return new Promise<boolean>((resolve) => {
-      setPopupState({
-        isOpen: true,
-        type: "confirm",
-        title,
-        message,
-        confirmText: isDestructive ? "Delete" : "Confirm",
-        cancelText: "Cancel",
-        isDestructive,
-        onConfirm: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve(true);
-        },
-        onCancel: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve(false);
-        },
-      });
-    });
-  };
+  const { popupState, showCustomAlert, showCustomConfirm } = useConfirmDialog();
 
   const [neckCm, setNeckCm] = useState("");
   const [waistCm, setWaistCm] = useState("");
@@ -226,73 +172,60 @@ export default function ProfilePage() {
   const [savingEvent, setSavingEvent] = useState(false);
 
   useEffect(() => {
-    const initialEmail = localStorage.getItem("healthos_email");
-    const initialUserId = localStorage.getItem("healthos_userId");
-    if (!initialEmail || !initialUserId) {
-      router.push("/login");
-      return;
+    if (!profile) return;
+    setLoading(false);
+
+    if (profile.messMenu) {
+      setRawMenuInput(profile.messMenu.rawText || "");
+      setParsedMenu(profile.messMenu.parsedMenu || null);
+    }
+    if (profile.dietPlan) {
+      setDietPlan(profile.dietPlan.generatedPlan || null);
     }
 
-    async function loadData() {
-      const email = localStorage.getItem("healthos_email");
-      const userId = localStorage.getItem("healthos_userId");
-      if (!email || !userId) return;
+    // Initialize specs form
+    setName(profile.name || "");
+    setAge(profile.age ? String(profile.age) : "");
+    setHeightCm(profile.heightCm ? String(profile.heightCm) : "");
+    setWeightKg(profile.weightKg ? String(profile.weightKg) : "");
+    setTargetWeightKg(profile.targetWeightKg ? String(profile.targetWeightKg) : "");
+    setSleepTarget(profile.sleepTarget ? String(profile.sleepTarget) : "8");
+    setGoal(profile.goal || "lose_fat");
+    setActivityLevel(profile.activityLevel || "moderate");
+    setDietPreference(profile.dietPreference || "none");
+    setGymExperience(profile.gymExperience || "beginner");
+    setStrictMessOnly(profile.strictMessOnly || false);
+    setCollegeSchedule(profile.collegeSchedule || "");
+    setNeckCm(profile.neckCm ? String(profile.neckCm) : "");
+    setWaistCm(profile.waistCm ? String(profile.waistCm) : "");
+    setHipCm(profile.hipCm ? String(profile.hipCm) : "");
+    setCustomCalories(profile.customCalories ? String(profile.customCalories) : "");
+    setCustomProtein(profile.customProtein ? String(profile.customProtein) : "");
+    setUseCustomMacros(profile.useCustomMacros || false);
+  }, [profile]);
 
-      try {
-        // Fetch Profile Specs
-        const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
-        const data = await res.json();
-        if (data.notInitialized) {
-          router.push(`/onboarding?email=${encodeURIComponent(email)}`);
-          return;
-        }
-
-        const prof = data.profile;
-        setProfile(prof);
-        if (prof.messMenu) {
-          setRawMenuInput(prof.messMenu.rawText || "");
-          setParsedMenu(prof.messMenu.parsedMenu || null);
-        }
-        if (prof.dietPlan) {
-          setDietPlan(prof.dietPlan.generatedPlan || null);
-        }
-        
-        // Initialize specs form
-        setName(prof.name || "");
-        setAge(prof.age ? String(prof.age) : "");
-        setHeightCm(prof.heightCm ? String(prof.heightCm) : "");
-        setWeightKg(prof.weightKg ? String(prof.weightKg) : "");
-        setTargetWeightKg(prof.targetWeightKg ? String(prof.targetWeightKg) : "");
-        setSleepTarget(prof.sleepTarget ? String(prof.sleepTarget) : "8");
-        setGoal(prof.goal || "lose_fat");
-        setActivityLevel(prof.activityLevel || "moderate");
-        setDietPreference(prof.dietPreference || "none");
-        setGymExperience(prof.gymExperience || "beginner");
-        setStrictMessOnly(prof.strictMessOnly || false);
-        setCollegeSchedule(prof.collegeSchedule || "");
-        setNeckCm(prof.neckCm ? String(prof.neckCm) : "");
-        setWaistCm(prof.waistCm ? String(prof.waistCm) : "");
-        setHipCm(prof.hipCm ? String(prof.hipCm) : "");
-        setCustomCalories(prof.customCalories ? String(prof.customCalories) : "");
-        setCustomProtein(prof.customProtein ? String(prof.customProtein) : "");
-        setUseCustomMacros(prof.useCustomMacros || false);
-
-        // Fetch Timeline Events to filter for busy calendar events (notes)
-        const timelineRes = await fetch(`/api/timeline?userId=${userId}`);
-        if (timelineRes.ok) {
-          const timelineData = await timelineRes.json();
-          const notes = (timelineData.events || []).filter((e: any) => e.type === "note");
-          setEvents(notes);
-        }
-      } catch (err) {
-        console.error("Failed to load profile specs", err);
-      } finally {
-        setLoading(false);
-        setLoadingEvents(false);
+  const loadCalendarEvents = useCallback(async () => {
+    if (!userId) return;
+    setLoadingEvents(true);
+    try {
+      const timelineRes = await fetch(`/api/timeline?userId=${userId}&t=${Date.now()}`, { cache: "no-store" });
+      if (timelineRes.ok) {
+        const timelineData = await timelineRes.json();
+        const notes = (timelineData.events || []).filter((e: any) => e.type === "note");
+        setEvents(notes);
       }
+    } catch (err) {
+      console.error("Failed to load calendar events:", err);
+    } finally {
+      setLoadingEvents(false);
     }
-    loadData();
-  }, [router]);
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId) {
+      loadCalendarEvents();
+    }
+  }, [userId, loadCalendarEvents]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -604,7 +537,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
         <div className="w-8 h-8 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-4" />
