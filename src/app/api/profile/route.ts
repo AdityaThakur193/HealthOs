@@ -338,7 +338,7 @@ export async function POST(request: NextRequest) {
 
     savedProfile = await UserProfile.findOneAndUpdate(
       { email },
-      profileData,
+      { $set: profileData },   // ← $set prevents full-document replacement; preserves workouts, stepsTarget, etc.
       { new: true, upsert: true }
     );
   } catch (error) {

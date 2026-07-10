@@ -342,6 +342,7 @@ export default function Dashboard() {
       setWeightDeltaKg(data.weightDeltaKg || 0);
       setStreak(data.streak || 0);
       localStorage.setItem("healthos_userId", data.profile._id);
+      if (data.profile?.name) localStorage.setItem("healthos_name", data.profile.name.split(" ")[0]);
       await fetchDashboardData(data.profile._id);
     } catch (err: any) {
       console.error("Dashboard init error", err);
