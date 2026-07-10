@@ -134,14 +134,20 @@ export async function DELETE(request: NextRequest) {
 
     try {
       await connectDB();
-      await TimelineEvent.deleteOne({ _id: eventId });
+      const res = await TimelineEvent.deleteOne({ _id: eventId });
+      if (res.deletedCount === 0) {
+        return Response.json({ error: "Event not found" }, { status: 404 });
+      }
       console.log(`✅ Deleted MongoDB timeline event: ${eventId}`);
     } catch (dbError) {
       console.warn("⚠️ MongoDB offline. Deleting local JSON record.");
       if (process.env.NODE_ENV === "production") {
         return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
       }
-      await deleteLocalEventById(eventId);
+      const deleted = await deleteLocalEventById(eventId);
+      if (!deleted) {
+        return Response.json({ error: "Event not found" }, { status: 404 });
+      }
       console.log(`✅ Deleted local JSON event: ${eventId}`);
     }
 

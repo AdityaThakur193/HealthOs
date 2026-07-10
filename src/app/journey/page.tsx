@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
-import ProgressRing from "@/components/ProgressRing";
 import CustomPopup from "@/components/CustomPopup";
-import { Download, AlertTriangle, Scale, Activity, TrendingDown } from "lucide-react";
+import { Download, AlertTriangle, Scale } from "lucide-react";
+import { getGroupedEvents } from "@/lib/timelineUtils";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 interface WeightPoint {
   date: string;
@@ -14,7 +16,7 @@ interface WeightPoint {
 
 export default function Journey() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
+  const { profile, userId, loading: authLoading } = useAuthGuard();
   const [loading, setLoading] = useState(true);
   
   // Stats states
@@ -32,61 +34,7 @@ export default function Journey() {
   const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
 
   // Custom Popup Alert/Confirm States
-  const [popupState, setPopupState] = useState<{
-    isOpen: boolean;
-    type: "alert" | "confirm" | "error" | "success" | "warning";
-    title: string;
-    message: string;
-    confirmText?: string;
-    cancelText?: string;
-    isDestructive?: boolean;
-    onConfirm: () => void;
-    onCancel?: () => void;
-  }>({
-    isOpen: false,
-    type: "alert",
-    title: "",
-    message: "",
-    onConfirm: () => {},
-  });
-
-  const showCustomAlert = (title: string, message: string, type: "alert" | "error" | "success" | "warning" = "alert") => {
-    return new Promise<void>((resolve) => {
-      setPopupState({
-        isOpen: true,
-        type,
-        title,
-        message,
-        confirmText: "OK",
-        onConfirm: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve();
-        },
-      });
-    });
-  };
-
-  const showCustomConfirm = (title: string, message: string, isDestructive = false) => {
-    return new Promise<boolean>((resolve) => {
-      setPopupState({
-        isOpen: true,
-        type: "confirm",
-        title,
-        message,
-        confirmText: isDestructive ? "Delete" : "Confirm",
-        cancelText: "Cancel",
-        isDestructive,
-        onConfirm: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve(true);
-        },
-        onCancel: () => {
-          setPopupState((prev) => ({ ...prev, isOpen: false }));
-          resolve(false);
-        },
-      });
-    });
-  };
+  const { popupState, showCustomAlert, showCustomConfirm } = useConfirmDialog();
 
   // Log Editing states
   const [editingEvent, setEditingEvent] = useState<any>(null);
@@ -98,25 +46,12 @@ export default function Journey() {
   const [editSleep, setEditSleep] = useState("");
   const [editWater, setEditWater] = useState("");
 
-  async function loadJourneyData() {
-    const email = localStorage.getItem("healthos_email");
-    const userId = localStorage.getItem("healthos_userId");
-    if (!email || !userId) {
-      router.push("/login");
-      return;
-    }
+  const loadJourneyData = useCallback(async () => {
+    if (!userId) return;
+    setLoading(true);
 
     try {
-      // 1. Fetch Profile
-      const profRes = await fetch(`/api/profile?email=${email}&t=${Date.now()}`, { cache: "no-store" });
-      if (!profRes.ok) {
-        router.push("/onboarding");
-        return;
-      }
-      const profData = await profRes.json();
-      setProfile(profData.profile);
-
-      // 2. Fetch Timeline Events
+      // Fetch Timeline Events
       const timelineRes = await fetch(`/api/timeline?userId=${userId}&t=${Date.now()}`, { cache: "no-store" });
       if (timelineRes.ok) {
         const timelineData = await timelineRes.json();
@@ -160,16 +95,18 @@ export default function Journey() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [userId]);
 
   useEffect(() => {
-    loadJourneyData();
-  }, [router]);
+    if (userId) {
+      loadJourneyData();
+    }
+  }, [userId, loadJourneyData]);
 
   // Set default collapsed headers on initial load (collapse all except the first day)
   useEffect(() => {
     if (allEvents.length > 0) {
-      const groups = getGroupedEvents();
+      const groups = getGroupedEvents(allEvents);
       if (groups.length > 0 && Object.keys(collapsedDates).length === 0) {
         const initialCollapsed: Record<string, boolean> = {};
         groups.forEach(([dateStr], idx) => {
@@ -365,58 +302,9 @@ export default function Journey() {
     }
   };
 
-  const getGroupedEvents = () => {
-    const groups: Record<string, any[]> = {};
-    
-    // Sort events descending first so they display newest first
-    const sortedEvents = [...allEvents].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
+  const groupedEvents = getGroupedEvents(allEvents);
 
-    sortedEvents.forEach((event) => {
-      const dateStr = new Date(event.timestamp).toLocaleDateString([], {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-      if (!groups[dateStr]) {
-        groups[dateStr] = [];
-      }
-      groups[dateStr].push(event);
-    });
-
-    // Consolidate water logs for each date group
-    const consolidatedGroups: [string, any[]][] = Object.entries(groups).map(([dateStr, dayEvents]) => {
-      const waterEvents = dayEvents.filter((e) => e.type === "water");
-      const nonWater = dayEvents.filter((e) => e.type !== "water");
-      
-      if (waterEvents.length > 0) {
-        // Sum total water amount
-        const totalAmount = waterEvents.reduce((sum, e) => sum + (Number(e.payload?.amountL || e.payload?.waterL) || 0), 0);
-        // Create a consolidated water event
-        const consolidatedWaterEvent = {
-          _id: `consolidated_water_${dateStr}`,
-          type: "water",
-          timestamp: waterEvents[0].timestamp, // use the latest timestamp
-          payload: {
-            amountL: Math.round(totalAmount * 10) / 10,
-            isConsolidated: true,
-            originalEventIds: waterEvents.map((e) => e._id || e.id),
-            subEvents: waterEvents // store references to show inside the editor
-          }
-        };
-        // Put the water event at the end or maintain sort
-        return [dateStr, [...nonWater, consolidatedWaterEvent]];
-      }
-      
-      return [dateStr, dayEvents];
-    });
-
-    return consolidatedGroups;
-  };
-
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
         <div className="w-8 h-8 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mb-4" />
@@ -599,7 +487,7 @@ export default function Journey() {
           </GlassCard>
         ) : (
           <div className="space-y-3">
-            {getGroupedEvents().map(([dateStr, events]) => {
+            {groupedEvents.map(([dateStr, events]) => {
               const isCollapsed = collapsedDates[dateStr] ?? false;
               return (
                 <div key={dateStr} className="space-y-1.5 border-b border-white/3 pb-2 last:border-b-0">
@@ -753,7 +641,25 @@ export default function Journey() {
                           step="0.1"
                           defaultValue={sub.payload.amountL || 0}
                           onChange={(e) => {
-                            sub.payload.amountL = Number(e.target.value) || 0;
+                            const val = Number(e.target.value) || 0;
+                            setEditingEvent((prev: any) => {
+                              if (!prev) return null;
+                              const updatedSubEvents = prev.payload.subEvents.map((item: any) => {
+                                if ((item._id || item.id) === (sub._id || sub.id)) {
+                                  return { ...item, payload: { ...item.payload, amountL: val } };
+                                }
+                                return item;
+                              });
+                              const total = updatedSubEvents.reduce((sum: number, item: any) => sum + (Number(item.payload.amountL) || 0), 0);
+                              return {
+                                ...prev,
+                                payload: {
+                                  ...prev.payload,
+                                  subEvents: updatedSubEvents,
+                                  amountL: Math.round(total * 10) / 10,
+                                },
+                              };
+                            });
                           }}
                           className="w-14 bg-zinc-950/60 border border-white/10 rounded-lg px-1.5 py-0.5 text-center text-white text-[11px]"
                         />
@@ -763,14 +669,24 @@ export default function Journey() {
                             const confirmed = await showCustomConfirm("Delete Sub-entry", "Are you sure you want to permanently delete this sub-entry?", true);
                             if (confirmed) {
                               await fetch(`/api/timeline?eventId=${sub._id || sub.id}`, { method: "DELETE" });
-                              editingEvent.payload.subEvents = editingEvent.payload.subEvents.filter((item: any) => (item._id || item.id) !== (sub._id || sub.id));
-                              const total = editingEvent.payload.subEvents.reduce((sum: number, item: any) => sum + (Number(item.payload.amountL) || 0), 0);
-                              editingEvent.payload.amountL = Math.round(total * 10) / 10;
-                              if (editingEvent.payload.subEvents.length === 0) {
-                                setEditingEvent(null);
-                              } else {
-                                setEditingEvent({ ...editingEvent });
-                              }
+                              
+                              setEditingEvent((prev: any) => {
+                                if (!prev) return null;
+                                const filteredSubEvents = prev.payload.subEvents.filter((item: any) => (item._id || item.id) !== (sub._id || sub.id));
+                                if (filteredSubEvents.length === 0) {
+                                  return null;
+                                }
+                                const total = filteredSubEvents.reduce((sum: number, item: any) => sum + (Number(item.payload.amountL) || 0), 0);
+                                return {
+                                  ...prev,
+                                  payload: {
+                                    ...prev.payload,
+                                    subEvents: filteredSubEvents,
+                                    amountL: Math.round(total * 10) / 10,
+                                  }
+                                };
+                              });
+                              
                               loadJourneyData();
                               window.dispatchEvent(new Event("profileUpdated"));
                             }

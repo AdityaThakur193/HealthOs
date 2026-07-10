@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { sanitizeJsonOutput } from "@/lib/gemini";
 
 export const dynamic = "force-dynamic";
 
@@ -7,14 +8,6 @@ function getGenAI(): GoogleGenerativeAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
   return new GoogleGenerativeAI(apiKey);
-}
-
-function sanitizeJsonOutput(text: string): string {
-  let cleaned = text.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  }
-  return cleaned;
 }
 
 export async function POST(request: NextRequest) {

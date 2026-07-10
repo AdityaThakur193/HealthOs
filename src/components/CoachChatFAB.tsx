@@ -1,92 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { 
-  MessageSquare, X, Send, Loader2, Sparkles, User, HelpCircle, 
-  Settings, CheckCircle2, ChevronRight 
-} from "lucide-react";
+import { MessageSquare, X, Send, Loader2, Sparkles, User } from "lucide-react";
 import GlassCard from "./GlassCard";
+import { COACH_AVATAR_URL } from "@/lib/constants";
+import { formatMessageContent } from "@/lib/markdownFormat";
 
 interface Message {
   role: "user" | "model";
   content: string;
 }
 
-function formatMessageContent(content: string, isUser = false) {
-  return content.split("\n").map((line, lineIdx) => {
-    let cleanLine = line.trim();
-    if (!cleanLine) return <div key={lineIdx} className="h-2" />;
-
-    // Handle headers (### or ## or #)
-    let isHeader = false;
-    let headerText = cleanLine;
-    if (cleanLine.startsWith("### ")) {
-      headerText = cleanLine.substring(4);
-      isHeader = true;
-    } else if (cleanLine.startsWith("## ")) {
-      headerText = cleanLine.substring(3);
-      isHeader = true;
-    } else if (cleanLine.startsWith("# ")) {
-      headerText = cleanLine.substring(2);
-      isHeader = true;
-    }
-
-    if (isHeader) {
-      // Strip any inner bold markings inside header
-      const title = headerText.replace(/\*\*/g, "");
-      return (
-        <h5 
-          key={lineIdx} 
-          className={`font-bold text-[10px] uppercase tracking-wider mt-3 mb-1.5 ${
-            isUser ? "text-zinc-950" : "text-[#8ba893]"
-          }`}
-        >
-          {title}
-        </h5>
-      );
-    }
-
-    // Handle bullet points
-    let isBullet = false;
-    if (cleanLine.startsWith("* ") || cleanLine.startsWith("- ")) {
-      cleanLine = cleanLine.substring(2);
-      isBullet = true;
-    }
-
-    // Handle inline bolding (**text**)
-    const parts: React.ReactNode[] = [];
-    const regex = /\*\*(.*?)\*\*/g;
-    let lastIndex = 0;
-    let match;
-
-    while ((match = regex.exec(cleanLine)) !== null) {
-      const textBefore = cleanLine.substring(lastIndex, match.index);
-      const boldText = match[1];
-      
-      if (textBefore) parts.push(textBefore);
-      parts.push(
-        <strong key={match.index} className={`font-bold ${isUser ? "text-zinc-950" : "text-white"}`}>
-          {boldText}
-        </strong>
-      );
-      lastIndex = regex.lastIndex;
-    }
-
-    const textAfter = cleanLine.substring(lastIndex);
-    if (textAfter) parts.push(textAfter);
-
-    if (isBullet) {
-      return (
-        <div key={lineIdx} className="flex items-start gap-1 ml-1 my-0.5">
-          <span className={`${isUser ? "text-zinc-900" : "text-[#8ba893]"} text-[10px] mt-1 mr-0.5 flex-shrink-0`}>•</span>
-          <span className={`flex-1 ${isUser ? "text-zinc-900" : "text-zinc-300"}`}>{parts}</span>
-        </div>
-      );
-    }
-
-    return <p key={lineIdx} className="my-0.5 leading-relaxed">{parts}</p>;
-  });
-}
 
 export default function CoachChatFAB() {
   const [isOpen, setIsOpen] = useState(false);
@@ -163,7 +87,7 @@ export default function CoachChatFAB() {
     if (!profile) return;
     setMessages((prev) => {
       if (prev.length === 0) {
-        const name = profile?.name || "Aditya";
+        const name = profile?.name ? profile.name.split(" ")[0] : (localStorage.getItem("healthos_name") || "there");
         return [
           { 
             role: "model", 
@@ -411,7 +335,7 @@ export default function CoachChatFAB() {
       >
         <div className="absolute inset-0 bg-[#8ba893]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
         <img 
-          src="https://user-images.githubusercontent.com/74038190/216654095-6f6772e4-e433-4bba-9164-1ca6f463ac3f.gif" 
+          src={COACH_AVATAR_URL} 
           alt="Coach Avatar"
           className="w-11 h-11 object-contain rounded-full"
         />
@@ -427,7 +351,7 @@ export default function CoachChatFAB() {
             <div className="flex items-center gap-3">
               <div className="relative">
                 <img 
-                  src="https://user-images.githubusercontent.com/74038190/216654095-6f6772e4-e433-4bba-9164-1ca6f463ac3f.gif" 
+                  src={COACH_AVATAR_URL} 
                   alt="Coach Avatar"
                   className="w-10 h-10 object-contain rounded-full border border-[#8ba893]/30"
                 />
@@ -457,7 +381,7 @@ export default function CoachChatFAB() {
               >
                 {msg.role === "model" && (
                   <img 
-                    src="https://user-images.githubusercontent.com/74038190/216654095-6f6772e4-e433-4bba-9164-1ca6f463ac3f.gif" 
+                    src={COACH_AVATAR_URL} 
                     alt="Coach Avatar"
                     className="w-7 h-7 object-contain rounded-full flex-shrink-0 border border-white/10"
                   />
@@ -478,7 +402,7 @@ export default function CoachChatFAB() {
             {sending && (
               <div className="flex gap-2.5 justify-start">
                 <img 
-                  src="https://user-images.githubusercontent.com/74038190/216654095-6f6772e4-e433-4bba-9164-1ca6f463ac3f.gif" 
+                  src={COACH_AVATAR_URL} 
                   alt="Coach Avatar"
                   className="w-7 h-7 object-contain rounded-full flex-shrink-0 border border-white/10"
                 />
