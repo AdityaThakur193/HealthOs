@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ProgressRing from "@/components/ProgressRing";
@@ -8,6 +8,7 @@ import MacroBar from "@/components/MacroBar";
 import CoachInsight from "@/components/CoachInsight";
 import CustomPopup from "@/components/CustomPopup";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { getTodaysWorkout } from "@/lib/workoutPlans";
 import { Flame, Dumbbell, Droplet, Footprints, Moon, Sparkles, Scale, GraduationCap, Compass, Calendar, Zap, Activity, Camera, Beef, X } from "lucide-react";
 
@@ -24,7 +25,7 @@ interface TodayState {
 
 export default function Dashboard() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
+  const { profile, setProfile, userId, loading: authLoading } = useAuthGuard();
   const [today, setToday] = useState<TodayState>({
     calories: 0,
     protein: 0,
@@ -141,7 +142,7 @@ export default function Dashboard() {
   // Controls which input form is expanded in the quick log drawer
   const [activeForm, setActiveForm] = useState<"none" | "steps" | "sleep" | "meal">("none");
 
-  const fetchDashboardData = async (userId: string) => {
+  const fetchDashboardData = useCallback(async (userId: string) => {
     try {
       // 1. Fetch Today's events
       const todayRes = await fetch(`/api/timeline?userId=${userId}&t=${Date.now()}`, { cache: "no-store" });
@@ -229,7 +230,7 @@ export default function Dashboard() {
     } finally {
       setCoachLoading(false);
     }
-  };
+  }, []);
 
   const handleDeleteEvent = async (eventId: string) => {
     const confirmed = await showCustomConfirm("Delete Entry", "Are you sure you want to permanently delete this timeline entry?", true);
@@ -254,53 +255,34 @@ export default function Dashboard() {
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const initDashboard = async () => {
+  const initDashboard = useCallback(async () => {
+    if (!userId || !profile) return;
     setLoading(true);
     setErrorMsg(null);
     try {
-      const email = localStorage.getItem("healthos_email");
-      if (!email) {
-        router.push("/login");
-        return;
+      const res = await fetch(`/api/profile?email=${encodeURIComponent(profile.email)}&t=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setTdeeMode(data.tdeeMode || "calibrating");
+        setDaysRemaining(typeof data.daysRemaining === "number" ? data.daysRemaining : 14);
+        setAvgCalories(data.avgCalories || 0);
+        setWeightDeltaKg(data.weightDeltaKg || 0);
+        setStreak(data.streak || 0);
       }
-
-      const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}&t=${Date.now()}`, { cache: "no-store" });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP error ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      if (data.notInitialized) {
-        router.push(`/onboarding?email=${encodeURIComponent(email)}`);
-        return;
-      }
-
-      if (!data || !data.profile) {
-        throw new Error("Missing profile info. Database configuration may be incomplete.");
-      }
-
-      setProfile(data.profile);
-      setTdeeMode(data.tdeeMode || "calibrating");
-      setDaysRemaining(typeof data.daysRemaining === "number" ? data.daysRemaining : 14);
-      setAvgCalories(data.avgCalories || 0);
-      setWeightDeltaKg(data.weightDeltaKg || 0);
-      setStreak(data.streak || 0);
-      localStorage.setItem("healthos_userId", data.profile._id);
-      if (data.profile?.name) localStorage.setItem("healthos_name", data.profile.name.split(" ")[0]);
-      await fetchDashboardData(data.profile._id);
+      await fetchDashboardData(userId);
     } catch (err: any) {
       console.error("Dashboard init error", err);
       setErrorMsg(err.message || "Failed to load dashboard metrics. Ensure database is online.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, profile, fetchDashboardData]);
 
   useEffect(() => {
-    initDashboard();
-  }, [router]);
+    if (userId) {
+      initDashboard();
+    }
+  }, [userId, initDashboard]);
 
   // Re-fetch dashboard whenever chatbot logs health data
   useEffect(() => {
@@ -341,7 +323,7 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
         <div className="w-8 h-8 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-4" />
