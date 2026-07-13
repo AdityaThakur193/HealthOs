@@ -1,5 +1,7 @@
 "use client";
 
+import { motion } from "framer-motion";
+
 interface ExerciseSet {
   weight: number;
   reps: number;
@@ -33,22 +35,31 @@ export default function ExerciseCard({
   const allDone = completedSets === targetSets;
 
   return (
-    <div className={`glass-card p-4 transition-all duration-300 ${allDone ? "border-brand-500/30" : ""}`}
-      style={allDone ? { background: "rgba(34,197,94,0.04)" } : {}}>
+    <motion.div 
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 350, damping: 25 }}
+      className={`glass-card p-4 transition-all duration-300 ${allDone ? "border-[#8ba893]/30" : ""}`}
+      style={allDone ? { background: "rgba(139,168,147,0.04)" } : {}}
+    >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div>
+        <div className="text-left">
           <h3 className="text-sm font-semibold text-white">{name}</h3>
           <p className="text-xs text-zinc-500 mt-0.5">{muscleGroup} · {targetSets}×{targetReps}</p>
         </div>
         <div className="flex items-center gap-1.5">
           {Array.from({ length: targetSets }).map((_, i) => (
-            <div
+            <motion.div
               key={i}
-              className="w-2 h-2 rounded-full transition-all duration-300"
+              animate={{ 
+                scale: i < completedSets ? [1, 1.3, 1] : 1,
+                backgroundColor: i < completedSets ? "#8ba893" : "rgba(255,255,255,0.12)"
+              }}
+              transition={{ type: "spring", stiffness: 300, damping: 15 }}
+              className="w-2 h-2 rounded-full"
               style={{
-                background: i < completedSets ? "#22c55e" : "rgba(255,255,255,0.12)",
-                boxShadow: i < completedSets ? "0 0 6px rgba(34,197,94,0.5)" : "none",
+                boxShadow: i < completedSets ? "0 0 6px rgba(139,168,147,0.5)" : "none",
               }}
             />
           ))}
@@ -57,12 +68,16 @@ export default function ExerciseCard({
 
       {/* Progressive overload hint */}
       {suggestedWeight && (
-        <div className="mb-3 px-3 py-1.5 rounded-lg text-xs flex items-center gap-2"
-          style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)" }}>
-          <span className="text-brand-400">↑</span>
-          <span className="text-zinc-400">Suggested: <span className="text-brand-400 font-semibold">{suggestedWeight}kg</span></span>
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="mb-3 px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 overflow-hidden"
+          style={{ background: "rgba(139,168,147,0.08)", border: "1px solid rgba(139,168,147,0.15)" }}
+        >
+          <span className="text-[#8ba893]">↑</span>
+          <span className="text-zinc-400">Suggested: <span className="text-[#8ba893] font-semibold">{suggestedWeight}kg</span></span>
           {previousWeight && <span className="text-zinc-600 ml-auto">prev {previousWeight}kg</span>}
-        </div>
+        </motion.div>
       )}
 
       {/* Sets */}
@@ -84,22 +99,23 @@ export default function ExerciseCard({
               onChange={(e) => onLogSet(i, set.weight, parseInt(e.target.value))}
               className="input-glass text-center h-9 text-xs flex-1"
             />
-            <button
+            <motion.button
+              whileTap={{ scale: 0.9 }}
               onClick={() => onToggleSet(i)}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 flex-shrink-0 ${
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 flex-shrink-0 cursor-pointer ${
                 set.completed
                   ? "text-white"
                   : "text-zinc-600 hover:text-zinc-400"
               }`}
-              style={set.completed ? { background: "#22c55e", boxShadow: "0 0 12px rgba(34,197,94,0.3)" } : { background: "rgba(255,255,255,0.06)" }}
+              style={set.completed ? { background: "#8ba893", boxShadow: "0 0 12px rgba(139,168,147,0.3)" } : { background: "rgba(255,255,255,0.06)" }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                 <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
               </svg>
-            </button>
+            </motion.button>
           </div>
         ))}
       </div>
-    </div>
+    </motion.div>
   );
 }
