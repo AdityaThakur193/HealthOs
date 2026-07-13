@@ -290,6 +290,14 @@ export async function POST(request: NextRequest) {
     gymExperience,
   });
 
+  let existingProfile: any = null;
+  try {
+    await connectDB();
+    existingProfile = await UserProfile.findOne({ email }).lean();
+  } catch (err) {
+    existingProfile = await getLocalProfile(email);
+  }
+
   const profileData: any = {
     name,
     email,
@@ -301,21 +309,21 @@ export async function POST(request: NextRequest) {
     goal,
     activityLevel,
     gymExperience,
-    gymFrequency: gymFrequency ? parseInt(gymFrequency) : 4,
-    gymAccess: gymAccess || "college_gym",
-    messAccess: messAccess || "hostel_mess",
-    dietPreference: dietPreference || "none",
-    foodAllergies: foodAllergies || [],
-    medicalConditions: medicalConditions || [],
+    gymFrequency: gymFrequency !== undefined ? parseInt(gymFrequency) : (existingProfile?.gymFrequency || 4),
+    gymAccess: gymAccess || existingProfile?.gymAccess || "college_gym",
+    messAccess: messAccess || existingProfile?.messAccess || "hostel_mess",
+    dietPreference: dietPreference || existingProfile?.dietPreference || "none",
+    foodAllergies: foodAllergies || existingProfile?.foodAllergies || [],
+    medicalConditions: medicalConditions || existingProfile?.medicalConditions || [],
     sleepTarget: parseInt(sleepTarget || "8"),
-    collegeSchedule: collegeSchedule || "",
-    strictMessOnly: strictMessOnly || false,
+    collegeSchedule: collegeSchedule || existingProfile?.collegeSchedule || "",
+    strictMessOnly: strictMessOnly !== undefined ? strictMessOnly : (existingProfile?.strictMessOnly || false),
     neckCm: neckCm ? parseFloat(neckCm) : undefined,
     waistCm: waistCm ? parseFloat(waistCm) : undefined,
     hipCm: hipCm ? parseFloat(hipCm) : undefined,
     customCalories: customCalories ? parseInt(customCalories) : undefined,
     customProtein: customProtein ? parseInt(customProtein) : undefined,
-    useCustomMacros: useCustomMacros || false,
+    useCustomMacros: useCustomMacros !== undefined ? useCustomMacros : (existingProfile?.useCustomMacros || false),
     ...targets,
   };
 
@@ -330,15 +338,11 @@ export async function POST(request: NextRequest) {
   let isNewProfile = false;
 
   try {
-    await connectDB();
-
-    // Check if profile already exists
-    const existingProfile = await UserProfile.findOne({ email }).lean();
     isNewProfile = !existingProfile;
 
     savedProfile = await UserProfile.findOneAndUpdate(
       { email },
-      { $set: profileData },   // ← $set prevents full-document replacement; preserves workouts, stepsTarget, etc.
+      { $set: profileData },
       { new: true, upsert: true }
     );
   } catch (error) {
