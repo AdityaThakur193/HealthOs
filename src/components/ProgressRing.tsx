@@ -63,8 +63,8 @@ export default function ProgressRing({
         {/* Glow circle at tip */}
         {percentage > 0.01 && (
           <circle
-            cx={size / 2 + radius * Math.cos(2 * Math.PI * percentage - Math.PI / 2)}
-            cy={size / 2 + radius * Math.sin(2 * Math.PI * percentage - Math.PI / 2)}
+            cx={size / 2 + radius * Math.cos(2 * Math.PI * percentage)}
+            cy={size / 2 + radius * Math.sin(2 * Math.PI * percentage)}
             r={strokeWidth / 2 + 1}
             fill={color}
             opacity={0.8}

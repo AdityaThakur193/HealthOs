@@ -19,11 +19,40 @@ export default function CoachChatFAB() {
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [dragConstraints, setDragConstraints] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Free Draggable gesture state (managed automatically by Framer Motion)
   const isDraggingRef = useRef(false);
+
+  useEffect(() => {
+    const updateConstraints = () => {
+      if (typeof window !== "undefined") {
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+          // Mobile starts bottom-24, left-6
+          setDragConstraints({
+            left: -12,
+            right: window.innerWidth - 80,
+            top: -window.innerHeight + 160,
+            bottom: 60,
+          });
+        } else {
+          // Desktop starts bottom-6, right-6
+          setDragConstraints({
+            left: -window.innerWidth + 80,
+            right: 12,
+            top: -window.innerHeight + 80,
+            bottom: 12,
+          });
+        }
+      }
+    };
+    updateConstraints();
+    window.addEventListener("resize", updateConstraints);
+    return () => window.removeEventListener("resize", updateConstraints);
+  }, []);
 
   const handleDragStart = () => {
     isDraggingRef.current = true;
@@ -306,6 +335,7 @@ export default function CoachChatFAB() {
       {/* Draggable Floating Action Button with Spring Hover Scale */}
       <motion.button
         drag
+        dragConstraints={dragConstraints}
         dragMomentum={true}
         dragElastic={0.1}
         onDragStart={handleDragStart}
