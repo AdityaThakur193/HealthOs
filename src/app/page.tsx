@@ -509,54 +509,60 @@ export default function Dashboard() {
         {/* Calories Card (Large Bento element, col-span-2) */}
         <GlassCard 
           onClick={() => router.push("/meal")}
-          className="p-5 flex justify-between items-center min-h-[130px] border border-white/5 bg-white/2 hover:border-[#8ba893]/20 transition-all rounded-2xl col-span-2 relative overflow-hidden group"
+          className="p-5 flex flex-col justify-between min-h-[130px] border border-white/5 bg-white/2 hover:border-[#8ba893]/20 transition-all rounded-2xl col-span-2 relative overflow-hidden group"
         >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[#c87a53]/10 border border-[#c87a53]/20 flex items-center justify-center flex-shrink-0">
-              <Flame className="w-6 h-6 text-[#c87a53] group-hover:scale-110 transition-transform" />
-            </div>
-            <div className="text-left">
-              <span className="text-[10px] text-zinc-400 font-semibold tracking-tight block">Energy Tracking</span>
-              <h4 className="text-sm font-extrabold text-white mt-0.5">Calories</h4>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-xl font-black text-white font-heading tracking-tight">{today.calories}</span>
-                <span className="text-[10px] text-zinc-500 font-mono">/ {targetCal} kcal</span>
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-[#c87a53]/10 border border-[#c87a53]/20 flex items-center justify-center">
+                <Flame className="w-4 h-4 text-[#c87a53] group-hover:scale-110 transition-transform" />
+              </div>
+              <div className="text-left">
+                <span className="text-[10px] text-zinc-400 font-semibold tracking-tight block">Energy Tracking</span>
+                <h4 className="text-xs font-extrabold text-white mt-0.5">Calories</h4>
               </div>
             </div>
+            <ProgressRing
+              value={today.calories}
+              max={targetCal}
+              size={32}
+              strokeWidth={3}
+              color="var(--brand)"
+              label=""
+            />
           </div>
-          <ProgressRing
-            value={today.calories}
-            max={targetCal}
-            size={70}
-            strokeWidth={7}
-            color="var(--brand)"
-            label=""
-          />
+          <div className="mt-4 flex items-baseline gap-2 text-left">
+            <span className="text-2xl font-black text-white font-heading tracking-tight">{today.calories}</span>
+            <span className="text-xs text-zinc-500 font-mono">/ {targetCal} kcal</span>
+          </div>
         </GlassCard>
 
         {/* Protein Card (col-span-1) */}
         <GlassCard 
           onClick={() => router.push("/meal")}
-          className="p-5 flex justify-between items-center min-h-[130px] border border-white/5 bg-white/2 hover:border-[#8ba893]/20 transition-all rounded-2xl col-span-1 group"
+          className="p-5 flex flex-col justify-between min-h-[130px] border border-white/5 bg-white/2 hover:border-[#8ba893]/20 transition-all rounded-2xl col-span-1 group"
         >
-          <div className="text-left">
-            <span className="text-[10px] text-zinc-400 font-semibold tracking-tight block">Protein</span>
-            <div className="flex items-baseline gap-0.5 mt-0.5 mb-2">
-              <span className="text-base font-black text-white font-heading tracking-tight">{today.protein}g</span>
-              <span className="text-[9px] text-zinc-500 font-mono">/{targetProt}g</span>
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-1.5">
+              <div className="w-8 h-8 rounded-xl bg-[#8ba893]/10 border border-[#8ba893]/20 flex items-center justify-center">
+                <Beef className="w-4 h-4 text-[#8ba893] group-hover:scale-110 transition-transform" />
+              </div>
             </div>
-            <div className="w-7 h-7 rounded-lg bg-[#8ba893]/10 border border-[#8ba893]/20 flex items-center justify-center mt-1">
-              <Beef className="w-4 h-4 text-[#8ba893]" />
+            <ProgressRing
+              value={today.protein}
+              max={targetProt}
+              size={28}
+              strokeWidth={3}
+              color="var(--brand)"
+              label=""
+            />
+          </div>
+          <div className="mt-4 text-left">
+            <span className="text-[10px] text-zinc-400 font-semibold tracking-tight block">Protein Goal</span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-lg font-black text-white font-heading tracking-tight">{today.protein}g</span>
+              <span className="text-[10px] text-zinc-500 font-mono">/ {targetProt}g</span>
             </div>
           </div>
-          <ProgressRing
-            value={today.protein}
-            max={targetProt}
-            size={56}
-            strokeWidth={5.5}
-            color="var(--brand)"
-            label=""
-          />
         </GlassCard>
 
         {/* Steps Card (col-span-1) */}
@@ -565,26 +571,28 @@ export default function Dashboard() {
             setQuickLogOpen(true);
             setActiveForm("steps");
           }}
-          className="p-5 flex justify-between items-center min-h-[130px] border border-white/5 bg-white/2 hover:border-[#8ba893]/20 transition-all rounded-2xl group"
+          className="p-5 flex flex-col justify-between min-h-[130px] border border-white/5 bg-white/2 hover:border-[#8ba893]/20 transition-all rounded-2xl group"
         >
-          <div className="text-left">
-            <span className="text-[10px] text-zinc-400 font-semibold tracking-tight block">Steps</span>
-            <div className="flex items-baseline gap-0.5 mt-0.5 mb-2">
-              <span className="text-base font-black text-white font-heading tracking-tight">{today.steps.toLocaleString()}</span>
-              <span className="text-[9px] text-zinc-500 font-mono">/{stepsTarget >= 1000 ? `${(stepsTarget/1000).toFixed(0)}k` : stepsTarget}</span>
+          <div className="flex justify-between items-start">
+            <div className="w-8 h-8 rounded-xl bg-[#c87a53]/10 border border-[#c87a53]/20 flex items-center justify-center">
+              <Footprints className="w-4 h-4 text-[#c87a53] group-hover:scale-110 transition-transform" />
             </div>
-            <div className="w-7 h-7 rounded-lg bg-[#c87a53]/10 border border-[#c87a53]/20 flex items-center justify-center mt-1">
-              <Footprints className="w-4 h-4 text-[#c87a53]" />
+            <ProgressRing
+              value={today.steps}
+              max={stepsTarget}
+              size={28}
+              strokeWidth={3}
+              color="var(--brand)"
+              label=""
+            />
+          </div>
+          <div className="mt-4 text-left">
+            <span className="text-[10px] text-zinc-400 font-semibold tracking-tight block">Activity Steps</span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-lg font-black text-white font-heading tracking-tight">{today.steps.toLocaleString()}</span>
+              <span className="text-[10px] text-zinc-500 font-mono">/{stepsTarget >= 1000 ? `${(stepsTarget/1000).toFixed(0)}k` : stepsTarget}</span>
             </div>
           </div>
-          <ProgressRing
-            value={today.steps}
-            max={stepsTarget}
-            size={56}
-            strokeWidth={5.5}
-            color="var(--brand)"
-            label=""
-          />
         </GlassCard>
 
         {/* Sleep Card (col-span-1) */}
@@ -593,69 +601,76 @@ export default function Dashboard() {
             setQuickLogOpen(true);
             setActiveForm("sleep");
           }}
-          className="p-5 flex justify-between items-center min-h-[130px] border border-white/5 bg-white/2 hover:border-[#8ba893]/20 transition-all rounded-2xl group"
+          className="p-5 flex flex-col justify-between min-h-[130px] border border-white/5 bg-white/2 hover:border-[#8ba893]/20 transition-all rounded-2xl group"
         >
-          <div className="text-left">
-            <span className="text-[10px] text-zinc-400 font-semibold tracking-tight block">Sleep</span>
-            <div className="flex items-baseline gap-0.5 mt-0.5 mb-2">
-              <span className="text-base font-black text-white font-heading tracking-tight">{today.sleepHours}h</span>
-              <span className="text-[9px] text-zinc-500 font-mono">/{sleepTarget}h</span>
+          <div className="flex justify-between items-start">
+            <div className="w-8 h-8 rounded-xl bg-[#8ba893]/10 border border-[#8ba893]/20 flex items-center justify-center">
+              <Moon className="w-4 h-4 text-[#8ba893] group-hover:scale-110 transition-transform" />
             </div>
-            <div className="w-7 h-7 rounded-lg bg-[#8ba893]/10 border border-[#8ba893]/20 flex items-center justify-center mt-1">
-              <Moon className="w-4 h-4 text-[#8ba893]" />
+            <ProgressRing
+              value={today.sleepHours}
+              max={sleepTarget}
+              size={28}
+              strokeWidth={3}
+              color="var(--brand)"
+              label=""
+            />
+          </div>
+          <div className="mt-4 text-left">
+            <span className="text-[10px] text-zinc-400 font-semibold tracking-tight block">Sleep Duration</span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-lg font-black text-white font-heading tracking-tight">{today.sleepHours}h</span>
+              <span className="text-[10px] text-zinc-500 font-mono">/ {sleepTarget}h</span>
             </div>
           </div>
-          <ProgressRing
-            value={today.sleepHours}
-            max={sleepTarget}
-            size={56}
-            strokeWidth={5.5}
-            color="var(--brand)"
-            label=""
-          />
         </GlassCard>
 
         {/* Water Card (col-span-1, interactive buttons) */}
         <GlassCard 
           hoverScale={false}
-          className="p-5 flex justify-between items-center min-h-[130px] border border-white/5 bg-white/2 rounded-2xl"
+          className="p-5 flex flex-col justify-between min-h-[130px] border border-white/5 bg-white/2 rounded-2xl"
         >
-          <div className="text-left flex-1 min-w-0">
-            <span className="text-[10px] text-zinc-400 font-semibold tracking-tight block">Water</span>
-            <div className="flex items-baseline gap-0.5 mt-0.5">
-              <span className="text-base font-black text-white font-heading tracking-tight">{today.waterL}L</span>
-              <span className="text-[9px] text-zinc-500 font-mono">/3.5L</span>
+          <div className="flex justify-between items-start">
+            <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+              <Droplet className="w-4 h-4 text-blue-400" />
             </div>
-            {/* Spring Eased Button triggers */}
-            <div className="flex gap-1.5 mt-3">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleQuickLog("water", { amountL: 0.25 });
-                }}
-                className="flex-1 py-1 rounded-lg bg-white/5 hover:bg-[#8ba893]/15 text-[9px] font-bold text-zinc-400 hover:text-white transition-all border border-white/5 hover:border-[#8ba893]/20 cursor-pointer active:scale-95"
-              >
-                +250ml
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleQuickLog("water", { amountL: 0.5 });
-                }}
-                className="flex-1 py-1 rounded-lg bg-white/5 hover:bg-[#8ba893]/15 text-[9px] font-bold text-zinc-400 hover:text-white transition-all border border-white/5 hover:border-[#8ba893]/20 cursor-pointer active:scale-95"
-              >
-                +500ml
-              </button>
+            <ProgressRing
+              value={today.waterL}
+              max={3.5}
+              size={28}
+              strokeWidth={3}
+              color="var(--brand)"
+              label=""
+            />
+          </div>
+          <div className="mt-2 text-left">
+            <span className="text-[10px] text-zinc-400 font-semibold tracking-tight block">Hydration</span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-lg font-black text-white font-heading tracking-tight">{today.waterL}L</span>
+              <span className="text-[10px] text-zinc-500 font-mono">/ 3.5L</span>
             </div>
           </div>
-          <ProgressRing
-            value={today.waterL}
-            max={3.5}
-            size={56}
-            strokeWidth={5.5}
-            color="var(--brand)"
-            label=""
-          />
+          {/* Spring Eased Button triggers */}
+          <div className="flex gap-1.5 mt-2.5 pt-2 border-t border-white/5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleQuickLog("water", { amountL: 0.25 });
+              }}
+              className="flex-1 py-1 rounded-lg bg-white/5 hover:bg-[#8ba893]/15 text-[9px] font-bold text-zinc-400 hover:text-white transition-all border border-white/5 hover:border-[#8ba893]/20 cursor-pointer active:scale-95"
+            >
+              +250ml
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleQuickLog("water", { amountL: 0.5 });
+              }}
+              className="flex-1 py-1 rounded-lg bg-white/5 hover:bg-[#8ba893]/15 text-[9px] font-bold text-zinc-400 hover:text-white transition-all border border-white/5 hover:border-[#8ba893]/20 cursor-pointer active:scale-95"
+            >
+              +500ml
+            </button>
+          </div>
         </GlassCard>
       </div>
 
