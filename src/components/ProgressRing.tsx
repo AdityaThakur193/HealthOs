@@ -26,13 +26,15 @@ export default function ProgressRing({
   const percentage = Math.min(value / max, 1);
   const strokeDashoffset = circumference * (1 - percentage);
 
+  const isVarColor = color.startsWith("var");
+
   return (
     <div className="relative inline-flex items-center justify-center">
       <svg
         width={size}
         height={size}
         className="transform -rotate-90"
-        style={{ filter: `drop-shadow(0 0 8px ${color}20)` }}
+        style={{ filter: isVarColor ? "drop-shadow(0 0 6px var(--brand-glow))" : `drop-shadow(0 0 8px ${color}30)` }}
       >
         {/* Background ring */}
         <circle
@@ -53,17 +55,19 @@ export default function ProgressRing({
           fill="none"
           strokeLinecap="round"
           strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          className="transition-all duration-1000 ease-out"
+          style={{
+            strokeDashoffset: strokeDashoffset,
+            transition: "stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+          }}
         />
         {/* Glow circle at tip */}
-        {percentage > 0.02 && (
+        {percentage > 0.01 && (
           <circle
             cx={size / 2 + radius * Math.cos(2 * Math.PI * percentage - Math.PI / 2)}
             cy={size / 2 + radius * Math.sin(2 * Math.PI * percentage - Math.PI / 2)}
-            r={strokeWidth / 2 + 2}
+            r={strokeWidth / 2 + 1}
             fill={color}
-            opacity={0.3}
+            opacity={0.8}
             className="animate-pulse"
           />
         )}
