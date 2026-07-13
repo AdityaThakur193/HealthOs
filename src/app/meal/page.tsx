@@ -8,6 +8,7 @@ import CustomPopup from "@/components/CustomPopup";
 import { Camera, Edit3, AlertTriangle, Play, CheckCircle } from "lucide-react";
 import { compressImage } from "@/lib/imageUtils";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface FoodItem {
   name: string;
@@ -427,7 +428,7 @@ export default function MealCapture() {
 
           {/* Today's Meals History */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Today's Logs</h3>
+            <h3 className="text-xs font-extrabold text-zinc-400 tracking-tight">Today's Logs</h3>
             {loadingHistory ? (
               <div className="shimmer h-16 w-full rounded-xl" />
             ) : history.length === 0 ? (
@@ -458,7 +459,12 @@ export default function MealCapture() {
 
       {/* Loading Scanning State */}
       {state === "analyzing" && (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 animate-in">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: "spring", stiffness: 350, damping: 25 }}
+          className="flex flex-col items-center justify-center min-h-[50vh] space-y-6"
+        >
           {imagePreview && (
             <div className="relative w-44 h-44 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
               <img src={imagePreview} className="w-full h-full object-cover opacity-60" alt="Scanned food" />
@@ -485,12 +491,17 @@ export default function MealCapture() {
               100% { top: 0%; }
             }
           `}</style>
-        </div>
+        </motion.div>
       )}
 
       {/* Results Adjust/Verification State */}
       {state === "results" && (
-        <div className="space-y-5 animate-in">
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 350, damping: 25 }}
+          className="space-y-5"
+        >
           {isMock && (
             <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-center space-y-1">
               <p className="text-xs font-bold text-yellow-400 flex items-center justify-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Demo Result — Not Your Actual Food</p>
@@ -552,7 +563,7 @@ export default function MealCapture() {
               Log Meal
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
       {/* Premium Alert/Confirm Toast Popup */}
       <CustomPopup

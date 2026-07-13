@@ -5,6 +5,7 @@ import { MessageSquare, X, Send, Loader2, Sparkles, User } from "lucide-react";
 import GlassCard from "./GlassCard";
 import { COACH_AVATAR_URL } from "@/lib/constants";
 import { formatMessageContent } from "@/lib/markdownFormat";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Message {
   role: "user" | "model";
@@ -21,41 +22,21 @@ export default function CoachChatFAB() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Free Draggable Position state
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  // Free Draggable gesture state (managed automatically by Framer Motion)
   const isDraggingRef = useRef(false);
-  const dragStartRef = useRef({ x: 0, y: 0 });
-  const startPosRef = useRef({ x: 0, y: 0 });
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    isDraggingRef.current = false;
-    dragStartRef.current = { x: e.clientX, y: e.clientY };
-    startPosRef.current = { ...position };
+  const handleDragStart = () => {
+    isDraggingRef.current = true;
   };
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (dragStartRef.current.x === 0 && dragStartRef.current.y === 0) return;
-
-    const dx = e.clientX - dragStartRef.current.x;
-    const dy = e.clientY - dragStartRef.current.y;
-
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-      isDraggingRef.current = true;
-    }
-
-    if (isDraggingRef.current) {
-      setPosition({
-        x: startPosRef.current.x + dx,
-        y: startPosRef.current.y + dy,
-      });
-    }
+  const handleDragEnd = () => {
+    // Small timeout to allow click handler to register that drag occurred
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 100);
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    dragStartRef.current = { x: 0, y: 0 };
-    
+  const handleFABClick = () => {
     if (!isDraggingRef.current) {
       setIsOpen((prev) => !prev);
     }
@@ -322,15 +303,19 @@ export default function CoachChatFAB() {
 
   return (
     <>
-      {/* Floating Action Button */}
-      <button
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        className="fixed bottom-24 left-6 md:left-auto md:right-6 md:bottom-6 z-50 w-14 h-14 rounded-full bg-[#0c0f0d] border border-[#8ba893] flex items-center justify-center shadow-lg cursor-pointer hover:scale-105 transition-all group overflow-hidden touch-none select-none"
+      {/* Draggable Floating Action Button with Spring Hover Scale */}
+      <motion.button
+        drag
+        dragMomentum={true}
+        dragElastic={0.1}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onClick={handleFABClick}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.94 }}
+        className="fixed bottom-24 left-6 md:left-auto md:right-6 md:bottom-6 z-50 w-14 h-14 rounded-full bg-[#0c0f0d] border border-[#8ba893] flex items-center justify-center shadow-lg cursor-grab active:cursor-grabbing hover:scale-105 transition-all group overflow-hidden touch-none select-none"
         style={{ 
           boxShadow: "0 0 15px rgba(139, 168, 147, 0.25)",
-          transform: `translate3d(${position.x}px, ${position.y}px, 0)`
         }}
       >
         <div className="absolute inset-0 bg-[#8ba893]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -341,11 +326,18 @@ export default function CoachChatFAB() {
         />
         {/* Pulsing notification dot */}
         <span className="absolute top-0 right-1 w-3.5 h-3.5 bg-[#c87a53] border-2 border-[#0c0f0d] rounded-full animate-pulse" />
-      </button>
+      </motion.button>
 
-      {/* Chat Drawer Side Panel */}
-      {isOpen && (
-        <div className="fixed bottom-[82px] right-3 left-3 md:left-auto md:right-6 md:bottom-24 z-50 w-auto md:w-[385px] bg-[#0c0f0d]/95 border border-white/10 rounded-2xl backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden animate-in" style={{ maxHeight: 'min(480px, calc(100dvh - 160px))' }}>
+      {/* Chat Drawer Side Panel with Spring Animations */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 350, damping: 26 } }}
+            exit={{ opacity: 0, scale: 0.95, y: 15, transition: { duration: 0.15, ease: "easeOut" } }}
+            className="fixed bottom-[82px] right-3 left-3 md:left-auto md:right-6 md:bottom-24 z-50 w-auto md:w-[385px] bg-[#0c0f0d]/95 border border-white/10 rounded-2xl backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden" 
+            style={{ maxHeight: 'min(480px, calc(100dvh - 160px))' }}
+          >
           {/* Header */}
           <div className="p-4 bg-white/3 border-b border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -449,8 +441,9 @@ export default function CoachChatFAB() {
               <Send className="w-4 h-4" />
             </button>
           </form>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </>
   );
 }
