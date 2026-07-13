@@ -831,10 +831,10 @@ export default function Dashboard() {
 
       {/* Unified Bottom Drawer Modal */}
       {quickLogOpen && (
-        <div className="fixed inset-0 bg-[#0c0f0d]/70 backdrop-blur-md z-50 flex items-end justify-center animate-in">
+        <div className="fixed inset-0 bg-[#0c0f0d]/70 backdrop-blur-md z-[100] flex items-end justify-center animate-in">
           <div className="absolute inset-0" onClick={() => setQuickLogOpen(false)} />
           
-          <GlassCard className="w-full max-w-lg p-6 space-y-5 rounded-t-3xl border-t border-white/10 z-50 relative max-h-[90vh] overflow-y-auto bg-[#0c0f0d] text-left">
+          <GlassCard className="w-full max-w-lg p-6 space-y-5 rounded-t-3xl border-t border-white/10 z-[100] relative max-h-[90vh] overflow-y-auto bg-[#0c0f0d] text-left">
             {/* Drawer drag handle visual cue */}
             <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto -mt-1 mb-2" />
             
