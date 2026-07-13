@@ -108,65 +108,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let analysis: MealAnalysis;
+    let analysis: MealAnalysis = getMockMealAnalysis();
     let isMock = false;
 
     const groqKey = process.env.GROQ_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
 
-    if (groqKey && groqKey !== "your_groq_api_key_here") {
+    let geminiSuccess = false;
+
+    // 1. Try Gemini first (Primary)
+    if (geminiKey && geminiKey !== "your_gemini_api_key_here") {
       try {
-        console.log("⚡ Analyzing meal using Groq Vision API...");
-        analysis = await analyzeMealWithGroq(imageBase64, mimeType || "image/jpeg");
-      } catch (groqError: any) {
-        console.warn("⚠️ Groq Vision API call failed, falling back to Gemini:", groqError);
-        // Fallback to Gemini if Groq fails
-        if (geminiKey && geminiKey !== "your_gemini_api_key_here") {
-          try {
-            const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-            analysis = await analyzeMealImage(cleanBase64, mimeType || "image/jpeg");
-          } catch (geminiError: any) {
-            console.warn("⚠️ Gemini Vision API call also failed. Falling back to mock:", geminiError);
-            analysis = getMockMealAnalysis();
-            isMock = true;
-          }
-        } else {
+        console.log("⚡ Analyzing meal using Gemini Vision API (Primary)...");
+        const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+        analysis = await analyzeMealImage(cleanBase64, mimeType || "image/jpeg");
+        geminiSuccess = true;
+      } catch (geminiError: any) {
+        console.warn("⚠️ Gemini Vision API call failed, falling back to Groq:", geminiError);
+      }
+    }
+
+    // 2. Try Groq second (Secondary Fallback)
+    if (!geminiSuccess) {
+      if (groqKey && groqKey !== "your_groq_api_key_here") {
+        try {
+          console.log("⚡ Analyzing meal using Groq Vision API (Fallback)...");
+          analysis = await analyzeMealWithGroq(imageBase64, mimeType || "image/jpeg");
+        } catch (groqError: any) {
+          console.warn("⚠️ Groq Vision API call also failed. Falling back to mock:", groqError);
           analysis = getMockMealAnalysis();
           isMock = true;
         }
-      }
-    } else if (geminiKey && geminiKey !== "your_gemini_api_key_here") {
-      try {
-        console.log("⚡ Analyzing meal using Gemini Vision API...");
-        const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-        analysis = await analyzeMealImage(cleanBase64, mimeType || "image/jpeg");
-      } catch (geminiError: any) {
-        const isQuotaError =
-          geminiError?.status === 429 ||
-          String(geminiError).includes("429") ||
-          String(geminiError).includes("quota");
-
-        if (isQuotaError) {
-          console.warn("⚠️ Gemini quota exceeded — returning error to client");
-          return Response.json(
-            {
-              error: "quota_exceeded",
-              message:
-                "Gemini API daily limit reached. Wait until tomorrow or enable billing at console.cloud.google.com for higher limits.",
-            },
-            { status: 429 }
-          );
-        }
-
-        console.warn("⚠️ Gemini Vision API call failed. Falling back to mock:", geminiError);
+      } else {
+        console.log("⚠️ No Groq API key configured. Falling back to mock.");
         analysis = getMockMealAnalysis();
         isMock = true;
       }
-    } else {
-      console.log("⚠️ Using mock vision analysis (no API key configured)");
-      await new Promise((r) => setTimeout(r, 1500));
-      analysis = getMockMealAnalysis();
-      isMock = true;
     }
 
     return Response.json({ analysis, isMock });
