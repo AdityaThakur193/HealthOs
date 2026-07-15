@@ -1470,13 +1470,13 @@ export default function ProfilePage() {
                             {/* Mess Items Choice */}
                             <div className="p-2.5 bg-zinc-950/40 rounded-xl border border-white/5">
                               <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block mb-0.5">🥣 From Hostel Mess</span>
-                              <p className="text-xs text-white leading-relaxed">{meal.messItems || "No mess options suggested"}</p>
+                              <p className="text-xs text-white leading-relaxed whitespace-pre-line">{meal.messItems || "No mess options suggested"}</p>
                             </div>
 
                             {/* Required Additions */}
                             <div className="p-2.5 bg-[#8ba893]/5 rounded-xl border border-[#8ba893]/15">
                               <span className="text-[8px] font-bold text-[#8ba893] uppercase tracking-widest block mb-0.5">➕ Custom Additions / Supplements</span>
-                              <p className="text-xs text-[#8ba893] font-semibold leading-relaxed">{meal.additions || "No additions needed"}</p>
+                              <p className="text-xs text-[#8ba893] font-semibold leading-relaxed whitespace-pre-line">{meal.additions || "No additions needed"}</p>
                             </div>
                           </div>
 

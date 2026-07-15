@@ -184,6 +184,7 @@ CRITICAL MATHEMATICAL ENFORCEMENT:
   - 1 cup cooked Rice = 200 kcal, 4g Protein
   - 1 cup Dal = 150 kcal, 7g Protein
   - Ensure the sums add up correctly. Do not output arbitrary numbers.
+- You MUST format both "messItems" and "additions" fields strictly as a bulleted list using the bullet symbol (•) and newlines (\n) to separate each food item, instead of comma-separated lines. For example: "• Onion Utapam (2 pieces, approx 160g total - 8g P, 320 kcal)\n• Plain Curd (200g - 6g P, 120 kcal)".
 
 Return a JSON object matching this exact structure:
 {
