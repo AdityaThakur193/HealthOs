@@ -165,8 +165,13 @@ You MUST design the weekly diet plan following these strict scientific principle
    - Snacks: 4:30 PM - 6:00 PM (e.g. schedule snacks at 5:00 PM)
    - Dinner: 7:30 PM - 9:30 PM (e.g. schedule dinner at 8:15 PM)
    You MUST design all meal times in the plan to fall strictly within these specific time windows when using mess menu items.
+9. Specific Weights & Quantities (NO VAGUE PORTIONS):
+   - You MUST NOT use vague adjectives like "large serving", "generous portion", "very large bowl", "minimal gravy", "focus on X".
+   - You MUST specify exact weights in grams (e.g. "150g cooked soya chunks", "150g chicken breast", "200g plain curd") or precise quantities (e.g. "2 Rotis (approx 100g total)", "250ml Milk").
+   - In both the "messItems" and "additions" fields, you must list the exact estimated weight/volume and macro contribution in parentheses for EACH food item. For example: "Onion Utapam (2 pieces, approx 160g total - 8g P, 320 kcal), Plain Curd (200g - 6g P, 120 kcal)".
 
 CRITICAL MATHEMATICAL ENFORCEMENT:
+- Every single food item suggested in the "messItems" and "additions" fields MUST list its estimated weight/quantity, estimated protein in grams, and calories in parentheses. For example: "Plain Curd (200g - 6g P, 120 kcal)". The meal's total "proteinG" and "calories" fields MUST equal the exact sum of these individual item breakdowns.
 - If Strict Mess Only Mode is INACTIVE: The daily SUM of "calories" across all meals MUST EQUAL the target of ${targetCalories} kcal (+/- 50 kcal), and the daily SUM of "proteinG" across all meals MUST EQUAL the target of ${targetProtein}g (+/- 5g).
 - If Strict Mess Only Mode is ACTIVE: The daily SUM does NOT need to hit the targets if the mess menu cannot support it. In this case, you MUST prioritize realistic macro estimations. Do NOT inflate the protein of mess foods. Simply sum the real values of the mess items, even if the total is far below the targets.
 - Make sure the individual meal calorie and protein estimates are realistic:
