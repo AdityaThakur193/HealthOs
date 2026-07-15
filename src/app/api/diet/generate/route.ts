@@ -112,7 +112,20 @@ export async function POST(request: NextRequest) {
 
     let additionsGuideline = "";
     if (strictMessOnly) {
-      additionsGuideline = `CRITICAL CONSTRAINT (Strict Mess Only Mode): The user is on a strict budget and CAN ONLY eat food provided by the hostel mess. You MUST NOT suggest any external additions, purchases, or supplements. Set "additions" to "None (Strict Mess Only)" for all meals. Prioritize and suggest the highest protein options available directly from the mess menu items served that day. If they cannot meet the protein goal due to low protein in the mess, accept this restriction and maximize what they can get from the mess.`;
+      additionsGuideline = `CRITICAL CONSTRAINT (Strict Mess Only Mode): The user is on a strict budget and CAN ONLY eat food provided by the hostel mess. You MUST NOT suggest any external additions, purchases, or supplements. Set "additions" to "None (Strict Mess Only)" for all meals. 
+      Prioritize and suggest the highest protein options available directly from the mess menu items served that day.
+      
+      REALISTIC MACROS ONLY (DO NOT HALLUCINATE):
+      - In Strict Mess Only mode, it is physically impossible to meet high protein targets (like 150g+) using only typical carb-heavy hostel mess foods (roti, rice, sabzi, thin dal).
+      - You MUST estimate the true, realistic protein and calories of the mess food:
+        * 1 cup typical thin Mess Dal = 4g to 5g protein (NOT 15g or 20g)
+        * 1 Roti = 2.5g protein
+        * 1 cup cooked Rice = 3.5g protein
+        * 200g Curd = 6g protein
+        * Onion Utapam (2 large) = 8g protein (NOT 40g or 50g)
+        * Ghugni Masala / Chole = 8g protein
+        * Banana Milkshake (1 glass) = 8g protein
+      - If the daily protein total under strict mess constraints is only 50g-70g, that is perfectly fine. DO NOT inflate or hallucinate the protein of mess food to meet the ${targetProtein}g target! Under this mode, accuracy of food metrics takes absolute priority over hitting the target. If the targets cannot be met, accept the deficit and explain it in the "timingReason" field.`;
     } else {
       additionsGuideline = `Since mess food is typically low in protein, you MUST suggest specific additions/supplements in the "additions" field to hit the daily target of ${targetProtein}g protein.
 Guidelines for additions based on diet preference ("${dietPreference}"):
@@ -154,8 +167,8 @@ You MUST design the weekly diet plan following these strict scientific principle
    You MUST design all meal times in the plan to fall strictly within these specific time windows when using mess menu items.
 
 CRITICAL MATHEMATICAL ENFORCEMENT:
-- For every day (Monday to Sunday), the SUM of "calories" across all meals MUST EQUAL the daily target of ${targetCalories} kcal (with a tolerance of +/- 50 kcal).
-- For every day, the SUM of "proteinG" across all meals MUST EQUAL the daily target of ${targetProtein}g (with a tolerance of +/- 5g).
+- If Strict Mess Only Mode is INACTIVE: The daily SUM of "calories" across all meals MUST EQUAL the target of ${targetCalories} kcal (+/- 50 kcal), and the daily SUM of "proteinG" across all meals MUST EQUAL the target of ${targetProtein}g (+/- 5g).
+- If Strict Mess Only Mode is ACTIVE: The daily SUM does NOT need to hit the targets if the mess menu cannot support it. In this case, you MUST prioritize realistic macro estimations. Do NOT inflate the protein of mess foods. Simply sum the real values of the mess items, even if the total is far below the targets.
 - Make sure the individual meal calorie and protein estimates are realistic:
   - 1 scoop Whey Protein = 120 kcal, 24g Protein
   - 4 Egg Whites = 68 kcal, 16g Protein
@@ -164,7 +177,7 @@ CRITICAL MATHEMATICAL ENFORCEMENT:
   - 1 Roti = 80-100 kcal, 2-3g Protein
   - 1 cup cooked Rice = 200 kcal, 4g Protein
   - 1 cup Dal = 150 kcal, 7g Protein
-  - Ensure the sums add up correctly to ${targetCalories} kcal and ${targetProtein}g protein daily. Do not output arbitrary numbers.
+  - Ensure the sums add up correctly. Do not output arbitrary numbers.
 
 Return a JSON object matching this exact structure:
 {
