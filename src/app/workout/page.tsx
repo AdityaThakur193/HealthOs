@@ -19,6 +19,7 @@ interface ExerciseState {
   previousWeight?: number;
   suggestedWeight?: number;
   sets: { weight: number; reps: number; completed: boolean }[];
+  youtubeId?: string;
 }
 
 export default function WorkoutTracker() {
@@ -60,6 +61,7 @@ export default function WorkoutTracker() {
         muscleGroup: ex.muscle,
         targetSets: ex.targetSets,
         targetReps: ex.targetReps,
+        youtubeId: ex.youtubeId,
         sets: Array.from({ length: ex.targetSets }, () => ({
           weight: 0,
           reps: 0,
@@ -470,6 +472,7 @@ export default function WorkoutTracker() {
             previousWeight={ex.previousWeight}
             suggestedWeight={ex.suggestedWeight}
             sets={ex.sets}
+            youtubeId={ex.youtubeId}
             onLogSet={(setIndex, w, r) => handleLogSet(ex.id, setIndex, w, r)}
             onToggleSet={(setIndex) => handleToggleSet(ex.id, setIndex)}
           />

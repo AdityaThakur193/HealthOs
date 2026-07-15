@@ -6,6 +6,7 @@ export interface Exercise {
   targetSets: number;
   targetReps: string;
   restSeconds: number;
+  youtubeId?: string;
 }
 
 export interface WorkoutPlan {
@@ -15,64 +16,64 @@ export interface WorkoutPlan {
   exercises: Exercise[];
 }
 
-// Complete library of custom exercises mapping to ChatGPT evidence-based targets
+// Complete library of custom exercises mapping to ChatGPT evidence-based targets with form videos
 const EXERCISE_LIBRARY: Record<string, Omit<Exercise, "targetSets" | "targetReps" | "restSeconds">> = {
   // Chest
-  bench_press: { id: "bench_press", name: "Barbell Bench Press (2 RIR)", muscle: "chest", equipment: "barbell" },
-  incline_db_press: { id: "incline_db_press", name: "Incline Dumbbell Press", muscle: "chest", equipment: "dumbbell" },
-  pec_deck_fly: { id: "pec_deck_fly", name: "Pec Deck Fly", muscle: "chest", equipment: "machine" },
-  incline_smith_press: { id: "incline_smith_press", name: "Incline Smith Press", muscle: "chest", equipment: "machine" },
-  machine_chest_press: { id: "machine_chest_press", name: "Machine Chest Press", muscle: "chest", equipment: "machine" },
+  bench_press: { id: "bench_press", name: "Barbell Bench Press (2 RIR)", muscle: "chest", equipment: "barbell", youtubeId: "gRVjAtPip0Y" },
+  incline_db_press: { id: "incline_db_press", name: "Incline Dumbbell Press", muscle: "chest", equipment: "dumbbell", youtubeId: "8iPckaTs9aM" },
+  pec_deck_fly: { id: "pec_deck_fly", name: "Pec Deck Fly", muscle: "chest", equipment: "machine", youtubeId: "eGjt4lk6g34" },
+  incline_smith_press: { id: "incline_smith_press", name: "Incline Smith Press", muscle: "chest", equipment: "machine", youtubeId: "3m0VvHvx6o4" },
+  machine_chest_press: { id: "machine_chest_press", name: "Machine Chest Press", muscle: "chest", equipment: "machine", youtubeId: "mS6NdfgUvHk" },
 
   // Back / Lats
-  wide_grip_lat_pulldown: { id: "wide_grip_lat_pulldown", name: "Wide Grip Lat Pulldown", muscle: "back", equipment: "machine" },
-  chest_supported_row: { id: "chest_supported_row", name: "Chest Supported Row", muscle: "back", equipment: "machine" },
-  seated_cable_row: { id: "seated_cable_row", name: "Seated Cable Row", muscle: "back", equipment: "cable" },
-  neutral_grip_pulldown: { id: "neutral_grip_pulldown", name: "Neutral Grip Pulldown", muscle: "back", equipment: "machine" },
-  single_arm_cable_row: { id: "single_arm_cable_row", name: "Single Arm Cable Row", muscle: "back", equipment: "cable" },
-  straight_arm_pulldown: { id: "straight_arm_pulldown", name: "Straight Arm Pulldown", muscle: "back", equipment: "cable" },
+  wide_grip_lat_pulldown: { id: "wide_grip_lat_pulldown", name: "Wide Grip Lat Pulldown", muscle: "back", equipment: "machine", youtubeId: "1SStR4EwP_E" },
+  chest_supported_row: { id: "chest_supported_row", name: "Chest Supported Row", muscle: "back", equipment: "machine", youtubeId: "H75im9fAUMc" },
+  seated_cable_row: { id: "seated_cable_row", name: "Seated Cable Row", muscle: "back", equipment: "cable", youtubeId: "GZbfZ033fQ4" },
+  neutral_grip_pulldown: { id: "neutral_grip_pulldown", name: "Neutral Grip Pulldown", muscle: "back", equipment: "machine", youtubeId: "1SStR4EwP_E" },
+  single_arm_cable_row: { id: "single_arm_cable_row", name: "Single Arm Cable Row", muscle: "back", equipment: "cable", youtubeId: "k_m75n2S-7w" },
+  straight_arm_pulldown: { id: "straight_arm_pulldown", name: "Straight Arm Pulldown", muscle: "back", equipment: "cable", youtubeId: "P4S1f-UplxI" },
 
   // Shoulders / Delts
-  cable_lateral_raise: { id: "cable_lateral_raise", name: "Cable Lateral Raise", muscle: "shoulders", equipment: "cable" },
-  reverse_pec_deck: { id: "reverse_pec_deck", name: "Reverse Pec Deck (Rear Delts)", muscle: "shoulders", equipment: "machine" },
-  face_pull: { id: "face_pull", name: "Cable Face Pull", muscle: "shoulders", equipment: "cable" },
-  machine_shoulder_press: { id: "machine_shoulder_press", name: "Machine Shoulder Press", muscle: "shoulders", equipment: "machine" },
-  lean_away_lateral_raise: { id: "lean_away_lateral_raise", name: "Lean Away Lateral Raise", muscle: "shoulders", equipment: "cable" },
+  cable_lateral_raise: { id: "cable_lateral_raise", name: "Cable Lateral Raise", muscle: "shoulders", equipment: "cable", youtubeId: "PPripNh_sDw" },
+  reverse_pec_deck: { id: "reverse_pec_deck", name: "Reverse Pec Deck (Rear Delts)", muscle: "shoulders", equipment: "machine", youtubeId: "5ykMyyPcxW0" },
+  face_pull: { id: "face_pull", name: "Cable Face Pull", muscle: "shoulders", equipment: "cable", youtubeId: "V81Z35t-6i0" },
+  machine_shoulder_press: { id: "machine_shoulder_press", name: "Machine Shoulder Press", muscle: "shoulders", equipment: "machine", youtubeId: "WvLM7e-wTIk" },
+  lean_away_lateral_raise: { id: "lean_away_lateral_raise", name: "Lean Away Lateral Raise", muscle: "shoulders", equipment: "cable", youtubeId: "PPripNh_sDw" },
 
   // Arms (Biceps/Triceps)
-  bayesian_curl: { id: "bayesian_curl", name: "Bayesian Curl (Long Head emphasis)", muscle: "biceps", equipment: "cable" },
-  preacher_curl: { id: "preacher_curl", name: "Preacher Curl (Short Head emphasis)", muscle: "biceps", equipment: "machine" },
-  hammer_curl: { id: "hammer_curl", name: "Hammer Curl (Brachialis emphasis)", muscle: "biceps", equipment: "dumbbell" },
-  incline_db_curl: { id: "incline_db_curl", name: "Incline Dumbbell Curl", muscle: "biceps", equipment: "dumbbell" },
-  rope_pushdown: { id: "rope_pushdown", name: "Cable Rope Pushdown", muscle: "triceps", equipment: "cable" },
-  overhead_cable_extension: { id: "overhead_cable_extension", name: "Overhead Cable Rope Extension", muscle: "triceps", equipment: "cable" },
-  single_arm_cross_body_ext: { id: "single_arm_cross_body_ext", name: "Single Arm Cross-Body Extension", muscle: "triceps", equipment: "cable" },
+  bayesian_curl: { id: "bayesian_curl", name: "Bayesian Curl (Long Head emphasis)", muscle: "biceps", equipment: "cable", youtubeId: "GusFwM2oO3M" },
+  preacher_curl: { id: "preacher_curl", name: "Preacher Curl (Short Head emphasis)", muscle: "biceps", equipment: "machine", youtubeId: "fIWP-FRFNPM" },
+  hammer_curl: { id: "hammer_curl", name: "Hammer Curl (Brachialis emphasis)", muscle: "biceps", equipment: "dumbbell", youtubeId: "zC3nLlEvin4" },
+  incline_db_curl: { id: "incline_db_curl", name: "Incline Dumbbell Curl", muscle: "biceps", equipment: "dumbbell", youtubeId: "aTYlqC_JacQ" },
+  rope_pushdown: { id: "rope_pushdown", name: "Cable Rope Pushdown", muscle: "triceps", equipment: "cable", youtubeId: "vB5OHsJ3EME" },
+  overhead_cable_extension: { id: "overhead_cable_extension", name: "Overhead Cable Rope Extension", muscle: "triceps", equipment: "cable", youtubeId: "1yPJG3-Y8E0" },
+  single_arm_cross_body_ext: { id: "single_arm_cross_body_ext", name: "Single Arm Cross-Body Extension", muscle: "triceps", equipment: "cable", youtubeId: "vB5OHsJ3EME" },
 
   // Quads/Glutes/Hamstrings
-  hack_squat: { id: "hack_squat", name: "Hack Squat Machine", muscle: "quads", equipment: "machine" },
-  leg_press: { id: "leg_press", name: "Leg Press Machine", muscle: "quads", equipment: "machine" },
-  leg_extension: { id: "leg_extension", name: "Leg Extension Machine", muscle: "quads", equipment: "machine" },
-  romanian_deadlift: { id: "romanian_deadlift", name: "Barbell Romanian Deadlift", muscle: "hamstrings", equipment: "barbell" },
-  seated_leg_curl: { id: "seated_leg_curl", name: "Seated Leg Curl Machine", muscle: "hamstrings", equipment: "machine" },
-  lying_leg_curl: { id: "lying_leg_curl", name: "Lying Leg Curl Machine", muscle: "hamstrings", equipment: "machine" },
-  hip_thrust: { id: "hip_thrust", name: "Glute Hip Thrust", muscle: "glutes", equipment: "barbell" },
-  standing_calf_raise: { id: "standing_calf_raise", name: "Standing Calf Raises", muscle: "calves", equipment: "machine" },
-  seated_calf_raise: { id: "seated_calf_raise", name: "Seated Calf Raises", muscle: "calves", equipment: "machine" },
-  bulgarian_split_squat: { id: "bulgarian_split_squat", name: "Bulgarian Split Squat", muscle: "quads", equipment: "dumbbell" },
-  front_squat: { id: "front_squat", name: "Front Squat OR Smith Squat", muscle: "quads", equipment: "barbell" },
+  hack_squat: { id: "hack_squat", name: "Hack Squat Machine", muscle: "quads", equipment: "machine", youtubeId: "0tYmXGpbS6w" },
+  leg_press: { id: "leg_press", name: "Leg Press Machine", muscle: "quads", equipment: "machine", youtubeId: "IZxyjWwMJyQ" },
+  leg_extension: { id: "leg_extension", name: "Leg Extension Machine", muscle: "quads", equipment: "machine", youtubeId: "IZxyjWwMJyQ" },
+  romanian_deadlift: { id: "romanian_deadlift", name: "Barbell Romanian Deadlift", muscle: "hamstrings", equipment: "barbell", youtubeId: "JCXUYt5RQ0k" },
+  seated_leg_curl: { id: "seated_leg_curl", name: "Seated Leg Curl Machine", muscle: "hamstrings", equipment: "machine", youtubeId: "Orxowest56U" },
+  lying_leg_curl: { id: "lying_leg_curl", name: "Lying Leg Curl Machine", muscle: "hamstrings", equipment: "machine", youtubeId: "n5Vb0f4M33I" },
+  hip_thrust: { id: "hip_thrust", name: "Glute Hip Thrust", muscle: "glutes", equipment: "barbell", youtubeId: "LM8XH3VJHbs" },
+  standing_calf_raise: { id: "standing_calf_raise", name: "Standing Calf Raises", muscle: "calves", equipment: "machine", youtubeId: "hL5vLz87Ypw" },
+  seated_calf_raise: { id: "seated_calf_raise", name: "Seated Calf Raises", muscle: "calves", equipment: "machine", youtubeId: "JbC8JZZZ5_Q" },
+  bulgarian_split_squat: { id: "bulgarian_split_squat", name: "Bulgarian Split Squat", muscle: "quads", equipment: "dumbbell", youtubeId: "2C-uNgw13cY" },
+  front_squat: { id: "front_squat", name: "Front Squat OR Smith Squat", muscle: "quads", equipment: "barbell", youtubeId: "v-mQm_dra5g" },
 
   // Core & Recovery Work
-  cable_crunch: { id: "cable_crunch", name: "Cable Crunch", muscle: "core", equipment: "cable" },
-  hanging_knee_raise: { id: "hanging_knee_raise", name: "Hanging Knee Raise", muscle: "core", equipment: "bodyweight" },
-  dead_bug: { id: "dead_bug", name: "Dead Bug", muscle: "core", equipment: "bodyweight" },
-  bird_dog: { id: "bird_dog", name: "Bird Dog", muscle: "core", equipment: "bodyweight" },
-  plank: { id: "plank", name: "Standard Forearm Plank", muscle: "core", equipment: "bodyweight" },
-  ab_wheel: { id: "ab_wheel", name: "Ab Wheel", muscle: "core", equipment: "bodyweight" },
+  cable_crunch: { id: "cable_crunch", name: "Cable Crunch", muscle: "core", equipment: "cable", youtubeId: "2Cw7WkF-R2c" },
+  hanging_knee_raise: { id: "hanging_knee_raise", name: "Hanging Knee Raise", muscle: "core", equipment: "bodyweight", youtubeId: "4H2L50_rNQA" },
+  dead_bug: { id: "dead_bug", name: "Dead Bug", muscle: "core", equipment: "bodyweight", youtubeId: "4XLEnwUr1d8" },
+  bird_dog: { id: "bird_dog", name: "Bird Dog", muscle: "core", equipment: "bodyweight", youtubeId: "wiFSPDxGpQA" },
+  plank: { id: "plank", name: "Standard Forearm Plank", muscle: "core", equipment: "bodyweight", youtubeId: "pSHjTRCQxIw" },
+  ab_wheel: { id: "ab_wheel", name: "Ab Wheel", muscle: "core", equipment: "bodyweight", youtubeId: "rqIeOIJ3ycU" },
   
   // Cardio & Walks
-  zone_2_cardio: { id: "zone_2_cardio", name: "Zone 2 Cardio (Brisk Walk or Treadmill)", muscle: "conditioning", equipment: "bodyweight" },
-  incline_walk: { id: "incline_walk", name: "Incline Treadmill Walk", muscle: "conditioning", equipment: "machine" },
-  mobility_routine: { id: "mobility_routine", name: "Full Body Mobility Routine", muscle: "recovery", equipment: "bodyweight" },
+  zone_2_cardio: { id: "zone_2_cardio", name: "Zone 2 Cardio (Brisk Walk or Treadmill)", muscle: "conditioning", equipment: "bodyweight", youtubeId: "V4d3P5GqH58" },
+  incline_walk: { id: "incline_walk", name: "Incline Treadmill Walk", muscle: "conditioning", equipment: "machine", youtubeId: "T_WfCskp6p4" },
+  mobility_routine: { id: "mobility_routine", name: "Full Body Mobility Routine", muscle: "recovery", equipment: "bodyweight", youtubeId: "v41v70eF0hE" },
 };
 
 /**
