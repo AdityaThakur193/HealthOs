@@ -84,30 +84,64 @@ export default function ExerciseCard({
       </div>
 
       {/* Video Embed */}
-      {showVideo && youtubeId && (
-        <motion.div 
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="mb-3 rounded-xl overflow-hidden border border-white/10 p-2 bg-white/5 space-y-2"
-        >
-          <iframe
-            className="w-full aspect-video rounded-lg"
-            src={`https://www.youtube.com/embed/${youtubeId}`}
-            title={`${name} Form Video`}
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
-          <a
-            href={`https://www.youtube.com/watch?v=${youtubeId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 w-full py-1.5 text-[10px] text-zinc-400 hover:text-white transition-colors bg-white/5 rounded-lg hover:bg-white/10 font-medium"
+      {showVideo && youtubeId && (() => {
+        const getYoutubeEmbedUrl = (id: string) => {
+          if (id.includes('?t=') || id.includes('&t=')) {
+            const parts = id.split(/[?&]t=/);
+            const videoId = parts[0];
+            const timeStr = parts[1].replace('s', '');
+            return `https://www.youtube.com/embed/${videoId}?start=${timeStr}`;
+          }
+          if (id.includes('?start=') || id.includes('&start=')) {
+            const parts = id.split(/[?&]start=/);
+            const videoId = parts[0];
+            const timeStr = parts[1];
+            return `https://www.youtube.com/embed/${videoId}?start=${timeStr}`;
+          }
+          return `https://www.youtube.com/embed/${id}`;
+        };
+
+        const getYoutubeWatchUrl = (id: string) => {
+          if (id.includes('?t=') || id.includes('&t=')) {
+            const parts = id.split(/[?&]t=/);
+            const videoId = parts[0];
+            const timeStr = parts[1];
+            return `https://www.youtube.com/watch?v=${videoId}&t=${timeStr}`;
+          }
+          if (id.includes('?start=') || id.includes('&start=')) {
+            const parts = id.split(/[?&]start=/);
+            const videoId = parts[0];
+            const timeStr = parts[1];
+            return `https://www.youtube.com/watch?v=${videoId}&t=${timeStr}s`;
+          }
+          return `https://www.youtube.com/watch?v=${id}`;
+        };
+
+        return (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="mb-3 rounded-xl overflow-hidden border border-white/10 p-2 bg-white/5 space-y-2"
           >
-            <span>Can't view? Open on YouTube ↗</span>
-          </a>
-        </motion.div>
-      )}
+            <iframe
+              className="w-full aspect-video rounded-lg"
+              src={getYoutubeEmbedUrl(youtubeId)}
+              title={`${name} Form Video`}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+            <a
+              href={getYoutubeWatchUrl(youtubeId)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 w-full py-1.5 text-[10px] text-zinc-400 hover:text-white transition-colors bg-white/5 rounded-lg hover:bg-white/10 font-medium"
+            >
+              <span>Can't view? Open on YouTube ↗</span>
+            </a>
+          </motion.div>
+        );
+      })()}
 
       {/* Progressive overload hint */}
       {suggestedWeight && (
