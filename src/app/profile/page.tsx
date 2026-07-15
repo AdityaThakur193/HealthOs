@@ -206,6 +206,85 @@ export default function ProfilePage() {
     setCustomDietPreferences(profile.customDietPreferences || "");
   }, [profile]);
 
+  const renderFoodList = (text: string, isAdditions: boolean = false) => {
+    if (!text) {
+      return (
+        <span className="text-xs text-zinc-500 italic block py-1 text-left">None suggested</span>
+      );
+    }
+
+    const cleanText = text.trim();
+    if (
+      cleanText.toLowerCase() === "none" || 
+      cleanText.toLowerCase() === "none (strict mess only)" ||
+      cleanText.toLowerCase().includes("none (strict mess only)")
+    ) {
+      return (
+        <div className="flex items-center gap-1.5 py-1 text-zinc-500">
+          <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+          <span className="text-[11px] font-semibold">None (Strict Mess Only)</span>
+        </div>
+      );
+    }
+
+    // Split items by line
+    const items = cleanText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+    return (
+      <div className="space-y-1.5 py-0.5">
+        {items.map((line, idx) => {
+          // Clean bullet symbols
+          const cleanLine = line.replace(/^[•\-\*\s]+/, "");
+          
+          // Match Parentheses: Name (Portion - Macros)
+          const parenMatch = cleanLine.match(/^([^(]+)\(([^)]+)\)$/);
+          if (parenMatch) {
+            const name = parenMatch[1].trim();
+            const details = parenMatch[2].trim();
+            
+            // Split details by '-'
+            const parts = details.split("-").map(p => p.trim());
+            const portion = parts[0] || "";
+            const macros = parts[1] || "";
+
+            return (
+              <div key={idx} className="flex items-start justify-between py-1 border-b border-white/5 last:border-b-0 last:pb-0 gap-2">
+                <div className="text-left min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-1 h-1 rounded-full flex-shrink-0 ${isAdditions ? "bg-[#8ba893]" : "bg-[#c87a53]"}`} />
+                    <span className="text-[11px] font-semibold text-zinc-100 truncate">{name}</span>
+                  </div>
+                  {portion && (
+                    <span className="text-[9px] text-zinc-500 pl-2.5 block truncate leading-tight">{portion}</span>
+                  )}
+                </div>
+                {macros && (
+                  <div className="flex-shrink-0 flex items-center">
+                    <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded-md border ${
+                      isAdditions 
+                        ? "bg-[#8ba893]/10 border-[#8ba893]/20 text-[#8ba893]" 
+                        : "bg-white/5 border-white/10 text-zinc-300"
+                    }`}>
+                      {macros}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // Fallback if formatting doesn't match
+          return (
+            <div key={idx} className="flex items-start gap-1.5 py-1 text-left border-b border-white/5 last:border-b-0 last:pb-0">
+              <span className={`w-1 h-1 rounded-full mt-1.5 flex-shrink-0 ${isAdditions ? "bg-[#8ba893]" : "bg-[#c87a53]"}`} />
+              <span className="text-[11px] text-zinc-300 font-medium leading-relaxed">{cleanLine}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const loadCalendarEvents = useCallback(async () => {
     if (!userId) return;
     setLoadingEvents(true);
@@ -1468,15 +1547,15 @@ export default function ProfilePage() {
                           {/* Meal Choices */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                             {/* Mess Items Choice */}
-                            <div className="p-2.5 bg-zinc-950/40 rounded-xl border border-white/5">
-                              <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block mb-0.5">🥣 From Hostel Mess</span>
-                              <p className="text-xs text-white leading-relaxed whitespace-pre-line">{meal.messItems || "No mess options suggested"}</p>
+                            <div className="p-3 bg-zinc-950/40 rounded-xl border border-white/5">
+                              <span className="text-[8.5px] font-extrabold text-zinc-500 uppercase tracking-widest block mb-2 text-left">🥣 From Hostel Mess</span>
+                              {renderFoodList(meal.messItems)}
                             </div>
 
                             {/* Required Additions */}
-                            <div className="p-2.5 bg-[#8ba893]/5 rounded-xl border border-[#8ba893]/15">
-                              <span className="text-[8px] font-bold text-[#8ba893] uppercase tracking-widest block mb-0.5">➕ Custom Additions / Supplements</span>
-                              <p className="text-xs text-[#8ba893] font-semibold leading-relaxed whitespace-pre-line">{meal.additions || "No additions needed"}</p>
+                            <div className="p-3 bg-[#8ba893]/3 rounded-xl border border-[#8ba893]/10">
+                              <span className="text-[8.5px] font-extrabold text-[#8ba893] uppercase tracking-widest block mb-2 text-left">➕ Custom Additions / Supplements</span>
+                              {renderFoodList(meal.additions, true)}
                             </div>
                           </div>
 
