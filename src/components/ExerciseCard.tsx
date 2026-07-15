@@ -88,16 +88,24 @@ export default function ExerciseCard({
         <motion.div 
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
-          className="mb-3 rounded-xl overflow-hidden border border-white/10"
+          className="mb-3 rounded-xl overflow-hidden border border-white/10 p-2 bg-white/5 space-y-2"
         >
           <iframe
-            className="w-full aspect-video"
-            src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&loop=1&playlist=${youtubeId}`}
+            className="w-full aspect-video rounded-lg"
+            src={`https://www.youtube.com/embed/${youtubeId}`}
             title={`${name} Form Video`}
             frameBorder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
           />
+          <a
+            href={`https://www.youtube.com/watch?v=${youtubeId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 w-full py-1.5 text-[10px] text-zinc-400 hover:text-white transition-colors bg-white/5 rounded-lg hover:bg-white/10 font-medium"
+          >
+            <span>Can't view? Open on YouTube ↗</span>
+          </a>
         </motion.div>
       )}
 

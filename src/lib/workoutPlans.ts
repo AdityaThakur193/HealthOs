@@ -50,7 +50,7 @@ const EXERCISE_LIBRARY: Record<string, Omit<Exercise, "targetSets" | "targetReps
   single_arm_cross_body_ext: { id: "single_arm_cross_body_ext", name: "Single Arm Cross-Body Extension", muscle: "triceps", equipment: "cable", youtubeId: "vB5OHsJ3EME" },
 
   // Quads/Glutes/Hamstrings
-  hack_squat: { id: "hack_squat", name: "Hack Squat Machine", muscle: "quads", equipment: "machine", youtubeId: "0tYmXGpbS6w" },
+  hack_squat: { id: "hack_squat", name: "Hack Squat Machine", muscle: "quads", equipment: "machine", youtubeId: "N4tL_wWq9X4" },
   leg_press: { id: "leg_press", name: "Leg Press Machine", muscle: "quads", equipment: "machine", youtubeId: "IZxyjWwMJyQ" },
   leg_extension: { id: "leg_extension", name: "Leg Extension Machine", muscle: "quads", equipment: "machine", youtubeId: "IZxyjWwMJyQ" },
   romanian_deadlift: { id: "romanian_deadlift", name: "Barbell Romanian Deadlift", muscle: "hamstrings", equipment: "barbell", youtubeId: "JCXUYt5RQ0k" },
