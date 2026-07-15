@@ -22,6 +22,7 @@ const EXERCISE_LIBRARY: Record<string, Omit<Exercise, "targetSets" | "targetReps
   incline_db_press: { id: "incline_db_press", name: "Incline Dumbbell Press", muscle: "chest", equipment: "dumbbell" },
   pec_deck_fly: { id: "pec_deck_fly", name: "Pec Deck Fly", muscle: "chest", equipment: "machine" },
   incline_smith_press: { id: "incline_smith_press", name: "Incline Smith Press", muscle: "chest", equipment: "machine" },
+  machine_chest_press: { id: "machine_chest_press", name: "Machine Chest Press", muscle: "chest", equipment: "machine" },
 
   // Back / Lats
   wide_grip_lat_pulldown: { id: "wide_grip_lat_pulldown", name: "Wide Grip Lat Pulldown", muscle: "back", equipment: "machine" },
@@ -29,6 +30,7 @@ const EXERCISE_LIBRARY: Record<string, Omit<Exercise, "targetSets" | "targetReps
   seated_cable_row: { id: "seated_cable_row", name: "Seated Cable Row", muscle: "back", equipment: "cable" },
   neutral_grip_pulldown: { id: "neutral_grip_pulldown", name: "Neutral Grip Pulldown", muscle: "back", equipment: "machine" },
   single_arm_cable_row: { id: "single_arm_cable_row", name: "Single Arm Cable Row", muscle: "back", equipment: "cable" },
+  straight_arm_pulldown: { id: "straight_arm_pulldown", name: "Straight Arm Pulldown", muscle: "back", equipment: "cable" },
 
   // Shoulders / Delts
   cable_lateral_raise: { id: "cable_lateral_raise", name: "Cable Lateral Raise", muscle: "shoulders", equipment: "cable" },
@@ -52,9 +54,12 @@ const EXERCISE_LIBRARY: Record<string, Omit<Exercise, "targetSets" | "targetReps
   leg_extension: { id: "leg_extension", name: "Leg Extension Machine", muscle: "quads", equipment: "machine" },
   romanian_deadlift: { id: "romanian_deadlift", name: "Barbell Romanian Deadlift", muscle: "hamstrings", equipment: "barbell" },
   seated_leg_curl: { id: "seated_leg_curl", name: "Seated Leg Curl Machine", muscle: "hamstrings", equipment: "machine" },
+  lying_leg_curl: { id: "lying_leg_curl", name: "Lying Leg Curl Machine", muscle: "hamstrings", equipment: "machine" },
   hip_thrust: { id: "hip_thrust", name: "Glute Hip Thrust", muscle: "glutes", equipment: "barbell" },
   standing_calf_raise: { id: "standing_calf_raise", name: "Standing Calf Raises", muscle: "calves", equipment: "machine" },
   seated_calf_raise: { id: "seated_calf_raise", name: "Seated Calf Raises", muscle: "calves", equipment: "machine" },
+  bulgarian_split_squat: { id: "bulgarian_split_squat", name: "Bulgarian Split Squat", muscle: "quads", equipment: "dumbbell" },
+  front_squat: { id: "front_squat", name: "Front Squat OR Smith Squat", muscle: "quads", equipment: "barbell" },
 
   // Core & Recovery Work
   cable_crunch: { id: "cable_crunch", name: "Cable Crunch", muscle: "core", equipment: "cable" },
@@ -62,6 +67,7 @@ const EXERCISE_LIBRARY: Record<string, Omit<Exercise, "targetSets" | "targetReps
   dead_bug: { id: "dead_bug", name: "Dead Bug", muscle: "core", equipment: "bodyweight" },
   bird_dog: { id: "bird_dog", name: "Bird Dog", muscle: "core", equipment: "bodyweight" },
   plank: { id: "plank", name: "Standard Forearm Plank", muscle: "core", equipment: "bodyweight" },
+  ab_wheel: { id: "ab_wheel", name: "Ab Wheel", muscle: "core", equipment: "bodyweight" },
   
   // Cardio & Walks
   zone_2_cardio: { id: "zone_2_cardio", name: "Zone 2 Cardio (Brisk Walk or Treadmill)", muscle: "conditioning", equipment: "bodyweight" },
@@ -89,14 +95,14 @@ export function getWeekSchedule(gymFrequency: number): { day: number; name: stri
         { day: 6, name: "Saturday — Lower B" },
       ];
     case 5:
-      // Locked-in Custom 5-Day Split: Tuesday (Push), Wednesday (Pull), Thursday (Recovery), Friday (Legs), Saturday (Upper), Sunday (Arms + Delts)
+      // Locked-in Custom 9.8/10 Split: Tuesday (Upper A), Wednesday (Lower A), Thursday (Recovery), Friday (Upper B), Saturday (Lower B), Sunday (Sunday Optional)
       return [
-        { day: 2, name: "Tuesday — Push" },
-        { day: 3, name: "Wednesday — Pull" },
+        { day: 2, name: "Tuesday — Upper A" },
+        { day: 3, name: "Wednesday — Lower A" },
         { day: 4, name: "Thursday — Recovery" },
-        { day: 5, name: "Friday — Legs" },
-        { day: 6, name: "Saturday — Upper" },
-        { day: 0, name: "Sunday — Arms + Delts" },
+        { day: 5, name: "Friday — Upper B" },
+        { day: 6, name: "Saturday — Lower B" },
+        { day: 0, name: "Sunday — Optional Delts" },
       ];
     case 6:
       return [
@@ -178,7 +184,7 @@ export function getTodaysWorkout(
         { id: "romanian_deadlift", sets: 3, reps: "8-10", rest: 120 },
         { id: "seated_leg_curl", sets: 3, reps: "10-12", rest: 90 },
         { id: "standing_calf_raise", sets: 4, reps: "12-15", rest: 60 },
-        { id: "cable_crunch", sets: 3, reps: "15", rest: 60 }
+        { id: "seated_calf_raise", sets: 3, reps: "15-20", rest: 60 }
       );
     }
   }
@@ -188,10 +194,10 @@ export function getTodaysWorkout(
       focus = "Upper Body Strength & Hypertrophy A";
       duration = 55;
       exerciseSpecs.push(
-        { id: "bench_press", sets: 3, reps: "6-8", rest: 150 },
-        { id: "wide_grip_lat_pulldown", sets: 3, reps: "8-10", rest: 90 },
-        { id: "machine_shoulder_press", sets: 3, reps: "8-10", rest: 90 },
-        { id: "seated_cable_row", sets: 3, reps: "10-12", rest: 90 },
+        { id: "bench_press", sets: 3, reps: "6-8", rest: 120 },
+        { id: "chest_supported_row", sets: 3, reps: "8-10", rest: 90 },
+        { id: "incline_db_press", sets: 3, reps: "8-10", rest: 90 },
+        { id: "wide_grip_lat_pulldown", sets: 3, reps: "10-12", rest: 90 },
         { id: "cable_lateral_raise", sets: 3, reps: "12-15", rest: 60 },
         { id: "bayesian_curl", sets: 3, reps: "10-12", rest: 60 },
         { id: "rope_pushdown", sets: 3, reps: "10-12", rest: 60 }
@@ -232,84 +238,80 @@ export function getTodaysWorkout(
       );
     }
   }
-  // ── Custom 5-Day Lifting Program ──
+  // ── Custom 9.8/10 5-Day Hypertrophy Program ──
   else if (frequency === 5) {
-    if (name.includes("Push")) {
-      focus = "Chest, Shoulders & Triceps (Shoulder Friendly)";
+    if (name.includes("Upper A")) {
+      focus = "Horizontal Push & Pull (Chest/Back Compounds)";
       duration = 55;
       exerciseSpecs.push(
-        { id: "bench_press", sets: 3, reps: "6-8", rest: 150 },
+        { id: "bench_press", sets: 3, reps: "5-8", rest: 180 },
         { id: "incline_db_press", sets: 3, reps: "8-10", rest: 90 },
-        { id: "pec_deck_fly", sets: 3, reps: "12-15", rest: 90 },
+        { id: "chest_supported_row", sets: 3, reps: "8-10", rest: 90 },
+        { id: "seated_cable_row", sets: 2, reps: "10-12", rest: 90 },
         { id: "cable_lateral_raise", sets: 4, reps: "12-15", rest: 90 },
         { id: "rope_pushdown", sets: 3, reps: "10-12", rest: 90 },
-        { id: "overhead_cable_extension", sets: 2, reps: "12-15", rest: 90 },
-        { id: "cable_crunch", sets: 3, reps: "15", rest: 60 }
+        { id: "bayesian_curl", sets: 3, reps: "10-12", rest: 60 },
+        { id: "cable_crunch", sets: 3, reps: "12-15", rest: 60 }
       );
-    } else if (name.includes("Pull")) {
-      focus = "Lats, Upper Back & Biceps (Postural Focus)";
+    } else if (name.includes("Lower A")) {
+      focus = "Quad-Dominant Lower Body Strength & Hypertrophy";
       duration = 60;
       exerciseSpecs.push(
-        { id: "wide_grip_lat_pulldown", sets: 3, reps: "8-10", rest: 90 },
-        { id: "chest_supported_row", sets: 3, reps: "8-10", rest: 90 },
-        { id: "seated_cable_row", sets: 3, reps: "10-12", rest: 90 },
-        { id: "reverse_pec_deck", sets: 3, reps: "15", rest: 90 },
-        { id: "face_pull", sets: 3, reps: "15", rest: 90 },
-        { id: "bayesian_curl", sets: 3, reps: "10-12", rest: 60 },
-        { id: "preacher_curl", sets: 3, reps: "10-12", rest: 60 },
-        { id: "hammer_curl", sets: 2, reps: "12-15", rest: 60 }
+        { id: "hack_squat", sets: 3, reps: "6-8", rest: 180 },
+        { id: "leg_press", sets: 3, reps: "10-12", rest: 120 },
+        { id: "romanian_deadlift", sets: 3, reps: "8-10", rest: 180 },
+        { id: "seated_leg_curl", sets: 3, reps: "10-12", rest: 90 },
+        { id: "leg_extension", sets: 2, reps: "12-15", rest: 90 },
+        { id: "standing_calf_raise", sets: 4, reps: "12-15", rest: 60 },
+        { id: "hanging_knee_raise", sets: 3, reps: "12-15", rest: 60 }
       );
     } else if (name.includes("Recovery")) {
-      focus = "Active Recovery & Core Dial-in";
+      focus = "Active Recovery, Cardio & Core Stability";
       duration = 45;
       exerciseSpecs.push(
-        { id: "zone_2_cardio", sets: 1, reps: "35-45 min", rest: 0 },
-        { id: "mobility_routine", sets: 1, reps: "10 min", rest: 0 },
+        { id: "zone_2_cardio", sets: 1, reps: "40 min", rest: 0 },
+        { id: "mobility_routine", sets: 1, reps: "15 min", rest: 0 },
         { id: "dead_bug", sets: 3, reps: "12", rest: 45 },
         { id: "bird_dog", sets: 3, reps: "12", rest: 45 },
         { id: "plank", sets: 3, reps: "60 sec", rest: 45 }
       );
-    } else if (name.includes("Legs")) {
-      focus = "Quads, Hamstrings, Glutes & Calves (Joint Friendly)";
+    } else if (name.includes("Upper B")) {
+      focus = "Vertical Push & Pull (Lats/Rear Delts Hypertrophy)";
+      duration = 55;
+      exerciseSpecs.push(
+        { id: "neutral_grip_pulldown", sets: 3, reps: "8-10", rest: 90 },
+        { id: "single_arm_cable_row", sets: 3, reps: "10-12", rest: 90 },
+        { id: "straight_arm_pulldown", sets: 2, reps: "12-15", rest: 90 },
+        { id: "machine_chest_press", sets: 3, reps: "8-10", rest: 120 },
+        { id: "pec_deck_fly", sets: 2, reps: "12-15", rest: 90 },
+        { id: "reverse_pec_deck", sets: 3, reps: "15", rest: 60 },
+        { id: "face_pull", sets: 3, reps: "15", rest: 90 },
+        { id: "preacher_curl", sets: 3, reps: "10-12", rest: 60 },
+        { id: "overhead_cable_extension", sets: 3, reps: "10-12", rest: 90 }
+      );
+    } else if (name.includes("Lower B")) {
+      focus = "Posterior Chain Leg Volume & Direct Arm Work";
       duration = 60;
       exerciseSpecs.push(
-        { id: "hack_squat", sets: 3, reps: "8-10", rest: 120 },
-        { id: "leg_press", sets: 3, reps: "10-12", rest: 90 },
-        { id: "leg_extension", sets: 3, reps: "15", rest: 90 },
-        { id: "romanian_deadlift", sets: 3, reps: "8-10", rest: 120 },
-        { id: "seated_leg_curl", sets: 3, reps: "10-12", rest: 90 },
-        { id: "hip_thrust", sets: 2, reps: "10-12", rest: 90 },
-        { id: "standing_calf_raise", sets: 4, reps: "12-15", rest: 60 },
-        { id: "seated_calf_raise", sets: 3, reps: "15-20", rest: 60 },
-        { id: "hanging_knee_raise", sets: 3, reps: "12", rest: 60 }
-      );
-    } else if (name.includes("Upper")) {
-      focus = "Strength + Hypertrophy Compounds";
-      duration = 55;
-      exerciseSpecs.push(
-        { id: "incline_smith_press", sets: 3, reps: "8", rest: 120 },
-        { id: "neutral_grip_pulldown", sets: 3, reps: "10", rest: 90 },
-        { id: "single_arm_cable_row", sets: 3, reps: "10", rest: 90 },
-        { id: "machine_shoulder_press", sets: 2, reps: "10", rest: 90 },
-        { id: "cable_lateral_raise", sets: 3, reps: "15", rest: 60 },
-        { id: "reverse_pec_deck", sets: 2, reps: "15", rest: 60 },
-        { id: "bayesian_curl", sets: 2, reps: "12", rest: 60 },
-        { id: "rope_pushdown", sets: 2, reps: "12", rest: 60 }
-      );
-    } else if (name.includes("Arms")) {
-      focus = "Targeted Arm/Lateral Delts Hypertrophy";
-      duration = 55;
-      exerciseSpecs.push(
+        { id: "front_squat", sets: 3, reps: "8-10", rest: 180 },
+        { id: "bulgarian_split_squat", sets: 3, reps: "10", rest: 90 },
+        { id: "lying_leg_curl", sets: 3, reps: "10-12", rest: 90 },
+        { id: "hip_thrust", sets: 3, reps: "10", rest: 90 },
+        { id: "seated_calf_raise", sets: 4, reps: "15-20", rest: 60 },
         { id: "incline_db_curl", sets: 3, reps: "10-12", rest: 60 },
-        { id: "bayesian_curl", sets: 3, reps: "12", rest: 60 },
         { id: "hammer_curl", sets: 3, reps: "12", rest: 60 },
-        { id: "rope_pushdown", sets: 3, reps: "12", rest: 60 },
-        { id: "overhead_cable_extension", sets: 3, reps: "12", rest: 60 },
-        { id: "single_arm_cross_body_ext", sets: 2, reps: "15", rest: 60 },
-        { id: "cable_lateral_raise", sets: 4, reps: "15", rest: 60 },
-        { id: "lean_away_lateral_raise", sets: 3, reps: "15", rest: 60 },
+        { id: "single_arm_cross_body_ext", sets: 3, reps: "12", rest: 60 },
+        { id: "overhead_cable_extension", sets: 2, reps: "15", rest: 60 },
+        { id: "ab_wheel", sets: 3, reps: "10", rest: 45 }
+      );
+    } else if (name.includes("Sunday") || name.includes("Delts")) {
+      focus = "Optional Delts & Cardio Conditioning";
+      duration = 45;
+      exerciseSpecs.push(
+        { id: "cable_lateral_raise", sets: 4, reps: "15-20", rest: 60 },
+        { id: "lean_away_lateral_raise", sets: 3, reps: "12-15", rest: 60 },
         { id: "reverse_pec_deck", sets: 3, reps: "15", rest: 60 },
-        { id: "incline_walk", sets: 1, reps: "15-20 min", rest: 0 }
+        { id: "incline_walk", sets: 1, reps: "20-30 min", rest: 0 }
       );
     }
   }
