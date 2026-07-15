@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
+import { Video, VideoOff } from "lucide-react";
 
 interface ExerciseSet {
   weight: number;
@@ -16,6 +18,7 @@ interface ExerciseCardProps {
   previousWeight?: number;
   suggestedWeight?: number;
   sets: ExerciseSet[];
+  youtubeId?: string;
   onLogSet: (setIndex: number, weight: number, reps: number) => void;
   onToggleSet: (setIndex: number) => void;
 }
@@ -28,9 +31,11 @@ export default function ExerciseCard({
   previousWeight,
   suggestedWeight,
   sets,
+  youtubeId,
   onLogSet,
   onToggleSet,
 }: ExerciseCardProps) {
+  const [showVideo, setShowVideo] = useState(false);
   const completedSets = sets.filter((s) => s.completed).length;
   const allDone = completedSets === targetSets;
 
@@ -44,11 +49,23 @@ export default function ExerciseCard({
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div className="text-left">
-          <h3 className="text-sm font-semibold text-white">{name}</h3>
+        <div className="text-left flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-white">{name}</h3>
+            {youtubeId && (
+              <button 
+                type="button"
+                onClick={() => setShowVideo(!showVideo)}
+                className="text-zinc-500 hover:text-[#8ba893] transition-colors p-0.5 cursor-pointer flex items-center justify-center rounded hover:bg-white/5"
+                title={showVideo ? "Hide Form Video" : "Watch Form Video"}
+              >
+                {showVideo ? <VideoOff className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
+              </button>
+            )}
+          </div>
           <p className="text-xs text-zinc-500 mt-0.5">{muscleGroup} · {targetSets}×{targetReps}</p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 ml-2">
           {Array.from({ length: targetSets }).map((_, i) => (
             <motion.div
               key={i}
@@ -65,6 +82,24 @@ export default function ExerciseCard({
           ))}
         </div>
       </div>
+
+      {/* Video Embed */}
+      {showVideo && youtubeId && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="mb-3 rounded-xl overflow-hidden border border-white/10"
+        >
+          <iframe
+            className="w-full aspect-video"
+            src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&loop=1&playlist=${youtubeId}`}
+            title={`${name} Form Video`}
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </motion.div>
+      )}
 
       {/* Progressive overload hint */}
       {suggestedWeight && (
