@@ -319,6 +319,32 @@ export default function WorkoutTracker() {
               <span>Hit your protein target (1.6-2g/kg)</span>
             </div>
           </div>
+
+          <div className="mt-5 pt-5 border-t border-white/5 space-y-3 text-left max-w-xs mx-auto">
+            <span className="text-[9px] text-[#8ba893] font-extrabold uppercase tracking-wider block">Active Mobility & Posture Drills</span>
+            <div className="space-y-2 text-[11px] text-zinc-400 pl-1">
+              <div className="flex items-start gap-2">
+                <span className="text-[#8ba893] font-bold mt-0.5">•</span>
+                <span><strong>Daily Steps</strong>: Target 12,000–15,000 steps today</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-[#8ba893] font-bold mt-0.5">•</span>
+                <span><strong>Spine Health</strong>: Thoracic Extension Stretch</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-[#8ba893] font-bold mt-0.5">•</span>
+                <span><strong>Lower Body</strong>: Hip Flexor & Hamstring Stretches</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-[#8ba893] font-bold mt-0.5">•</span>
+                <span><strong>Upper Posture</strong>: Chest Opener & Band Pull-Aparts</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-[#8ba893] font-bold mt-0.5">•</span>
+                <span><strong>Shoulder Safety</strong>: External Rotations</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="pt-4 border-t border-white/5 animate-in-delay-2">
