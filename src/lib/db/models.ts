@@ -35,6 +35,7 @@ export interface IUserProfile extends Document {
   sleepTarget: number; // hours
   collegeSchedule?: string;
   strictMessOnly?: boolean;
+  customDietPreferences?: string;
 
   // Computed
   tdee?: number;
@@ -130,6 +131,7 @@ const UserProfileSchema = new Schema<IUserProfile>(
     sleepTarget: { type: Number, default: 8 },
     collegeSchedule: String,
     strictMessOnly: { type: Boolean, default: false },
+    customDietPreferences: { type: String, default: "" },
 
     tdee: Number,
     bmr: Number,

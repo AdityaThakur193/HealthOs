@@ -262,6 +262,7 @@ export async function POST(request: NextRequest) {
     customProtein,
     useCustomMacros,
     strictMessOnly,
+    customDietPreferences,
   } = body;
 
   if (!name || !email || !age || !gender || !heightCm || !weightKg || !goal || !activityLevel || !gymExperience) {
@@ -324,6 +325,7 @@ export async function POST(request: NextRequest) {
     customCalories: customCalories ? parseInt(customCalories) : undefined,
     customProtein: customProtein ? parseInt(customProtein) : undefined,
     useCustomMacros: useCustomMacros !== undefined ? useCustomMacros : (existingProfile?.useCustomMacros || false),
+    customDietPreferences: customDietPreferences !== undefined ? customDietPreferences : (existingProfile?.customDietPreferences || ""),
     ...targets,
   };
 

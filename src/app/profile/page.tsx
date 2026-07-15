@@ -41,6 +41,7 @@ export default function ProfilePage() {
   const [gymExperience, setGymExperience] = useState("beginner");
   const [collegeSchedule, setCollegeSchedule] = useState("");
   const [strictMessOnly, setStrictMessOnly] = useState(false);
+  const [customDietPreferences, setCustomDietPreferences] = useState("");
 
   // Notification States
   const [notificationPermission, setNotificationPermission] = useState<string>("default");
@@ -202,6 +203,7 @@ export default function ProfilePage() {
     setCustomCalories(profile.customCalories ? String(profile.customCalories) : "");
     setCustomProtein(profile.customProtein ? String(profile.customProtein) : "");
     setUseCustomMacros(profile.useCustomMacros || false);
+    setCustomDietPreferences(profile.customDietPreferences || "");
   }, [profile]);
 
   const loadCalendarEvents = useCallback(async () => {
@@ -258,6 +260,7 @@ export default function ProfilePage() {
           customProtein: useCustomMacros && customProtein ? parseInt(customProtein) : undefined,
           useCustomMacros,
           strictMessOnly,
+          customDietPreferences,
         }),
       });
 
@@ -865,6 +868,17 @@ export default function ProfilePage() {
                   checked={strictMessOnly}
                   onChange={(e) => setStrictMessOnly(e.target.checked)}
                   className="w-4 h-4 accent-[#8ba893] cursor-pointer flex-shrink-0"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Custom Dietary Rules & AI Memory Guidelines</label>
+                <textarea
+                  value={customDietPreferences}
+                  onChange={(e) => setCustomDietPreferences(e.target.value)}
+                  placeholder="Enter custom guidelines (e.g. 'No Soya chunks', 'Limit chapatis to 2 per day', 'Only suggest curd or milk instead of eggs'). The AI Diet Planner reads these rules and adapts all future generations accordingly."
+                  rows={3}
+                  className="input-glass text-xs py-2.5 px-3.5 resize-none h-20"
                 />
               </div>
             </div>
