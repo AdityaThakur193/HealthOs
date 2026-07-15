@@ -19,34 +19,11 @@ export default function CoachChatFAB() {
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
   const [profile, setProfile] = useState<any>(null);
-  const [dragConstraints, setDragConstraints] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
-
+  const constraintsRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Free Draggable gesture state (managed automatically by Framer Motion)
   const isDraggingRef = useRef(false);
-
-  useEffect(() => {
-    const updateConstraints = () => {
-      if (typeof window !== "undefined") {
-        const containerWidth = Math.min(512, window.innerWidth);
-        const containerHeight = window.innerHeight;
-        
-        // FAB size is 56x56. It is positioned absolute bottom-24, right-6.
-        // bottom-24 is bottom: 96px, right-6 is right: 24px.
-        // Drag constraints keep it inside the centered max-w-lg container:
-        setDragConstraints({
-          left: -(containerWidth - 56 - 12),
-          right: 12,
-          top: -(containerHeight - 56 - 12 - 96),
-          bottom: 96 - 12,
-        });
-      }
-    };
-    updateConstraints();
-    window.addEventListener("resize", updateConstraints);
-    return () => window.removeEventListener("resize", updateConstraints);
-  }, []);
 
   const handleDragStart = () => {
     isDraggingRef.current = true;
@@ -326,11 +303,11 @@ export default function CoachChatFAB() {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50">
-      <div className="max-w-lg mx-auto w-full h-full relative pointer-events-none">
+      <div ref={constraintsRef} className="max-w-lg mx-auto w-full h-full relative pointer-events-none">
         {/* Draggable Floating Action Button with Spring Hover Scale */}
         <motion.button
           drag
-          dragConstraints={dragConstraints}
+          dragConstraints={constraintsRef}
           dragMomentum={true}
           dragElastic={0.1}
           onDragStart={handleDragStart}
