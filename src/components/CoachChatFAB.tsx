@@ -316,10 +316,13 @@ export default function CoachChatFAB() {
 
       // ── 8. UPDATE WORKOUT PLAN ───────────────────────────────────────────
       if (action === "update_workout") {
+        const newFrequency = updatedData && typeof updatedData === "object" && "gymFrequency" in updatedData
+          ? (updatedData as any).gymFrequency
+          : updatedData;
         const res = await fetch("/api/profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...currentProfile, email, workouts: updatedData }),
+          body: JSON.stringify({ ...currentProfile, email, gymFrequency: parseInt(String(newFrequency)) || 4 }),
         });
         if (res.ok) window.dispatchEvent(new Event("profileUpdated"));
         return;
