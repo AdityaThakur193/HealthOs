@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { sanitizeJsonOutput } from "@/lib/gemini";
+import { getWeekSchedule } from "@/lib/workoutPlans";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,9 @@ export async function POST(request: NextRequest) {
     const strictMessOnly = profile?.strictMessOnly || false;
     const activeDietPlan = profile?.dietPlan?.generatedPlan || null;
     const activeMessMenu = profile?.messMenu?.parsedMenu || null;
+    const gymFrequency = profile?.gymFrequency || 4;
+    const gymExperience = profile?.gymExperience || "intermediate";
+    const workoutSchedule = getWeekSchedule(gymFrequency);
 
     const systemPrompt = `You are the Health OS Personal AI Coach — a fully autonomous health data agent with COMPLETE control over the user's health app. You can read and write all health data: meals, steps, water, sleep, weight, and workout logs. You are not just a conversational assistant — you are an ACTION-FIRST agent. Whenever the user mentions any health data, you MUST capture it and write it to the database immediately.
 
@@ -41,6 +45,9 @@ User Profile:
 - Goal: "${goal}" | Daily Targets: ${targetCalories} kcal, ${targetProtein}g protein
 - Schedule: ${collegeSchedule}
 - Strict Mess Mode: ${strictMessOnly ? "ACTIVE — only mess menu items allowed, no external purchases" : "INACTIVE — all food sources allowed"}
+- Gym Frequency: ${gymFrequency} days/week
+- Gym Experience: ${gymExperience}
+- Workout Split Schedule: ${JSON.stringify(workoutSchedule, null, 2)}
 - Active Mess Menu: ${JSON.stringify(activeMessMenu, null, 2)}
 - Active Diet Plan: ${JSON.stringify(activeDietPlan, null, 2)}
 
@@ -104,8 +111,8 @@ You have 8 possible actions. Choose the correct one based on what the user says:
 7. update_diet — User asks to modify their weekly diet plan
    updatedData: full updated dietPlan generatedPlan JSON
 
-8. update_workout — User asks to modify their workout split
-   updatedData: full updated workoutPlan JSON
+8. update_workout — User asks to modify their workout split / gym frequency (e.g., "change to a 5 days split", "shift to 3 days split", "update split to 6 days")
+   updatedData: { gymFrequency: number (value must be 3, 4, 5, or 6) }
 
 9. none — Pure question, general health advice, no data to save
    updatedData: null
