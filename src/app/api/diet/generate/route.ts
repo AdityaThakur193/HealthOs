@@ -146,6 +146,12 @@ You MUST design the weekly diet plan following these strict scientific principle
 7. Mutually Exclusive Mess Options (Single Selection Rule):
    - On Wednesday, Friday, and Sunday: The mess menu serves both Veg and Non-Veg choices for certain meals. You MUST strictly select exactly ONE option (either the vegetarian option OR the non-vegetarian option, never both) for a meal, and calculate the calories/protein based only on that selected option.
    - On Monday: The mess menu serves Eggs and Veg options. You MUST strictly select exactly ONE option (either the egg choice OR the veg choice, never both) for a meal.
+8. Hostel Mess Timings Constraint: The hostel mess operates strictly on this schedule:
+   - Breakfast: 7:30 AM - 9:00 AM (e.g. schedule breakfast at 8:00 AM)
+   - Lunch: 11:30 AM - 2:00 PM (e.g. schedule lunch at 1:00 PM)
+   - Snacks: 4:30 PM - 6:00 PM (e.g. schedule snacks at 5:00 PM)
+   - Dinner: 7:30 PM - 9:30 PM (e.g. schedule dinner at 8:15 PM)
+   You MUST design all meal times in the plan to fall strictly within these specific time windows when using mess menu items.
 
 CRITICAL MATHEMATICAL ENFORCEMENT:
 - For every day (Monday to Sunday), the SUM of "calories" across all meals MUST EQUAL the daily target of ${targetCalories} kcal (with a tolerance of +/- 50 kcal).

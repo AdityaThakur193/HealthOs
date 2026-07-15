@@ -19,11 +19,40 @@ export default function CoachChatFAB() {
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
   const [profile, setProfile] = useState<any>(null);
-  const constraintsRef = useRef<HTMLDivElement>(null);
+  const [dragConstraints, setDragConstraints] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Free Draggable gesture state (managed automatically by Framer Motion)
   const isDraggingRef = useRef(false);
+
+  useEffect(() => {
+    const updateConstraints = () => {
+      if (typeof window !== "undefined") {
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+          // Mobile starts bottom-24, left-6
+          setDragConstraints({
+            left: -12,
+            right: window.innerWidth - 80,
+            top: -window.innerHeight + 160,
+            bottom: 60,
+          });
+        } else {
+          // Desktop starts bottom-6, right-6
+          setDragConstraints({
+            left: -window.innerWidth + 80,
+            right: 12,
+            top: -window.innerHeight + 80,
+            bottom: 12,
+          });
+        }
+      }
+    };
+    updateConstraints();
+    window.addEventListener("resize", updateConstraints);
+    return () => window.removeEventListener("resize", updateConstraints);
+  }, []);
 
   const handleDragStart = () => {
     isDraggingRef.current = true;
@@ -302,151 +331,149 @@ export default function CoachChatFAB() {
   };
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-50">
-      <div ref={constraintsRef} className="max-w-lg mx-auto w-full h-full relative pointer-events-none">
-        {/* Draggable Floating Action Button with Spring Hover Scale */}
-        <motion.button
-          drag
-          dragConstraints={constraintsRef}
-          dragMomentum={true}
-          dragElastic={0.1}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onClick={handleFABClick}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.94 }}
-          className="absolute bottom-24 right-6 w-14 h-14 rounded-full bg-[#0c0f0d] border border-[#8ba893] flex items-center justify-center shadow-lg cursor-grab active:cursor-grabbing hover:scale-105 transition-all group overflow-hidden touch-none select-none pointer-events-auto"
-          style={{ 
-            boxShadow: "0 0 15px rgba(139, 168, 147, 0.25)",
-          }}
-        >
-          <div className="absolute inset-0 bg-[#8ba893]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <img 
-            src={COACH_AVATAR_URL} 
-            alt="Coach Avatar"
-            className="w-11 h-11 object-contain rounded-full"
-          />
-          {/* Pulsing notification dot */}
-          <span className="absolute top-0 right-1 w-3.5 h-3.5 bg-[#c87a53] border-2 border-[#0c0f0d] rounded-full animate-pulse" />
-        </motion.button>
+    <>
+      {/* Draggable Floating Action Button with Spring Hover Scale */}
+      <motion.button
+        drag
+        dragConstraints={dragConstraints}
+        dragMomentum={true}
+        dragElastic={0.1}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onClick={handleFABClick}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.94 }}
+        className="fixed bottom-24 left-6 md:left-auto md:right-6 md:bottom-6 z-50 w-14 h-14 rounded-full bg-[#0c0f0d] border border-[#8ba893] flex items-center justify-center shadow-lg cursor-grab active:cursor-grabbing hover:scale-105 transition-all group overflow-hidden touch-none select-none"
+        style={{ 
+          boxShadow: "0 0 15px rgba(139, 168, 147, 0.25)",
+        }}
+      >
+        <div className="absolute inset-0 bg-[#8ba893]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <img 
+          src={COACH_AVATAR_URL} 
+          alt="Coach Avatar"
+          className="w-11 h-11 object-contain rounded-full"
+        />
+        {/* Pulsing notification dot */}
+        <span className="absolute top-0 right-1 w-3.5 h-3.5 bg-[#c87a53] border-2 border-[#0c0f0d] rounded-full animate-pulse" />
+      </motion.button>
 
-        {/* Chat Drawer Side Panel with Spring Animations */}
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 350, damping: 26 } }}
-              exit={{ opacity: 0, scale: 0.95, y: 15, transition: { duration: 0.15, ease: "easeOut" } }}
-              className="absolute w-auto bg-[#0c0f0d]/95 border border-white/10 rounded-2xl backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden pointer-events-auto" 
-              style={{ maxHeight: 'min(480px, calc(100dvh - 160px))', bottom: '96px', left: '12px', right: '12px' }}
-            >
-              {/* Header */}
-              <div className="p-4 bg-white/3 border-b border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img 
-                      src={COACH_AVATAR_URL} 
-                      alt="Coach Avatar"
-                      className="w-10 h-10 object-contain rounded-full border border-[#8ba893]/30"
-                    />
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border border-[#0c0f0d] rounded-full" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
-                      AI Coach Assistant <Sparkles className="w-3 h-3 text-[#c87a53]" />
-                    </h4>
-                    <p className="text-[9px] text-[#8ba893] font-bold uppercase tracking-wider">Active Calibration</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="p-1.5 hover:bg-white/5 text-zinc-400 hover:text-white rounded-lg transition-all cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Messages Log */}
-              <div className="flex-1 min-h-0 p-4 overflow-y-auto space-y-4 scrollbar-thin bg-gradient-to-b from-transparent to-white/1">
-                {messages.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    {msg.role === "model" && (
-                      <img 
-                        src={COACH_AVATAR_URL} 
-                        alt="Coach Avatar"
-                        className="w-7 h-7 object-contain rounded-full flex-shrink-0 border border-white/10"
-                      />
-                    )}
-                    
-                    <div
-                      className={`max-w-[75%] p-3 rounded-2xl text-xs leading-relaxed animate-in duration-300 fade-in slide-in-from-bottom-2 ${
-                        msg.role === "user"
-                          ? "bg-gradient-to-tr from-[#8ba893] to-[#9cbda5] text-[#0c0f0d] rounded-tr-none font-bold shadow-lg shadow-[#8ba893]/10"
-                          : "bg-white/5 text-zinc-300 border border-white/10 rounded-tl-none backdrop-blur-sm"
-                      }`}
-                    >
-                      {formatMessageContent(msg.content, msg.role === "user")}
-                    </div>
-                  </div>
-                ))}
-                
-                {sending && (
-                  <div className="flex gap-2.5 justify-start">
-                    <img 
-                      src={COACH_AVATAR_URL} 
-                      alt="Coach Avatar"
-                      className="w-7 h-7 object-contain rounded-full flex-shrink-0 border border-white/10"
-                    />
-                    <div className="bg-white/5 border border-white/5 text-zinc-400 p-3 rounded-2xl rounded-tl-none flex items-center gap-1.5 text-xs">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#8ba893]" /> Coach is calibrating...
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Prompt Suggestions */}
-              {messages.length === 1 && (
-                <div className="px-4 pb-2 flex gap-1.5 overflow-x-auto scrollbar-none">
-                  <button
-                    onClick={() => setInputValue("Adjust Monday's breakfast...")}
-                    className="px-2.5 py-1 bg-white/5 border border-white/5 rounded-full text-[9px] font-bold text-zinc-400 hover:text-white transition-all cursor-pointer whitespace-nowrap"
-                  >
-                    ✏️ Edit Monday Breakfast
-                  </button>
-                  <button
-                    onClick={() => setInputValue("Suggest high-protein additions for today's mess menu")}
-                    className="px-2.5 py-1 bg-white/5 border border-white/5 rounded-full text-[9px] font-bold text-zinc-400 hover:text-white transition-all cursor-pointer whitespace-nowrap"
-                  >
-                    🥣 Daily Protein Additions
-                  </button>
-                </div>
-              )}
-
-              {/* Chat Input form */}
-              <form onSubmit={handleSend} className="flex-shrink-0 p-3 bg-white/2 border-t border-white/5 flex gap-2">
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Ask coach to modify your diet or split..."
-                  className="flex-1 bg-zinc-950/60 border border-white/10 rounded-xl px-3.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#8ba893] transition-all h-10"
+      {/* Chat Drawer Side Panel with Spring Animations */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 350, damping: 26 } }}
+            exit={{ opacity: 0, scale: 0.95, y: 15, transition: { duration: 0.15, ease: "easeOut" } }}
+            className="fixed bottom-[82px] right-3 left-3 md:left-auto md:right-6 md:bottom-24 z-50 w-auto md:w-[385px] bg-[#0c0f0d]/95 border border-white/10 rounded-2xl backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden" 
+            style={{ maxHeight: 'min(480px, calc(100dvh - 160px))' }}
+          >
+          {/* Header */}
+          <div className="p-4 bg-white/3 border-b border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <img 
+                  src={COACH_AVATAR_URL} 
+                  alt="Coach Avatar"
+                  className="w-10 h-10 object-contain rounded-full border border-[#8ba893]/30"
                 />
-                <button
-                  type="submit"
-                  disabled={sending || !inputValue.trim()}
-                  className="w-10 h-10 rounded-xl bg-[#8ba893] hover:bg-[#8ba893]/90 text-[#0c0f0d] flex items-center justify-center transition-all cursor-pointer disabled:opacity-50"
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border border-[#0c0f0d] rounded-full" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white flex items-center gap-1">
+                  AI Coach Assistant <Sparkles className="w-3 h-3 text-[#c87a53]" />
+                </h4>
+                <p className="text-[9px] text-[#8ba893] font-bold uppercase tracking-wider">Active Calibration</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1.5 hover:bg-white/5 text-zinc-400 hover:text-white rounded-lg transition-all cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Messages Log */}
+          <div className="flex-1 min-h-0 p-4 overflow-y-auto space-y-4 scrollbar-thin bg-gradient-to-b from-transparent to-white/1">
+            {messages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                {msg.role === "model" && (
+                  <img 
+                    src={COACH_AVATAR_URL} 
+                    alt="Coach Avatar"
+                    className="w-7 h-7 object-contain rounded-full flex-shrink-0 border border-white/10"
+                  />
+                )}
+                
+                <div
+                  className={`max-w-[75%] p-3 rounded-2xl text-xs leading-relaxed animate-in duration-300 fade-in slide-in-from-bottom-2 ${
+                    msg.role === "user"
+                      ? "bg-gradient-to-tr from-[#8ba893] to-[#9cbda5] text-[#0c0f0d] rounded-tr-none font-bold shadow-lg shadow-[#8ba893]/10"
+                      : "bg-white/5 text-zinc-300 border border-white/10 rounded-tl-none backdrop-blur-sm"
+                  }`}
                 >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
-            </motion.div>
+                  {formatMessageContent(msg.content, msg.role === "user")}
+                </div>
+              </div>
+            ))}
+            
+            {sending && (
+              <div className="flex gap-2.5 justify-start">
+                <img 
+                  src={COACH_AVATAR_URL} 
+                  alt="Coach Avatar"
+                  className="w-7 h-7 object-contain rounded-full flex-shrink-0 border border-white/10"
+                />
+                <div className="bg-white/5 border border-white/5 text-zinc-400 p-3 rounded-2xl rounded-tl-none flex items-center gap-1.5 text-xs">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#8ba893]" /> Coach is calibrating...
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Prompt Suggestions */}
+          {messages.length === 1 && (
+            <div className="px-4 pb-2 flex gap-1.5 overflow-x-auto scrollbar-none">
+              <button
+                onClick={() => setInputValue("Adjust Monday's breakfast...")}
+                className="px-2.5 py-1 bg-white/5 border border-white/5 rounded-full text-[9px] font-bold text-zinc-400 hover:text-white transition-all cursor-pointer whitespace-nowrap"
+              >
+                ✏️ Edit Monday Breakfast
+              </button>
+              <button
+                onClick={() => setInputValue("Suggest high-protein additions for today's mess menu")}
+                className="px-2.5 py-1 bg-white/5 border border-white/5 rounded-full text-[9px] font-bold text-zinc-400 hover:text-white transition-all cursor-pointer whitespace-nowrap"
+              >
+                🥣 Daily Protein Additions
+              </button>
+            </div>
           )}
-        </AnimatePresence>
-      </div>
-    </div>
+
+          {/* Chat Input form */}
+          <form onSubmit={handleSend} className="flex-shrink-0 p-3 bg-white/2 border-t border-white/5 flex gap-2">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Ask coach to modify your diet or split..."
+              className="flex-1 bg-zinc-950/60 border border-white/10 rounded-xl px-3.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#8ba893] transition-all h-10"
+            />
+            <button
+              type="submit"
+              disabled={sending || !inputValue.trim()}
+              className="w-10 h-10 rounded-xl bg-[#8ba893] hover:bg-[#8ba893]/90 text-[#0c0f0d] flex items-center justify-center transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        </motion.div>
+      )}
+      </AnimatePresence>
+    </>
   );
 }
