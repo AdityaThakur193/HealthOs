@@ -1353,6 +1353,74 @@ export default function ProfilePage() {
                     ))}
                   </div>
 
+                  {/* Daily Totals Summary */}
+                  {dietPlan && dietPlan[dietActiveDay] && dietPlan[dietActiveDay].meals && dietPlan[dietActiveDay].meals.length > 0 && (
+                    (() => {
+                      const meals = dietPlan[dietActiveDay].meals;
+                      const plannedCal = meals.reduce((sum: number, m: any) => sum + (Number(m.calories) || 0), 0);
+                      const plannedProt = meals.reduce((sum: number, m: any) => sum + (Number(m.proteinG) || 0), 0);
+                      const targetCal = profile?.targetCalories || 2000;
+                      const targetProt = profile?.targetProteinG || 150;
+                      const calPercent = Math.min(100, Math.round((plannedCal / targetCal) * 100));
+                      const protPercent = Math.min(100, Math.round((plannedProt / targetProt) * 100));
+                      
+                      const calMatch = Math.abs(plannedCal - targetCal) <= 50;
+                      const protMatch = Math.abs(plannedProt - targetProt) <= 5;
+                      const isPerfectFit = calMatch && protMatch;
+
+                      return (
+                        <GlassCard className="p-4 border border-[#8ba893]/20 bg-[#8ba893]/5 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                              Daily Planned Totals
+                            </h4>
+                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
+                              isPerfectFit 
+                                ? "bg-green-500/10 text-green-400 border border-green-500/20" 
+                                : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                            }`}>
+                              {isPerfectFit ? "🎯 Perfect Fit" : "⚠️ Needs Recalibration"}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Calories Tracker */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-baseline">
+                                <span className="text-[9px] text-zinc-500 font-bold uppercase">Calories</span>
+                                <span className="text-xs font-mono font-bold text-white">
+                                  {plannedCal} <span className="text-[9px] text-zinc-500">/ {targetCal} kcal</span>
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-gradient-to-r from-[#8ba893] to-green-400 transition-all duration-500"
+                                  style={{ width: `${calPercent}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Protein Tracker */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-baseline">
+                                <span className="text-[9px] text-zinc-500 font-bold uppercase">Protein</span>
+                                <span className="text-xs font-mono font-bold text-white">
+                                  {plannedProt}g <span className="text-[9px] text-zinc-500">/ {targetProt}g</span>
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-gradient-to-r from-[#c87a53] to-orange-400 transition-all duration-500"
+                                  style={{ width: `${protPercent}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </GlassCard>
+                      );
+                    })()
+                  )}
+
                   {/* Meals list */}
                   <div className="space-y-3">
                     {(!dietPlan[dietActiveDay] || !dietPlan[dietActiveDay].meals || dietPlan[dietActiveDay].meals.length === 0) ? (

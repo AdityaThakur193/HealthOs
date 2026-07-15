@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import connectDB from "@/lib/mongodb";
-import { UserProfile } from "@/lib/db/models";
-import { getLocalProfile, saveLocalProfile } from "@/lib/db/fallback";
+import { UserProfile, TimelineEvent } from "@/lib/db/models";
+import { getLocalProfile, saveLocalProfile, getLocalEvents } from "@/lib/db/fallback";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { calculateAdaptiveTdee } from "@/lib/tdee";
 
 export const dynamic = "force-dynamic";
 
@@ -32,13 +33,20 @@ export async function POST(request: NextRequest) {
     }
 
     let profile: any = null;
+    let events: any[] = [];
 
     try {
       await connectDB();
       profile = await UserProfile.findOne({ email }).lean();
+      if (profile) {
+        events = await TimelineEvent.find({ userId: profile._id }).lean();
+      }
     } catch (dbErr) {
       console.warn("⚠️ MongoDB offline during diet generation. Using local fallback file DB.");
       profile = await getLocalProfile(email);
+      if (profile) {
+        events = await getLocalEvents({ userId: profile._id.toString() });
+      }
     }
 
     if (!profile) {
@@ -49,30 +57,69 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Please configure and parse your Mess Menu in profile settings first." }, { status: 400 });
     }
 
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // 1. DYNAMICALLY CALCULATE DYNAMIC ADAPTIVE TDEE & CALORIES
+    const tdeeResult = calculateAdaptiveTdee(profile, events);
+    
+    let calculatedTdee = profile.tdee || 2400;
+    let targetCalories = profile.targetCalories || 2000;
+    let targetProtein = profile.targetProteinG || 150;
 
-    // Read user properties or use defaults
+    let isAdaptiveActive = false;
+    if (tdeeResult.status === "adaptive") {
+      calculatedTdee = tdeeResult.calculatedTdee;
+      isAdaptiveActive = true;
+      if (!profile.useCustomMacros) {
+        let newTargetCalories = calculatedTdee;
+        if (profile.goal === "lose_fat") {
+          newTargetCalories -= 500;
+        } else if (profile.goal === "build_muscle") {
+          newTargetCalories += 300;
+        } else if (profile.goal === "recomp") {
+          newTargetCalories -= 100;
+        }
+        targetCalories = Math.round(newTargetCalories);
+      }
+    }
+
+    // Apply custom calorie/protein target overrides if requested
+    if (profile.useCustomMacros) {
+      if (profile.customCalories && profile.customCalories > 0) {
+        targetCalories = profile.customCalories;
+      }
+      if (profile.customProtein && profile.customProtein > 0) {
+        targetProtein = profile.customProtein;
+      }
+    }
+
+    const genAI = getGenAI();
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.85,
+      }
+    });
+
     const name = profile.name || "User";
     const age = profile.age || 22;
     const height = profile.heightCm || 175;
     const weight = profile.weightKg || 75;
-    
-    // Prioritize inputs from POST request body over DB record
-    const goal = body.goal || profile.goal || "recomp";
-    const targetCalories = body.targetCalories || profile.targetCalories || 2000;
-    const targetProtein = body.targetProteinG || profile.targetProteinG || 150;
-    const dietPreference = body.dietPreference || profile.dietPreference || "none";
+    const goal = profile.goal || "recomp";
+    const dietPreference = profile.dietPreference || "none";
     const strictMessOnly = typeof body.strictMessOnly === "boolean" ? body.strictMessOnly : (profile.strictMessOnly || false);
-
     const collegeSchedule = profile.collegeSchedule || "8 AM - 4 PM";
     const sleepTarget = profile.sleepTarget || 8;
 
-    let budgetGuideline = "";
+    let additionsGuideline = "";
     if (strictMessOnly) {
-      budgetGuideline = `CRITICAL BUDGET CONSTRAINT (Strict Mess Only Mode): The user is on a strict budget and CAN ONLY eat food provided by their hostel mess menu. You MUST NOT suggest any external additions, purchases, or supplements (e.g., NO whey protein powder, NO eggs bought outside, NO store-bought curd or paneer). Set "additions" to "None (Strict Mess Only Mode)" for all meals. Prioritize and suggest the highest protein options available directly from the mess menu items served that day. If they cannot meet the protein goal due to low protein in the mess, accept this restriction and maximize what they can get from the mess without forcing external purchases.`;
+      additionsGuideline = `CRITICAL CONSTRAINT (Strict Mess Only Mode): The user is on a strict budget and CAN ONLY eat food provided by the hostel mess. You MUST NOT suggest any external additions, purchases, or supplements. Set "additions" to "None (Strict Mess Only)" for all meals. Prioritize and suggest the highest protein options available directly from the mess menu items served that day. If they cannot meet the protein goal due to low protein in the mess, accept this restriction and maximize what they can get from the mess.`;
     } else {
-      budgetGuideline = `Since mess food is typically low in protein, suggest specific supplements or additions (e.g., scoop of whey, egg whites, paneer, double curd) and exact quantities to hit the protein target for that meal.`;
+      additionsGuideline = `Since mess food is typically low in protein, you MUST suggest specific additions/supplements in the "additions" field to hit the daily target of ${targetProtein}g protein.
+Guidelines for additions based on diet preference ("${dietPreference}"):
+- veg / vegetarian: Add ONLY vegetarian items. Allowed additions: Whey protein powder (e.g. 1 scoop = 24g protein, 120 kcal), Paneer (e.g. 100g = 18g protein, 300 kcal), Greek Yogurt / Curd (e.g. 200g = 8g protein, 120 kcal), Soya chunks, Tofu, Milk, Roasted Chana. Do NOT suggest eggs, egg whites, chicken, fish, or meat.
+- eggitarian: Allowed additions: Eggs (e.g. 1 whole egg = 6g protein, 70 kcal), Egg whites (e.g. 4 whites = 16g protein, 68 kcal), and all Vegetarian items listed above. Do NOT suggest chicken, fish, or meat.
+- non_veg / non_vegetarian / none: Allowed additions: Chicken breast (e.g. 100g boiled = 30g protein, 150 kcal), Eggs, Egg whites, and all Vegetarian items.
+Make additions realistic, specific, and easy for a college student to purchase and consume in a hostel room.`;
     }
 
     const prompt = `You are an elite sports dietitian and bodybuilding nutrition coach. Your goal is to design a highly personalized week-long diet plan (Monday to Sunday) mapping out meal timings, mess food choices, necessary additions, and carbohydrate-fat distribution, optimized for the user's specific biometrics and schedule.
@@ -81,6 +128,7 @@ User Context:
 - Name: ${name}
 - Biometrics: ${age} years old, ${height}cm height, ${weight}kg weight.
 - Goals: Goal is "${goal}". Daily targets are ${targetCalories} kcal and ${targetProtein}g of protein.
+- Calorie Source: ${isAdaptiveActive ? `Empirically determined Adaptive TDEE: ${calculatedTdee} kcal.` : "Static biometrics calculation."}
 - Schedule: College classes are ${collegeSchedule}. Sleep target is ${sleepTarget} hours.
 - Diet preference: ${dietPreference}.
 - Strict Mess/Budget Mode: ${strictMessOnly ? "ACTIVE (Strictly Mess Items Only, NO additions)" : "INACTIVE (Allows additions/whey/eggs)"}
@@ -94,7 +142,23 @@ You MUST design the weekly diet plan following these strict scientific principle
 3. Fat Digestion Timing: Minimize fat intake in the peri-workout window (2 hours before to 2 hours after training) to avoid slowing down digestion. Consolidate healthy fats in breakfast and pre-sleep meals.
 4. College Schedule Integration: Align meal timings with the user's college schedule (${collegeSchedule}). Schedule a quick lunch at 1:00 PM and a pre-workout meal right after classes.
 5. Mess Menu & Budget Adaptations: Look at what is served in the mess for each meal of each day. Suggest EXACTLY what to eat from the mess.
-   ${budgetGuideline}
+6. ${additionsGuideline}
+7. Mutually Exclusive Mess Options (Single Selection Rule):
+   - On Wednesday, Friday, and Sunday: The mess menu serves both Veg and Non-Veg choices for certain meals. You MUST strictly select exactly ONE option (either the vegetarian option OR the non-vegetarian option, never both) for a meal, and calculate the calories/protein based only on that selected option.
+   - On Monday: The mess menu serves Eggs and Veg options. You MUST strictly select exactly ONE option (either the egg choice OR the veg choice, never both) for a meal.
+
+CRITICAL MATHEMATICAL ENFORCEMENT:
+- For every day (Monday to Sunday), the SUM of "calories" across all meals MUST EQUAL the daily target of ${targetCalories} kcal (with a tolerance of +/- 50 kcal).
+- For every day, the SUM of "proteinG" across all meals MUST EQUAL the daily target of ${targetProtein}g (with a tolerance of +/- 5g).
+- Make sure the individual meal calorie and protein estimates are realistic:
+  - 1 scoop Whey Protein = 120 kcal, 24g Protein
+  - 4 Egg Whites = 68 kcal, 16g Protein
+  - 100g Paneer = 300 kcal, 18g Protein
+  - 200g Curd = 120 kcal, 8g Protein
+  - 1 Roti = 80-100 kcal, 2-3g Protein
+  - 1 cup cooked Rice = 200 kcal, 4g Protein
+  - 1 cup Dal = 150 kcal, 7g Protein
+  - Ensure the sums add up correctly to ${targetCalories} kcal and ${targetProtein}g protein daily. Do not output arbitrary numbers.
 
 Return a JSON object matching this exact structure:
 {
@@ -140,6 +204,8 @@ Return a JSON object matching this exact structure:
 Do not add any text before or after the JSON response. Return ONLY valid JSON.`;
 
     console.log(`🥗 Generating custom sports-diet plan for ${email} using Gemini...`);
+    console.log(`⚡ Dynamic Targets: Calories=${targetCalories} kcal, Protein=${targetProtein}g (Adaptive TDEE active: ${isAdaptiveActive})`);
+    
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
