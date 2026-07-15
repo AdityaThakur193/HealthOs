@@ -145,6 +145,7 @@ User Context:
 - Schedule: College classes are ${collegeSchedule}. Sleep target is ${sleepTarget} hours.
 - Diet preference: ${dietPreference}.
 - Strict Mess/Budget Mode: ${strictMessOnly ? "ACTIVE (Strictly Mess Items Only, NO additions)" : "INACTIVE (Allows additions/whey/eggs)"}
+- User Custom Preferences & Learned Corrections: ${profile.customDietPreferences || "None configured"}
 
 Active Hostel Mess Menu:
 ${JSON.stringify(profile.messMenu.parsedMenu, null, 2)}
