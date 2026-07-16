@@ -34,6 +34,7 @@ export default function WorkoutTracker() {
   const [customExName, setCustomExName] = useState("");
   const [customExMuscle, setCustomExMuscle] = useState("");
   const [showAddCustomForm, setShowAddCustomForm] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
 
   const { popupState, showCustomAlert, showCustomConfirm } = useConfirmDialog();
 
@@ -45,7 +46,7 @@ export default function WorkoutTracker() {
         gymFrequency: profile.gymFrequency,
         gymExperience: profile.gymExperience,
         goal: profile.goal,
-      });
+      }, selectedDay);
       setPlan(todaysPlan);
 
       // If rest day, no exercises to load
@@ -136,7 +137,7 @@ export default function WorkoutTracker() {
     } finally {
       setFetchingHistory(false);
     }
-  }, [userId, profile]);
+  }, [userId, profile, selectedDay]);
 
   useEffect(() => {
     if (userId && profile) {
@@ -412,16 +413,21 @@ export default function WorkoutTracker() {
               {daysOrder.map((d) => {
                 const scheduled = schedule.find((s) => s.day === d);
                 const isToday = d === currentDay;
+                const isSelected = d === selectedDay;
                 return (
-                  <div 
+                  <button 
                     key={d} 
-                    className={`p-2 rounded-xl flex flex-col items-center justify-between text-center transition-all ${
-                      isToday 
-                        ? "bg-cyan-500/10 border border-cyan-500/30 glow-cyan relative" 
-                        : "bg-white/2 border border-white/5"
+                    type="button"
+                    onClick={() => setSelectedDay(d)}
+                    className={`p-2 rounded-xl flex flex-col items-center justify-between text-center transition-all cursor-pointer ${
+                      isSelected 
+                        ? "bg-[#8ba893]/20 border border-[#8ba893]/50 glow-green relative" 
+                        : isToday 
+                          ? "bg-cyan-500/5 border border-cyan-500/20 relative" 
+                          : "bg-white/2 border border-white/5 hover:bg-white/5"
                     }`}
                   >
-                    <span className={`text-[9px] font-bold ${isToday ? "text-cyan-400" : "text-zinc-500"}`}>
+                    <span className={`text-[9px] font-bold ${isSelected ? "text-[#8ba893]" : isToday ? "text-cyan-400" : "text-zinc-500"}`}>
                       {getDayLabel(d)}
                     </span>
                     <span className={`text-[8px] font-black uppercase tracking-tighter mt-1 block truncate w-full ${
@@ -437,7 +443,7 @@ export default function WorkoutTracker() {
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
                       </span>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
