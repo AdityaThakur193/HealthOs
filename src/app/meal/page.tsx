@@ -9,14 +9,20 @@ import { Camera, Edit3, AlertTriangle, Play, CheckCircle } from "lucide-react";
 import { compressImage } from "@/lib/imageUtils";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { motion, AnimatePresence } from "framer-motion";
+import { calculateFoodMacros } from "@/lib/ifctData";
 
 interface FoodItem {
   name: string;
-  portionSize: "small" | "medium" | "large";
+  dishName?: string;
+  preparationStyle?: string;
+  portionSize?: "small" | "medium" | "large";
+  quantity?: number;
+  unitType?: string;
   estimatedCalories: number;
   proteinG: number;
-  carbsG: number;
-  fatG: number;
+  carbsG?: number;
+  fatG?: number;
+  weightGrams?: number;
 }
 
 
@@ -131,9 +137,21 @@ export default function MealCapture() {
     galleryInputRef.current?.click();
   };
 
-  const handlePortionChange = (index: number, size: "small" | "medium" | "large") => {
+  const handleQuantityChange = (index: number, newQty: number) => {
     setFoods((prev) =>
-      prev.map((f, i) => (i === index ? { ...f, portionSize: size } : f))
+      prev.map((f, i) => {
+        if (i !== index) return f;
+        const computed = calculateFoodMacros(f.dishName || f.name, newQty, f.unitType, f.preparationStyle);
+        return {
+          ...f,
+          quantity: newQty,
+          estimatedCalories: computed.calories,
+          proteinG: computed.proteinG,
+          carbsG: computed.carbsG,
+          fatG: computed.fatG,
+          weightGrams: computed.weightGrams,
+        };
+      })
     );
   };
 
@@ -145,22 +163,10 @@ export default function MealCapture() {
     const userId = localStorage.getItem("healthos_userId");
     if (!userId) return;
 
-    const portionMultipliers = { small: 0.7, medium: 1.0, large: 1.4 };
-
-    // Calculate adjusted values
-    const finalFoods = foods.map((f) => {
-      const mult = portionMultipliers[f.portionSize];
-      return {
-        ...f,
-        estimatedCalories: Math.round(f.estimatedCalories * mult),
-        proteinG: Math.round(f.proteinG * mult),
-        carbsG: Math.round(f.carbsG * mult),
-        fatG: Math.round(f.fatG * mult),
-      };
-    });
-
-    const totalCalories = finalFoods.reduce((sum, f) => sum + f.estimatedCalories, 0);
-    const totalProteinG = finalFoods.reduce((sum, f) => sum + f.proteinG, 0);
+    const totalCalories = foods.reduce((sum, f) => sum + (f.estimatedCalories || 0), 0);
+    const totalProteinG = Math.round(foods.reduce((sum, f) => sum + (f.proteinG || 0), 0) * 10) / 10;
+    const totalCarbsG = Math.round(foods.reduce((sum, f) => sum + (f.carbsG || 0), 0) * 10) / 10;
+    const totalFatG = Math.round(foods.reduce((sum, f) => sum + (f.fatG || 0), 0) * 10) / 10;
 
     try {
       const res = await fetch("/api/timeline", {
@@ -170,9 +176,11 @@ export default function MealCapture() {
           userId,
           type: "meal",
           payload: {
-            foods: finalFoods,
+            foods,
             totalCalories,
             totalProteinG,
+            totalCarbsG,
+            totalFatG,
             imagePreview,
           },
           source: "ai_vision",
@@ -520,12 +528,9 @@ export default function MealCapture() {
             </div>
             <div className="text-right">
               <span className="text-lg font-black text-brand-400">
-                {foods.reduce((sum, f) => {
-                  const mult = f.portionSize === "small" ? 0.7 : f.portionSize === "large" ? 1.4 : 1.0;
-                  return sum + Math.round(f.estimatedCalories * mult);
-                }, 0)}
+                {foods.reduce((sum, f) => sum + (f.estimatedCalories || 0), 0)}
               </span>
-              <p className="text-[10px] text-zinc-500">Estimated kcal</p>
+              <p className="text-[10px] text-zinc-500">IFCT 2017 Verified kcal</p>
             </div>
           </div>
 
@@ -538,7 +543,7 @@ export default function MealCapture() {
                 <MealResultCard
                   key={i}
                   food={food}
-                  onPortionChange={(size) => handlePortionChange(i, size)}
+                  onQuantityChange={(newQty) => handleQuantityChange(i, newQty)}
                   onRemove={() => handleRemoveFood(i)}
                 />
               ))
