@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { sendLocalTestNotification } from "@/lib/notifications";
+import { registerServiceWorker, sendLocalTestNotification } from "@/lib/notifications";
 
 interface NotificationSchedule {
   hour: number;
@@ -74,44 +74,67 @@ export default function NotificationScheduler() {
   const timersRef = useRef<NodeJS.Timeout[]>([]);
 
   useEffect(() => {
-    // Only run if notification permission is granted
-    if (typeof window === "undefined" || Notification.permission !== "granted") return;
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+
+    // Auto-register service worker if permission is granted
+    if (Notification.permission === "granted") {
+      registerServiceWorker();
+    } else {
+      return;
+    }
 
     const userName =
       localStorage.getItem("healthos_name") ||
       localStorage.getItem("healthos_email")?.split("@")[0] ||
       "Champ";
 
-    const now = new Date();
+    const checkAndSchedule = () => {
+      const now = new Date();
 
-    DAILY_NOTIFICATIONS.forEach((schedule) => {
-      if (hasNotificationFiredToday(schedule.key)) return;
-
-      const target = new Date();
-      target.setHours(schedule.hour, schedule.minute, 0, 0);
-
-      const msUntil = target.getTime() - now.getTime();
-      if (msUntil <= 0) return; // time already passed today
-
-      const timer = setTimeout(async () => {
+      DAILY_NOTIFICATIONS.forEach((schedule) => {
         if (hasNotificationFiredToday(schedule.key)) return;
-        markNotificationFired(schedule.key);
-        await sendLocalTestNotification(
-          schedule.getTitle(userName),
-          schedule.getBody(userName),
-          "/",
-          schedule.image
-        );
-      }, msUntil);
 
-      timersRef.current.push(timer);
-    });
+        const target = new Date();
+        target.setHours(schedule.hour, schedule.minute, 0, 0);
+
+        const msUntil = target.getTime() - now.getTime();
+        // If within 5 minutes or in the future
+        if (msUntil <= 0 && Math.abs(msUntil) < 5 * 60 * 1000) {
+          // Time just passed within last 5 minutes
+          markNotificationFired(schedule.key);
+          sendLocalTestNotification(
+            schedule.getTitle(userName),
+            schedule.getBody(userName),
+            "/",
+            schedule.image
+          );
+        } else if (msUntil > 0) {
+          const timer = setTimeout(async () => {
+            if (hasNotificationFiredToday(schedule.key)) return;
+            markNotificationFired(schedule.key);
+            await sendLocalTestNotification(
+              schedule.getTitle(userName),
+              schedule.getBody(userName),
+              "/",
+              schedule.image
+            );
+          }, msUntil);
+          timersRef.current.push(timer);
+        }
+      });
+    };
+
+    checkAndSchedule();
+
+    // Periodic check every 60 seconds
+    const interval = setInterval(checkAndSchedule, 60000);
 
     return () => {
+      clearInterval(interval);
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
   }, []);
 
-  return null; // invisible component
+  return null;
 }

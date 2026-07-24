@@ -88,6 +88,29 @@ export default function ProfilePage() {
   const handleRequestPermission = async () => {
     const perm = await requestNotificationPermission();
     setNotificationPermission(perm);
+    if (perm === "granted") {
+      await registerServiceWorker();
+      const sent = await sendLocalTestNotification(
+        "Notifications Enabled! 🎉",
+        "Health OS will send you daily reminders for workouts, meals, and hydration.",
+        "/"
+      );
+      if (sent) {
+        showCustomAlert("Notifications Active! 🔔", "Daily Push Notifications have been enabled.", "success");
+      } else {
+        showCustomAlert(
+          "Permission Granted",
+          "Notification permission is allowed in your browser, but system popups may be silenced by your OS Focus Assist / Do Not Disturb settings.",
+          "alert"
+        );
+      }
+    } else if (perm === "denied") {
+      showCustomAlert(
+        "Notifications Blocked",
+        "Notification permission was blocked in your browser site settings. Please click the lock/settings icon next to your URL bar to unblock.",
+        "warning"
+      );
+    }
   };
 
   const handleInstallApp = async () => {
@@ -133,12 +156,26 @@ export default function ProfilePage() {
     // Pick one at random for a fun, personalized experience!
     const choice = notifications[Math.floor(Math.random() * notifications.length)];
 
-    await sendLocalTestNotification(
+    const success = await sendLocalTestNotification(
       choice.title,
       choice.body,
       "/",
       choice.image
     );
+
+    if (success) {
+      showCustomAlert(
+        "Test Notification Sent! 🔔",
+        "A notification was triggered. If you didn't see a system popup, please check your OS Focus Assist / Windows Notification settings for Chrome/Edge.",
+        "success"
+      );
+    } else {
+      showCustomAlert(
+        "Notification Warning",
+        "Could not display notification. Please ensure browser permission is allowed and you are accessing over localhost or HTTPS.",
+        "warning"
+      );
+    }
   };
 
   const { popupState, showCustomAlert, showCustomConfirm } = useConfirmDialog();
