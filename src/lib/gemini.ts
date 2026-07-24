@@ -59,35 +59,63 @@ export function sanitizeJsonOutput(text: string): string {
  * nutrition estimates. Camera-first capture.
  * ───────────────────────────────────────────── */
 
+export interface DetectedFoodItem {
+  name: string;
+  dishName: string;
+  preparationStyle?: string;
+  visualCues?: string;
+  quantity: number;
+  unitType: "piece" | "katori" | "scoop" | "gram" | "plate";
+  portionSize?: "small" | "medium" | "large";
+  estimatedCalories?: number;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
+  weightGrams?: number;
+}
+
 export interface MealAnalysis {
-  foods: {
-    name: string;
-    portionSize: "small" | "medium" | "large";
-    estimatedCalories: number;
-    proteinG: number;
-    carbsG: number;
-    fatG: number;
-  }[];
+  foods: DetectedFoodItem[];
   totalCalories: number;
   totalProteinG: number;
+  totalCarbsG?: number;
+  totalFatG?: number;
   confidence: number;
+  plateType?: string;
+  notes?: string;
 }
 
 export async function analyzeMealImage(
   imageBase64: string,
-  mimeType: string = "image/jpeg"
+  mimeType: string = "image/jpeg",
+  learnedContext?: string
 ): Promise<MealAnalysis> {
   const model = getVisionModel();
 
-  const prompt = `You are a nutrition analysis AI for an Indian college student's health app.
-Analyze this food image and return a JSON object with:
-- "foods": array of detected food items, each with "name", "portionSize" (small/medium/large), "estimatedCalories", "proteinG", "carbsG", "fatG"
-- "totalCalories": sum of all calories
-- "totalProteinG": sum of all protein
-- "confidence": 0-1 confidence score
+  const prompt = `You are a world-class Indian Culinary Computer Vision Specialist.
+Analyze this food image and return a JSON object with strict visual identification. Do NOT attempt raw calorie/protein math; focus on accurate visual dish identification, preparation style, and standard unit counting.
 
-Be accurate with Indian foods (dal, roti, rice, sabzi, mess food, etc).
-Return ONLY valid JSON, no markdown.`;
+${learnedContext ? `LEARNED USER PLATE CONTEXT:\n${learnedContext}\n` : ""}
+
+Return a JSON object matching this structure:
+{
+  "foods": [
+    {
+      "name": "string (e.g. Yellow Dal, Whole Wheat Roti, Cooked White Rice)",
+      "dishName": "string (canonical name: roti | dal_toor | rice_cooked | curd | paneer_raw | egg_whole | etc)",
+      "preparationStyle": "string (e.g. thin_mess | plain | ghee | thick_home | steamed)",
+      "visualCues": "string (e.g. watery yellow turmeric dal, 2 circular whole wheat flatbreads)",
+      "quantity": number (e.g. 2 for rotis, 1 for katori dal),
+      "unitType": "piece" | "katori" | "scoop" | "gram" | "plate",
+      "portionSize": "small" | "medium" | "large"
+    }
+  ],
+  "confidence": number (0.0 to 1.0),
+  "plateType": "hostel_mess_thali" | "single_dish" | "snack_plate" | "home_thali",
+  "notes": "string (brief visual observations)"
+}
+
+STRICT RULE: Return ONLY valid JSON, no markdown code fences.`;
 
   const result = await model.generateContent([
     prompt,
