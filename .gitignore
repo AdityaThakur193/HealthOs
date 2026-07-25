@@ -40,7 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local database
+# local database & scratch scripts
 local_db.json
+check_timeline.js
 *.log
 
