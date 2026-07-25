@@ -109,3 +109,52 @@ export async function sendLocalTestNotification(
     return false;
   }
 }
+
+export interface CustomNotificationItem {
+  id: string;
+  title: string;
+  body: string;
+  time?: string; // HH:MM 24hr format, e.g. "17:30"
+  triggerAt?: number; // timestamp in ms
+  image?: string;
+  createdAt: string;
+  fired?: boolean;
+}
+
+const CUSTOM_NOTIF_KEY = "healthos_custom_notifications";
+
+export function getCustomNotifications(): CustomNotificationItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CUSTOM_NOTIF_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomNotification(item: Omit<CustomNotificationItem, "id" | "createdAt">): CustomNotificationItem {
+  const newItem: CustomNotificationItem = {
+    ...item,
+    id: "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+    createdAt: new Date().toISOString(),
+    fired: false,
+  };
+
+  if (typeof window !== "undefined") {
+    const list = getCustomNotifications();
+    list.push(newItem);
+    localStorage.setItem(CUSTOM_NOTIF_KEY, JSON.stringify(list));
+    window.dispatchEvent(new Event("customNotificationScheduled"));
+  }
+
+  return newItem;
+}
+
+export function markCustomNotificationFired(id: string) {
+  if (typeof window === "undefined") return;
+  const list = getCustomNotifications();
+  const updated = list.map((item) => (item.id === id ? { ...item, fired: true } : item));
+  localStorage.setItem(CUSTOM_NOTIF_KEY, JSON.stringify(updated));
+}
+
