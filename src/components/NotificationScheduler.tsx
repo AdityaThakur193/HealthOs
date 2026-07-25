@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { registerServiceWorker, sendLocalTestNotification } from "@/lib/notifications";
+import { 
+  registerServiceWorker, 
+  sendLocalTestNotification, 
+  getCustomNotifications, 
+  markCustomNotificationFired 
+} from "@/lib/notifications";
 
 interface NotificationSchedule {
   hour: number;
@@ -89,8 +94,13 @@ export default function NotificationScheduler() {
       "Champ";
 
     const checkAndSchedule = () => {
+      // Clear existing scheduled timers
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+
       const now = new Date();
 
+      // 1. Process daily static schedules
       DAILY_NOTIFICATIONS.forEach((schedule) => {
         if (hasNotificationFiredToday(schedule.key)) return;
 
@@ -122,14 +132,47 @@ export default function NotificationScheduler() {
           timersRef.current.push(timer);
         }
       });
+
+      // 2. Process custom notifications set via Coach AI or Profile
+      const customList = getCustomNotifications();
+      customList.forEach((item) => {
+        if (item.fired) return;
+
+        let msUntil = -1;
+
+        if (item.triggerAt) {
+          msUntil = item.triggerAt - Date.now();
+        } else if (item.time) {
+          const [hStr, mStr] = item.time.split(":");
+          const target = new Date();
+          target.setHours(parseInt(hStr, 10) || 0, parseInt(mStr, 10) || 0, 0, 0);
+          msUntil = target.getTime() - now.getTime();
+        }
+
+        if (msUntil <= 0 && Math.abs(msUntil) < 2 * 60 * 1000) {
+          // Fire right away if due within past 2 mins
+          markCustomNotificationFired(item.id);
+          sendLocalTestNotification(item.title, item.body, "/", item.image);
+        } else if (msUntil > 0) {
+          const timer = setTimeout(async () => {
+            markCustomNotificationFired(item.id);
+            await sendLocalTestNotification(item.title, item.body, "/", item.image);
+          }, msUntil);
+          timersRef.current.push(timer);
+        }
+      });
     };
 
     checkAndSchedule();
 
-    // Periodic check every 60 seconds
-    const interval = setInterval(checkAndSchedule, 60000);
+    // Listen for dynamically scheduled custom notifications
+    window.addEventListener("customNotificationScheduled", checkAndSchedule);
+
+    // Periodic check every 30 seconds
+    const interval = setInterval(checkAndSchedule, 30000);
 
     return () => {
+      window.removeEventListener("customNotificationScheduled", checkAndSchedule);
       clearInterval(interval);
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];

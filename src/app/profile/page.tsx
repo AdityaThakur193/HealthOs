@@ -178,6 +178,23 @@ export default function ProfilePage() {
     }
   };
 
+  const handleSendTimedTestNotification = async () => {
+    showCustomAlert(
+      "Timer Started! ⏱️",
+      "A test web push notification will fire in 5 seconds. You can switch tabs or minimize the browser to test background push!",
+      "alert"
+    );
+    setTimeout(async () => {
+      await sendLocalTestNotification(
+        "⏱️ 5-Second Timer Push Alert!",
+        "Web push notification timing works perfectly in Health OS!",
+        "/",
+        "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=600&auto=format&fit=crop"
+      );
+    }, 5000);
+  };
+
+
   const { popupState, showCustomAlert, showCustomConfirm } = useConfirmDialog();
 
   const [neckCm, setNeckCm] = useState("");
@@ -1088,13 +1105,22 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleSendTestNotification}
-                className="w-full py-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white font-bold text-xs border border-white/5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                ⚡ Send Test Push Reminder
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSendTestNotification}
+                  className="py-2.5 px-3 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white font-bold text-xs border border-white/5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  ⚡ Instant Test Push
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendTimedTestNotification}
+                  className="py-2.5 px-3 bg-[#8ba893]/10 hover:bg-[#8ba893]/20 text-[#8ba893] hover:text-white font-bold text-xs border border-[#8ba893]/20 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  ⏱️ Test Timed Push (5s)
+                </button>
+              </div>
             </div>
           )}
         </GlassCard>
