@@ -84,11 +84,6 @@ graph TD
 - **Engine Solution** (`/api/mess-menu/parse`):
   - Parses unstructured hostel mess menu photos or text into structured weekly JSON (`monday` to `sunday` for `breakfast`, `lunch`, `snacks`, `dinner`).
 
-### 6. Zomato/Swiggy Style PWA Web Push Notification System
-- **Engine Solution** (`src/lib/notifications.ts` & `public/sw.js`):
-  - Service worker auto-registration with immediate lifecycle activation (`skipWaiting` and `clients.claim`).
-  - Background push notifications for meal logging reminders, workout alerts, and water intake check-ins.
-
 ---
 
 ## 📦 Quickstart & Setup

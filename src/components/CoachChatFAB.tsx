@@ -6,11 +6,6 @@ import GlassCard from "./GlassCard";
 import { COACH_AVATAR_URL } from "@/lib/constants";
 import { formatMessageContent } from "@/lib/markdownFormat";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  requestNotificationPermission, 
-  sendLocalTestNotification, 
-  saveCustomNotification 
-} from "@/lib/notifications";
 
 interface Message {
   role: "user" | "model";
@@ -330,70 +325,6 @@ export default function CoachChatFAB() {
           body: JSON.stringify({ ...currentProfile, email, gymFrequency: parseInt(String(newFrequency)) || 4 }),
         });
         if (res.ok) window.dispatchEvent(new Event("profileUpdated"));
-        return;
-      }
-
-      // ── 9. TEST NOTIFICATION ─────────────────────────────────────────────
-      if (action === "test_notification") {
-        const title = updatedData?.title || "Test Push Notification 🔔";
-        const body = updatedData?.body || "Web push notifications are working smoothly!";
-        const delay = updatedData?.delaySeconds || 0;
-
-        const perm = await requestNotificationPermission();
-        if (perm !== "granted") {
-          confirm("⚠️ **Notification Permission Required**: Please grant notification permissions in your browser bar so Coach AI can display push notifications.");
-          return;
-        }
-
-        if (delay > 0) {
-          setTimeout(async () => {
-            await sendLocalTestNotification(title, body, "/");
-          }, delay * 1000);
-          confirm(`⏰ **Test Notification Scheduled!** Will fire in **${delay} seconds**. Keep this tab open or check your system tray! 🔔`);
-        } else {
-          const sent = await sendLocalTestNotification(title, body, "/");
-          if (sent) {
-            confirm("🔔 **Test Web Push Notification Sent!** Check your screen or system tray for the popup.");
-          } else {
-            confirm("⚠️ Permission granted, but system popup was blocked or silenced. Check OS Focus Assist / Notification settings.");
-          }
-        }
-        return;
-      }
-
-      // ── 10. SCHEDULE NOTIFICATION ─────────────────────────────────────────
-      if (action === "schedule_notification") {
-        const title = updatedData?.title || "Health OS Reminder ⏰";
-        const body = updatedData?.body || "Time to check your health log!";
-        const time = updatedData?.time;
-        const delaySeconds = updatedData?.delaySeconds;
-
-        const perm = await requestNotificationPermission();
-        if (perm !== "granted") {
-          confirm("⚠️ **Notification Permission Required**: Please grant notification permissions in your browser bar so Coach AI can schedule push reminders.");
-          return;
-        }
-
-        let triggerAt: number | undefined;
-        if (delaySeconds && delaySeconds > 0) {
-          triggerAt = Date.now() + delaySeconds * 1000;
-        }
-
-        saveCustomNotification({
-          title,
-          body,
-          time,
-          triggerAt,
-          image: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=600&auto=format&fit=crop",
-        });
-
-        const timingDesc = time 
-          ? `at **${time}**` 
-          : delaySeconds 
-          ? `in **${delaySeconds} seconds**` 
-          : "on schedule";
-
-        confirm(`⏰ **Push Notification Timed!** I've scheduled a web push notification: **"${title}"** ${timingDesc}. Stay tuned! 🔔`);
         return;
       }
 
