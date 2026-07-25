@@ -3,7 +3,6 @@ import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import CoachChatFAB from "@/components/CoachChatFAB";
 import SplashWrapper from "@/components/SplashWrapper";
-import NotificationScheduler from "@/components/NotificationScheduler";
 
 import type { Viewport } from "next";
 
@@ -46,7 +45,6 @@ export default function RootLayout({
             </main>
             <BottomNav />
             <CoachChatFAB />
-            <NotificationScheduler />
           </div>
         </SplashWrapper>
       </body>
