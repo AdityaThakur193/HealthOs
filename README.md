@@ -7,7 +7,7 @@
 [![CI Build](https://github.com/AdityaThakur193/HealthOs/actions/workflows/ci.yml/badge.svg)](https://github.com/AdityaThakur193/HealthOs/actions/workflows/ci.yml)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16.2.9-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript 5](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vitest Passed](https://img.shields.io/badge/Vitest-30%20Tests%20Passed-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Vitest Passed](https://img.shields.io/badge/Vitest-35%20Tests%20Passed-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 [![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas%20v8.0-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v3.4-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -16,15 +16,27 @@
   Reversing the health tracking paradigm from a manual logging diary into an <b>automated, adaptive decision engine</b>.
 </p>
 
-[Explore Features](#-core-architectural-pillars) • [Architecture Specs](ARCHITECTURE.md) • [API Documentation](API.md) • [Getting Started](#-quickstart--setup) • [Contributing](CONTRIBUTING.md)
+[Explore Features](#-core-architectural-pillars) • [Visual Showcase](#-visual-feature-showcase) • [Architecture Specs](ARCHITECTURE.md) • [API Documentation](API.md) • [Getting Started](#-quickstart--setup) • [Contributing](CONTRIBUTING.md)
 
 </div>
 
 ---
 
-## 🎨 System Architecture Overview
+## 🎨 Visual Feature Showcase
 
-Health OS decouples raw data collection from decision intelligence. All user actions (meal captures, workout completions, weight check-ins, sleep logs) write to a unified, immutable **Health Timeline**. Downstream analytics engines process this timeline to adapt metabolic expenditure, fine-tune workout progressive overload, and audit nutritional intake.
+| Feature Module | Visual Interface | Description & Engine Impact |
+| :--- | :---: | :--- |
+| **Main Dashboard HUD** | ![Dashboard HUD](public/images/dashboard.png) | **Glassmorphic Command Center**: Displays real-time macro progression rings, 14-day adaptive TDEE expenditure, water/steps logging, and AI health coach insights. |
+| **AI Vision & IFCT 2017 Portion Engine** | ![AI Vision Meal Capture](public/images/meal_capture.png) | **Deterministic Food Recognition**: Detects dish items via Gemini 2.5 Flash, cross-references official ICMR-NIN IFCT 2017 portion data, and offers interactive `-` / `+` portion quantity sliders. |
+| **Progressive Overload Workout Tracker** | ![Workout Tracker HUD](public/images/workout_hud.jpg) | **Evidence-Based Gym Engine**: Supports 3 to 6-day splits, auto-calculates load progression (+2.5kg compound / +2.0kg isolation), and embeds exercise form video demos directly inside exercise cards. |
+| **Autonomous AI Coach Assistant** | ![AI Coach Chat Assistant](public/images/coach_ai.jpg) | **Action-First Conversational Agent**: Directly reads and writes to the unified database timeline (logging meals, steps, water, sleep, weight) via natural language chat. |
+| **Habit Tracker & Streak Analytics** | ![Habit Tracker HUD](public/images/habit_tracker.jpg) | **Daily Discipline & Habit Formation**: Tracks daily health habits, calculates streak streaks (🔥), and integrates with AI Coach for zero-friction habit check-ins. |
+
+---
+
+## 🚀 System Architecture Overview
+
+Health OS decouples raw data collection from decision intelligence. All user actions (meal captures, workout completions, weight check-ins, sleep logs, habit check-ins) write to a unified, immutable **Health Timeline**. Downstream analytics engines process this timeline to adapt metabolic expenditure, fine-tune workout progressive overload, and audit nutritional intake.
 
 ```mermaid
 graph TD
@@ -32,6 +44,7 @@ graph TD
     User([👤 User Lives Life]) -->|Vision Capture| VisionAPI["/api/vision"]
     User -->|Weight Check-in| TimelineAPI["/api/timeline"]
     User -->|Workout Set| WorkoutEngine["Workout Engine"]
+    User -->|Habit Checkin| HabitsAPI["/api/habits"]
 
     %% Vision Pipeline
     VisionAPI -->|1. Candidate Detection| GeminiVision["Gemini 2.5 Flash"]
@@ -42,6 +55,7 @@ graph TD
     QuantityUI -->|Save Event| HealthTimeline[("Chronological Health Timeline")]
     TimelineAPI -->|Save Weight| HealthTimeline
     WorkoutEngine -->|Save Exercise Log| HealthTimeline
+    HabitsAPI -->|Save Habit Event| HealthTimeline
     HealthTimeline -->|Mongoose Serverless Pool| MongoDB[("MongoDB Atlas")]
 
     %% Adaptive Decision Engine
@@ -53,10 +67,10 @@ graph TD
 
 ---
 
-## 🚀 Core Architectural Pillars
+## ⚡ Core Architectural Pillars
 
 ### 1. 14-Day Adaptive TDEE Expenditure Engine (MacroFactor Paradigm)
-- **Problem**: Static BMR formulas (Harris-Benedict, Mifflin-St Jeor) ignore metabolic adaptation, neat variance, and sodium water retention.
+- **Problem**: Static BMR formulas (Harris-Benedict, Mifflin-St Jeor) ignore metabolic adaptation, NEAT variance, and sodium water retention.
 - **Engine Solution** (`src/lib/tdee.ts`): Computes a 14-day rolling window linear regression of daily weight change vs average caloric intake.
 - **Math Integrity**: Features water weight spike clamping (clamping max daily TDEE shift to ±200 kcal/day) and boundary safety limits `[1,200 kcal, 4,500 kcal]`.
 
@@ -80,9 +94,11 @@ graph TD
   - Implements double progression logic: automatically calculates target weight increases (+2.5kg for compound / +2.0kg for isolation) when top rep targets are hit.
   - Curated YouTube exercise video timestamp links embedded directly into exercise cards.
 
-### 5. Hostel Mess Menu AI Parser
-- **Engine Solution** (`/api/mess-menu/parse`):
-  - Parses unstructured hostel mess menu photos or text into structured weekly JSON (`monday` to `sunday` for `breakfast`, `lunch`, `snacks`, `dinner`).
+### 5. Habit Tracker & Daily Discipline Engine
+- **Engine Solution** (`src/lib/habitEngine.ts` & `/api/habits`):
+  - Tracks daily health habits (hydration, sleep targets, prayer/meditation, physical activity).
+  - Calculates active streaks (🔥) and completion percentages.
+  - Fully integrated with Coach AI so users can check off habits via natural voice/text commands.
 
 ---
 
@@ -120,7 +136,7 @@ Navigate to [http://localhost:3000](http://localhost:3000).
 # Run TypeScript Strict Validation
 npm run type-check
 
-# Run Vitest Test Suite (30 Unit & Security Tests)
+# Run Vitest Test Suite (35 Unit & Security Tests)
 npm test
 ```
 
@@ -141,28 +157,32 @@ HealthOs/
 │   │   └── ci.yml                # GitHub Actions CI Workflow (Lint, Type-Check, Test, Build)
 │   ├── PULL_REQUEST_TEMPLATE.md  # Standard Pull Request Submission Template
 │   └── ISSUE_TEMPLATE/           # Bug Report & Feature Request Issue Templates
-├── public/                       # Static Assets & PWA Service Worker (sw.js)
+├── public/
+│   ├── images/                   # High-Fidelity UI Interface Showcase Mockups
+│   └── sw.js                     # Static Assets & PWA Service Worker
 ├── src/
 │   ├── app/                      # Next.js 16 App Router Pages & REST API Routes
-│   │   ├── api/                  # Serverless API Endpoints (/vision, /diet, /timeline, etc.)
+│   │   ├── api/                  # Serverless API Endpoints (/vision, /diet, /timeline, /habits, etc.)
 │   │   ├── meal/                 # AI Vision Meal Capture Page
 │   │   ├── workout/              # Progressive Overload Workout HUD Page
+│   │   ├── habits/               # Habit Tracker & Streak Dashboard Page
 │   │   ├── review/               # Sunday Weekly Review Page
 │   │   └── page.tsx              # Main Glassmorphic Dashboard HUD
 │   ├── components/               # Reusable Glassmorphic UI Components
-│   ├── hooks/                    # Custom React Hooks (useConfirmDialog, etc.)
+│   ├── hooks/                    # Custom React Hooks (useConfirmDialog, useAuthGuard, etc.)
 │   ├── lib/                      # Core Engineering Algorithms
 │   │   ├── tdee.ts               # 14-Day Adaptive TDEE Expenditure Engine
 │   │   ├── ifctData.ts           # ICMR-NIN IFCT 2017 Indian Food Database
 │   │   ├── dietEngine.ts         # Grounded AI Diet Allocation & Math Audit Engine
-│   │   ├── workoutPlans.ts       # 5-Day Workout Split & Progressive Overload Engine
+│   │   ├── workoutPlans.ts       # Workout Split & Progressive Overload Engine
+│   │   ├── habitEngine.ts         # Habit Tracker & Streak Analytics Engine
 │   │   ├── gemini.ts             # Gemini 2.5 Flash Vision Integration
 │   │   └── mongodb.ts            # Serverless Mongoose Connection Pool Cache
-│   └── __tests__/                # Vitest Test Suites (30 Tests Passed)
-├── ARCHITECTURE.md               # Technical Deep-Dive & 5 Mermaid Flow Diagrams
+│   └── __tests__/                # Vitest Test Suites (35 Tests Passed)
+├── ARCHITECTURE.md               # Technical Deep-Dive & Mermaid Flow Diagrams
 ├── API.md                        # Complete REST API Specifications
 ├── CONTRIBUTING.md               # Developer Contribution & Branch/Commit Standards
-├── SECURITY.md                   # Vulnerability Reporting SLA & Security Defense Specs
+├── SECURITY.md                   # Vulnerability Reporting SLA & Security Specs
 ├── CHANGELOG.md                  # Release Version History
 ├── LICENSE                       # Official MIT License
 └── package.json                  # Dependencies & npm Scripts
@@ -172,7 +192,7 @@ HealthOs/
 
 ## 🧪 Automated Testing & Quality Audit
 
-Health OS maintains an automated **Vitest** test suite covering 30 unit, integration, and security edge cases:
+Health OS maintains an automated **Vitest** test suite covering 35 unit, integration, and security edge cases:
 
 ```
  RUN  v4.1.10 D:/HealthApp
@@ -181,11 +201,12 @@ Health OS maintains an automated **Vitest** test suite covering 30 unit, integra
  ✓ src/__tests__/apiValidation.test.ts (4 tests)
  ✓ src/__tests__/tdee.test.ts (6 tests)
  ✓ src/__tests__/workoutPlans.test.ts (4 tests)
+ ✓ src/__tests__/habitEngine.test.ts (5 tests)
  ✓ src/__tests__/ifctData.test.ts (4 tests)
  ✓ src/__tests__/dietEngine.test.ts (4 tests)
 
- Test Files  6 passed (6)
-      Tests  30 passed (30)
+ Test Files  7 passed (7)
+      Tests  35 passed (35)
 ```
 
 ---
