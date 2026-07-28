@@ -214,21 +214,24 @@ export default function Dashboard() {
         });
       }
 
-      // 2. Fetch AI Coach insight
+      setLoading(false); // Dashboard metrics rendered INSTANTLY!
+
+      // 2. Fetch AI Coach insight asynchronously (non-blocking)
       setCoachLoading(true);
-      const coachRes = await fetch("/api/coach", {
+      fetch("/api/coach", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
-      });
-      if (coachRes.ok) {
-        const data = await coachRes.json();
-        setCoachData(data.recommendation);
-      }
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && data.recommendation) setCoachData(data.recommendation);
+        })
+        .catch((err) => console.error("Non-blocking Coach AI fetch error:", err))
+        .finally(() => setCoachLoading(false));
     } catch (err) {
       console.error("Error loading dashboard metrics", err);
-    } finally {
-      setCoachLoading(false);
+      setLoading(false);
     }
   }, []);
 

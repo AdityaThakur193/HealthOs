@@ -13,9 +13,11 @@ export function useAuthGuard() {
     async function checkAuth() {
       const storedEmail = localStorage.getItem("healthos_email");
       const storedUserId = localStorage.getItem("healthos_userId");
+      const cachedProfile = localStorage.getItem("healthos_profile");
 
       if (!storedEmail) {
         router.push("/login");
+        setLoading(false);
         return;
       }
 
@@ -24,6 +26,18 @@ export function useAuthGuard() {
         setUserId(storedUserId);
       }
 
+      // INSTANT RENDER (0ms latency): Populate profile from localStorage immediately if available
+      if (cachedProfile) {
+        try {
+          const parsed = JSON.parse(cachedProfile);
+          setProfile(parsed);
+          setLoading(false); // Page renders INSTANTLY!
+        } catch {
+          // Ignore parse errors and continue to fetch
+        }
+      }
+
+      // Background Revalidation: Fetch fresh profile silently without blocking UI
       try {
         const res = await fetch(
           `/api/profile?email=${encodeURIComponent(storedEmail)}&t=${Date.now()}`,
@@ -31,7 +45,7 @@ export function useAuthGuard() {
         );
 
         if (!res.ok) {
-          router.push("/onboarding");
+          if (!cachedProfile) router.push("/onboarding");
           return;
         }
 
@@ -44,6 +58,7 @@ export function useAuthGuard() {
 
         if (data.profile) {
           setProfile(data.profile);
+          localStorage.setItem("healthos_profile", JSON.stringify(data.profile));
           if (data.profile._id) {
             setUserId(data.profile._id);
             localStorage.setItem("healthos_userId", data.profile._id);

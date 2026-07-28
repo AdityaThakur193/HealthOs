@@ -44,9 +44,9 @@ async function connectDB(): Promise<typeof mongoose> {
   if (!cached.promise) {
     const opts: mongoose.ConnectOptions = {
       bufferCommands: true,          // Queue ops during brief reconnects (don't fail immediately)
-      serverSelectionTimeoutMS: 10000, // Allow 10s for Atlas to respond (free tier can be slow)
-      connectTimeoutMS: 10000,
-      socketTimeoutMS: 45000,        // Keep socket alive for 45s
+      serverSelectionTimeoutMS: 3000, // Tight 3s timeout for fast response & memory fallback
+      connectTimeoutMS: 3000,
+      socketTimeoutMS: 30000,        // Keep socket alive for 30s
       maxPoolSize: 10,               // Limit connections per serverless instance
       minPoolSize: 1,
       retryWrites: true,
