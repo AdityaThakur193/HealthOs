@@ -10,7 +10,7 @@
 [![Vitest Passed](https://img.shields.io/badge/Vitest-35%20Tests%20Passed-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 [![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas%20v8.0-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v3.4-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 <p align="center">
   Reversing the health tracking paradigm from a manual logging diary into an <b>automated, adaptive decision engine</b>.
@@ -204,6 +204,6 @@ Health OS maintains an automated **Vitest** test suite covering 35 unit, integra
 
 ## 📄 License & Attribution
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
+Distributed under the **GNU Affero General Public License v3.0 (AGPLv3)** with mandatory author attribution. Anyone modifying, distributing, or hosting this software must preserve original credits acknowledging **Aditya Thakur** as the original author and keep derivative works 100% open-source under AGPLv3. See [`LICENSE`](LICENSE) for details.
 
 Designed & Built with ❤️ by [Aditya Thakur](https://github.com/AdityaThakur193).
