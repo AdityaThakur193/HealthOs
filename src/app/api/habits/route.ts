@@ -19,7 +19,11 @@ let memoryHabitLogs: any[] = [];
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const email = searchParams.get("email") || "adityath2305@gmail.com";
+    const email = searchParams.get("email");
+
+    if (!email) {
+      return NextResponse.json({ error: "email query parameter is required" }, { status: 400 });
+    }
 
     let dbConnected = false;
     let userIdStr = "default_user";
@@ -154,7 +158,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, email = "adityath2305@gmail.com", habit, checkin } = body;
+    const { action, email, habit, checkin } = body;
+
+    if (!email) {
+      return NextResponse.json({ error: "email is required" }, { status: 400 });
+    }
 
     let dbConnected = false;
     let userIdStr = "default_user";

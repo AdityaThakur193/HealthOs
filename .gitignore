@@ -46,4 +46,12 @@ check_timeline.js
 *.log
 *.xlsx
 
+# build artifacts
+tsconfig.tsbuildinfo
+
+# internal developer / AI-agent configuration (not for public consumption)
+CLAUDE.md
+AGENTS.md
+PRODUCT_CONSTITUTION.md
+generate_badge.js
 
