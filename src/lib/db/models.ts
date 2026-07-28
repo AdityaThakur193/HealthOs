@@ -279,6 +279,74 @@ const AIMemorySchema = new Schema<IAIMemory>(
 AIMemorySchema.index({ userId: 1, layer: 1, key: 1 });
 
 /* ─────────────────────────────────────────────
+ * Habit Schemas
+ * ───────────────────────────────────────────── */
+
+export interface IHabitModel extends Document {
+  userId: mongoose.Types.ObjectId;
+  habitId: string;
+  title: string;
+  category: string;
+  targetType: "boolean" | "numeric" | "duration";
+  targetValue: number;
+  unit?: string;
+  frequency: "daily" | "weekdays" | "weekly_count";
+  weeklyTargetCount?: number;
+  colorTag: string;
+  icon: string;
+  status: "active" | "archived";
+  notes?: string;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const HabitSchema = new Schema<IHabitModel>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "UserProfile", required: true, index: true },
+    habitId: { type: String, required: true },
+    title: { type: String, required: true },
+    category: { type: String, default: "Misc" },
+    targetType: { type: String, enum: ["boolean", "numeric", "duration"], default: "boolean" },
+    targetValue: { type: Number, default: 1 },
+    unit: String,
+    frequency: { type: String, enum: ["daily", "weekdays", "weekly_count"], default: "daily" },
+    weeklyTargetCount: { type: Number, default: 7 },
+    colorTag: { type: String, default: "#34d399" },
+    icon: { type: String, default: "Sparkles" },
+    status: { type: String, enum: ["active", "archived"], default: "active" },
+    notes: String,
+    sortOrder: { type: Number, default: 1 },
+  },
+  { timestamps: true }
+);
+
+HabitSchema.index({ userId: 1, habitId: 1 }, { unique: true });
+
+export interface IHabitLogModel extends Document {
+  userId: mongoose.Types.ObjectId;
+  habitId: string;
+  date: string; // YYYY-MM-DD
+  completed: boolean;
+  value?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const HabitLogSchema = new Schema<IHabitLogModel>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "UserProfile", required: true, index: true },
+    habitId: { type: String, required: true, index: true },
+    date: { type: String, required: true, index: true },
+    completed: { type: Boolean, default: false },
+    value: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+
+HabitLogSchema.index({ userId: 1, habitId: 1, date: 1 }, { unique: true });
+
+/* ─────────────────────────────────────────────
  * Model Exports
  * ───────────────────────────────────────────── */
 
@@ -293,3 +361,11 @@ export const TimelineEvent: Model<ITimelineEvent> =
 export const AIMemory: Model<IAIMemory> =
   mongoose.models.AIMemory ||
   mongoose.model<IAIMemory>("AIMemory", AIMemorySchema);
+
+export const Habit: Model<IHabitModel> =
+  mongoose.models.Habit ||
+  mongoose.model<IHabitModel>("Habit", HabitSchema);
+
+export const HabitLog: Model<IHabitLogModel> =
+  mongoose.models.HabitLog ||
+  mongoose.model<IHabitLogModel>("HabitLog", HabitLogSchema);
