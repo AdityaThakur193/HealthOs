@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Camera, Dumbbell, TrendingUp, User } from "lucide-react";
+import { Home, Camera, Dumbbell, CheckSquare, TrendingUp, User } from "lucide-react";
 
 const tabs = [
   {
@@ -19,6 +19,11 @@ const tabs = [
     name: "Workout",
     href: "/workout",
     Icon: Dumbbell,
+  },
+  {
+    name: "Habits",
+    href: "/habits",
+    Icon: CheckSquare,
   },
   {
     name: "Journey",

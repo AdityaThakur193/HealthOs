@@ -328,6 +328,35 @@ export default function CoachChatFAB() {
         return;
       }
 
+      // ── 9. LOG HABIT ─────────────────────────────────────────────
+      if (action === "log_habit") {
+        const habitTitle = updatedData?.habitTitle || "";
+        const hRes = await fetch(`/api/habits?email=${encodeURIComponent(email)}`);
+        const hData = await hRes.json();
+        if (hData.success && hData.habits) {
+          const matched = hData.habits.find(
+            (h: any) => h.title.toLowerCase().includes(habitTitle.toLowerCase()) || habitTitle.toLowerCase().includes(h.title.toLowerCase())
+          );
+          if (matched) {
+            await fetch("/api/habits", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "checkin",
+                email,
+                checkin: {
+                  habitId: matched.id,
+                  completed: updatedData?.completed !== undefined ? updatedData.completed : true,
+                  value: updatedData?.value !== undefined ? updatedData.value : matched.targetValue,
+                },
+              }),
+            });
+            window.dispatchEvent(new Event("habitsUpdated"));
+          }
+        }
+        return;
+      }
+
     } catch (err) {
       console.error("Failed to sync chatbot action:", err);
     }
