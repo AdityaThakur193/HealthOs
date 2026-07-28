@@ -16,21 +16,9 @@
   Reversing the health tracking paradigm from a manual logging diary into an <b>automated, adaptive decision engine</b>.
 </p>
 
-[Explore Features](#-core-architectural-pillars) • [Visual Showcase](#-visual-feature-showcase) • [Architecture Specs](ARCHITECTURE.md) • [API Documentation](API.md) • [Getting Started](#-quickstart--setup) • [Contributing](CONTRIBUTING.md)
+[Explore Features](#-core-architectural-pillars) • [System Overview](#-system-architecture-overview) • [Architecture Specs](ARCHITECTURE.md) • [API Documentation](API.md) • [Getting Started](#-quickstart--setup) • [Contributing](CONTRIBUTING.md)
 
 </div>
-
----
-
-## 🎨 Visual Feature Showcase
-
-| Feature Module | Visual Interface | Description & Engine Impact |
-| :--- | :---: | :--- |
-| **Main Dashboard HUD** | ![Dashboard HUD](public/images/dashboard.png) | **Glassmorphic Command Center**: Displays real-time macro progression rings, 14-day adaptive TDEE expenditure, water/steps logging, and AI health coach insights. |
-| **AI Vision & IFCT 2017 Portion Engine** | ![AI Vision Meal Capture](public/images/meal_capture.png) | **Deterministic Food Recognition**: Detects dish items via Gemini 2.5 Flash, cross-references official ICMR-NIN IFCT 2017 portion data, and offers interactive `-` / `+` portion quantity sliders. |
-| **Progressive Overload Workout Tracker** | ![Workout Tracker HUD](public/images/workout_hud.jpg) | **Evidence-Based Gym Engine**: Supports 3 to 6-day splits, auto-calculates load progression (+2.5kg compound / +2.0kg isolation), and embeds exercise form video demos directly inside exercise cards. |
-| **Autonomous AI Coach Assistant** | ![AI Coach Chat Assistant](public/images/coach_ai.jpg) | **Action-First Conversational Agent**: Directly reads and writes to the unified database timeline (logging meals, steps, water, sleep, weight) via natural language chat. |
-| **Habit Tracker & Streak Analytics** | ![Habit Tracker HUD](public/images/habit_tracker.jpg) | **Daily Discipline & Habit Formation**: Tracks daily health habits, calculates streak streaks (🔥), and integrates with AI Coach for zero-friction habit check-ins. |
 
 ---
 
@@ -94,10 +82,15 @@ graph TD
   - Implements double progression logic: automatically calculates target weight increases (+2.5kg for compound / +2.0kg for isolation) when top rep targets are hit.
   - Curated YouTube exercise video timestamp links embedded directly into exercise cards.
 
-### 5. Habit Tracker & Daily Discipline Engine
+### 5. Autonomous AI Coach Assistant & Real-Time Data Control
+- **Engine Solution** (`src/components/CoachChatFAB.tsx` & `/api/coach/chat`):
+  - Action-first agent capable of parsing natural language to directly log meals, steps, water, sleep, weight, and habits.
+  - Interacts directly with the chronological MongoDB health timeline database.
+
+### 6. Habit Tracker & Daily Discipline Engine
 - **Engine Solution** (`src/lib/habitEngine.ts` & `/api/habits`):
   - Tracks daily health habits (hydration, sleep targets, prayer/meditation, physical activity).
-  - Calculates active streaks (🔥) and completion percentages.
+  - Calculates active streaks (🔥) and completion percentages using EWMA exponential habit scoring.
   - Fully integrated with Coach AI so users can check off habits via natural voice/text commands.
 
 ---
@@ -157,9 +150,7 @@ HealthOs/
 │   │   └── ci.yml                # GitHub Actions CI Workflow (Lint, Type-Check, Test, Build)
 │   ├── PULL_REQUEST_TEMPLATE.md  # Standard Pull Request Submission Template
 │   └── ISSUE_TEMPLATE/           # Bug Report & Feature Request Issue Templates
-├── public/
-│   ├── images/                   # High-Fidelity UI Interface Showcase Mockups
-│   └── sw.js                     # Static Assets & PWA Service Worker
+├── public/                       # Static Assets & PWA Service Worker (sw.js)
 ├── src/
 │   ├── app/                      # Next.js 16 App Router Pages & REST API Routes
 │   │   ├── api/                  # Serverless API Endpoints (/vision, /diet, /timeline, /habits, etc.)
