@@ -160,6 +160,7 @@ export function auditAndFixDietPlanMath(dietPlan: Record<string, any>): Record<s
   for (const [dayKey, dayData] of Object.entries(dietPlan)) {
     if (dayData && typeof dayData === "object" && Array.isArray((dayData as any).meals)) {
       const auditedMeals = (dayData as any).meals.map((meal: any) => {
+        if (!meal || typeof meal !== "object") return meal;
         let computedProtein = 0;
         let computedCalories = 0;
 
