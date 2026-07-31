@@ -129,10 +129,10 @@ export function getWeekSchedule(gymFrequency: number): { day: number; name: stri
  * Generates today's workout plan based on user specs and the day of week.
  */
 export function getTodaysWorkout(
-  profile: { gymFrequency?: number; gymExperience?: string; goal?: string },
+  profile?: { gymFrequency?: number; gymExperience?: string; goal?: string },
   dayOfWeek?: number
 ): WorkoutPlan {
-  const frequency = profile.gymFrequency ?? 4;
+  const frequency = profile?.gymFrequency ?? 4;
   const targetDay = dayOfWeek !== undefined ? dayOfWeek : new Date().getDay();
 
   // Find if today is scheduled as a workout
