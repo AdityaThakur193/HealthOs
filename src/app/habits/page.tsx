@@ -271,6 +271,24 @@ export default function HabitsPage() {
     });
   };
 
+  const handleResetHabits = async () => {
+    try {
+      const res = await fetch("/api/habits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reset",
+          email: email || "adityath2305@gmail.com",
+        }),
+      });
+      if (res.ok) {
+        fetchHabits();
+      }
+    } catch (err) {
+      console.error("Failed to reset habits:", err);
+    }
+  };
+
   const filteredHabits = selectedCategory === "All"
     ? habits
     : habits.filter((h) => h.category.toLowerCase() === selectedCategory.toLowerCase());
@@ -295,12 +313,21 @@ export default function HabitsPage() {
             Custom routines, exponential strength scoring & streaks
           </p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="px-3 py-2 rounded-xl bg-[#8ba893] hover:bg-[#8ba893]/90 text-[#0c0f0d] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-[#8ba893]/10 active:scale-95"
-        >
-          <Plus className="w-4 h-4" /> Add Habit
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleResetHabits}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border border-white/10 transition-all cursor-pointer text-xs flex items-center gap-1"
+            title="Reset to 100% Health Defaults"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="px-3 py-2 rounded-xl bg-[#8ba893] hover:bg-[#8ba893]/90 text-[#0c0f0d] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-[#8ba893]/10 active:scale-95"
+          >
+            <Plus className="w-4 h-4" /> New Habit
+          </button>
+        </div>
       </div>
 
       {/* AI Coach Insight */}
