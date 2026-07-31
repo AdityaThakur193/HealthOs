@@ -725,6 +725,32 @@ export default function ProfilePage() {
                 </div>
               </div>
 
+              {/* Target Goal Completion Estimator */}
+              {(() => {
+                const currentW = parseFloat(weightKg);
+                const targetW = parseFloat(targetWeightKg);
+                if (!isNaN(currentW) && !isNaN(targetW) && currentW !== targetW) {
+                  const diff = Math.abs(currentW - targetW);
+                  const weeks = Math.ceil(diff / 0.4);
+                  const estDate = new Date();
+                  estDate.setDate(estDate.getDate() + weeks * 7);
+                  const dateStr = estDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                  const isLoss = currentW > targetW;
+
+                  return (
+                    <div className="p-3 bg-[#8ba893]/10 border border-[#8ba893]/20 rounded-xl text-left space-y-1 my-2">
+                      <span className="text-[9px] font-extrabold text-[#8ba893] uppercase tracking-wider block">
+                        🎯 Target Goal Estimator
+                      </span>
+                      <p className="text-xs text-zinc-300 leading-relaxed">
+                        At a safe rate of 0.4kg/week, reaching your target of <strong>{targetW}kg</strong> ({isLoss ? "losing" : "gaining"} {diff.toFixed(1)}kg) will take approximately <strong>{weeks} weeks</strong> (Estimated completion: <strong>{dateStr}</strong>).
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Optional Body Measurements (Navy Body Fat Method) */}
               <div className="border-t border-white/5 pt-4 space-y-3">
                 <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Body Measurements (Optional)</h4>
