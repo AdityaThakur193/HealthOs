@@ -29,7 +29,12 @@ function getGenAI(): GoogleGenerativeAI {
  * to unlock 1,500 req/day at no charge within free limits.
  */
 function getVisionModel() {
-  return getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+  return getGenAI().getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+      temperature: 0.0, // Enforce zero-variance deterministic visual dish identification
+    },
+  });
 }
 
 /**

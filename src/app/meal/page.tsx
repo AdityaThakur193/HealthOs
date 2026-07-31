@@ -9,7 +9,7 @@ import { Camera, Edit3, AlertTriangle, Play, CheckCircle } from "lucide-react";
 import { compressImage } from "@/lib/imageUtils";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { motion, AnimatePresence } from "framer-motion";
-import { calculateFoodMacros } from "@/lib/ifctData";
+import { calculateFoodMacros, CAMPUS_PRESETS, type CampusPreset } from "@/lib/ifctData";
 
 interface FoodItem {
   name: string;
@@ -359,6 +359,37 @@ export default function MealCapture() {
           ) : (
             <GlassCard className="p-5 space-y-4 border border-white/10 relative overflow-hidden">
               <div className="absolute top-1/2 right-0 -translate-y-1/2 w-32 h-32 bg-cyan-500/5 blur-[50px] rounded-full -z-10" />
+              
+              {/* 1-Tap Campus Canteen Presets */}
+              <div className="space-y-2 pb-3 border-b border-white/5">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">
+                  1-Tap Campus Snacks & Supplements
+                </span>
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {CAMPUS_PRESETS.map((preset, pIdx) => (
+                    <button
+                      key={pIdx}
+                      type="button"
+                      onClick={() => {
+                        setManualName(preset.name);
+                        setManualCal(preset.calories.toString());
+                        setManualProt(preset.proteinG.toString());
+                        setManualCarbs(preset.carbsG.toString());
+                        setManualFats(preset.fatG.toString());
+                      }}
+                      className="flex-shrink-0 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-brand-500/30 transition-all text-left group cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-white flex items-center gap-1">
+                        <span>{preset.icon}</span> {preset.name}
+                      </span>
+                      <span className="text-[9px] text-zinc-400 block mt-0.5 font-mono">
+                        {preset.calories} kcal · {preset.proteinG}g P
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Log Custom Plate</h3>
               <div className="space-y-3">
                 <div>

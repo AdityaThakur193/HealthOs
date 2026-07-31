@@ -110,6 +110,8 @@ function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnalysis {
   };
 }
 
+const visionCache = new Map<string, MealAnalysis>();
+
 /**
  * POST /api/vision
  *
@@ -128,6 +130,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const imageKey = cleanBase64.slice(0, 100) + cleanBase64.slice(-100) + cleanBase64.length;
+
+    if (visionCache.has(imageKey)) {
+      console.log("⚡ Returning cached Vision Analysis result for identical image submission...");
+      return Response.json({ analysis: visionCache.get(imageKey)!, isMock: false });
+    }
+
     let analysis: MealAnalysis = getMockMealAnalysis();
     let isMock = false;
 
@@ -136,9 +146,9 @@ export async function POST(request: NextRequest) {
     if (geminiKey && geminiKey !== "your_gemini_api_key_here") {
       try {
         console.log("⚡ Analyzing meal using Structured Vision Contract + IFCT 2017 Engine...");
-        const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
         const rawAnalysis = await analyzeMealImage(cleanBase64, mimeType || "image/jpeg");
         analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
+        visionCache.set(imageKey, analysis);
       } catch (geminiError: any) {
         console.warn("⚠️ Vision API call failed, using mock fallback:", geminiError);
         analysis = getMockMealAnalysis();

@@ -292,11 +292,28 @@ export const IFCT_DATABASE: Record<string, IFCTItem> = {
   },
 };
 
+export interface CampusPreset {
+  name: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  icon: string;
+}
+
+export const CAMPUS_PRESETS: CampusPreset[] = [
+  { name: "Samosa", calories: 210, proteinG: 4.5, carbsG: 24, fatG: 11, icon: "🥟" },
+  { name: "Cutting Chai", calories: 90, proteinG: 2.1, carbsG: 12, fatG: 3.5, icon: "☕" },
+  { name: "Maggi", calories: 310, proteinG: 6.2, carbsG: 44, fatG: 12, icon: "🍜" },
+  { name: "Egg Roll", calories: 280, proteinG: 11.5, carbsG: 28, fatG: 13, icon: "🍳" },
+  { name: "1 Scoop Whey", calories: 120, proteinG: 24.0, carbsG: 2, fatG: 1, icon: "🥛" },
+];
+
 /**
  * Fuzzy matches a dish name against official IFCT database items
  */
-export function findIFCTItem(queryName: string): IFCTItem {
-  const clean = queryName.toLowerCase().trim();
+export function findIFCTItem(queryName: string = ""): IFCTItem {
+  const clean = (queryName || "").toLowerCase().trim();
 
   if (clean.includes("roti") || clean.includes("chapati") || clean.includes("phulka")) {
     return IFCT_DATABASE.roti;
