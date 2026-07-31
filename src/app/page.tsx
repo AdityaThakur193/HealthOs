@@ -326,6 +326,63 @@ export default function Dashboard() {
     }
   };
 
+  const handleQuickWater = async () => {
+    const userId = localStorage.getItem("healthos_userId");
+    if (!userId) return;
+
+    try {
+      const res = await fetch("/api/timeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          type: "water",
+          payload: { amountL: 0.25, glasses: 1 },
+          source: "manual",
+        }),
+      });
+
+      if (res.ok) {
+        await fetchDashboardData(userId);
+      }
+    } catch (err) {
+      console.error("Quick water log error", err);
+    }
+  };
+
+  const handleToggleExamSickMode = async (modeType: "exam" | "sick" | "normal") => {
+    const userId = localStorage.getItem("healthos_userId");
+    if (!userId) return;
+
+    try {
+      if (modeType === "normal") {
+        setActiveEvent(null);
+      } else {
+        const todayStr = new Date().toISOString().split("T")[0];
+        const res = await fetch("/api/timeline", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            type: "note",
+            payload: {
+              title: modeType === "exam" ? "Exam Period" : "Sick Day",
+              event_type: modeType,
+              startDate: todayStr,
+              endDate: todayStr,
+            },
+            source: "manual",
+          }),
+        });
+        if (res.ok) {
+          await fetchDashboardData(userId);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle mode:", err);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0c0f0d] text-white">
@@ -446,7 +503,7 @@ export default function Dashboard() {
             {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
           </span>
           <h1 className="text-xl font-bold text-white mt-1 font-heading leading-tight">{getGreeting()}, {profile?.name || "User"}</h1>
-          <div className="flex items-center gap-1.5 mt-2">
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             {streak > 0 && (
               <span className="px-2 py-0.5 rounded-md bg-[#c87a53]/10 border border-[#c87a53]/30 text-[8px] font-extrabold text-[#e29b74] uppercase tracking-wider flex items-center gap-1 font-mono">
                 <Flame className="w-3 h-3 text-[#c87a53]" /> {streak} {streak === 1 ? "Day" : "Days"}
@@ -467,6 +524,27 @@ export default function Dashboard() {
                 <Compass className="w-2.5 h-2.5 text-[#e29b74] animate-spin" style={{ animationDuration: '8s' }} /> Calibration ({daysRemaining}d)
               </button>
             )}
+            {/* 1-Tap Mode Toggle */}
+            <button
+              onClick={() => handleToggleExamSickMode(activeEvent?.payload?.event_type === "exam" ? "normal" : "exam")}
+              className={`px-2 py-0.5 rounded-md text-[8px] font-extrabold uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer font-mono ${
+                activeEvent?.payload?.event_type === "exam"
+                  ? "bg-purple-500/20 border border-purple-500/40 text-purple-300"
+                  : "bg-white/5 border border-white/10 text-zinc-400 hover:text-white"
+              }`}
+            >
+              <GraduationCap className="w-2.5 h-2.5" /> {activeEvent?.payload?.event_type === "exam" ? "Exams On" : "Exams"}
+            </button>
+            <button
+              onClick={() => handleToggleExamSickMode(activeEvent?.payload?.event_type === "sick" ? "normal" : "sick")}
+              className={`px-2 py-0.5 rounded-md text-[8px] font-extrabold uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer font-mono ${
+                activeEvent?.payload?.event_type === "sick"
+                  ? "bg-red-500/20 border border-red-500/40 text-red-300"
+                  : "bg-white/5 border border-white/10 text-zinc-400 hover:text-white"
+              }`}
+            >
+              <Activity className="w-2.5 h-2.5" /> {activeEvent?.payload?.event_type === "sick" ? "Sick On" : "Sick"}
+            </button>
           </div>
         </div>
 
@@ -506,6 +584,53 @@ export default function Dashboard() {
           </span>
         </div>
       )}
+
+      {/* Glanceable Status Pill & 1-Tap Quick Action Bar */}
+      <div className="space-y-3 animate-in-delay-1">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            {today.protein >= targetProt ? (
+              <span className="px-3 py-1 text-[11px] font-bold rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
+                🟢 On Track
+              </span>
+            ) : (
+              <span className="px-3 py-1 text-[11px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                🟡 Need {targetProt - today.protein}g Protein
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] text-zinc-500 font-mono">
+            {Math.max(0, targetCal - today.calories)} kcal remaining
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/meal")}
+            className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-brand-500/40 hover:bg-white/10 transition-all flex flex-col items-center justify-center gap-1 group cursor-pointer"
+          >
+            <Camera className="w-4 h-4 text-brand-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[10px] font-bold text-white">Scan Meal</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/workout")}
+            className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-500/40 hover:bg-white/10 transition-all flex flex-col items-center justify-center gap-1 group cursor-pointer"
+          >
+            <Dumbbell className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[10px] font-bold text-white">Workout HUD</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleQuickWater}
+            className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/40 hover:bg-white/10 transition-all flex flex-col items-center justify-center gap-1 group cursor-pointer"
+          >
+            <Droplet className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[10px] font-bold text-white">+250ml Water</span>
+          </button>
+        </div>
+      </div>
 
       {/* Bento Grid HUD Dashboard */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 animate-in-delay-1">

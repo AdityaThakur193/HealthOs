@@ -59,6 +59,47 @@ export async function GET(request: NextRequest) {
 }
 
 /**
+ * Strict Edge Case & Sanity Validator for Timeline Entries
+ */
+function validateTimelinePayload(type: string, payload: any): string | null {
+  if (!payload || typeof payload !== "object") return "Payload must be a valid object.";
+
+  if (type === "water") {
+    const amount = Number(payload.amountL);
+    if (isNaN(amount) || amount <= 0) return "Water amount must be greater than 0 L.";
+    if (amount > 10) return "Water intake cannot exceed 10 Liters in a single log for safety.";
+  }
+
+  if (type === "sleep") {
+    const hours = Number(payload.hours);
+    if (isNaN(hours) || hours <= 0) return "Sleep duration must be greater than 0.";
+    if (hours > 24) return "Sleep duration cannot exceed 24 hours in a single day.";
+  }
+
+  if (type === "steps") {
+    const count = Number(payload.count || payload.steps);
+    if (isNaN(count) || count < 0) return "Step count cannot be negative.";
+    if (count > 100000) return "Step count cannot exceed 100,000 steps in a single log.";
+  }
+
+  if (type === "weight") {
+    const weight = Number(payload.weightKg);
+    if (isNaN(weight) || weight < 25 || weight > 350) {
+      return "Weight measurement must be between 25 kg and 350 kg.";
+    }
+  }
+
+  if (type === "meal") {
+    const cal = Number(payload.totalCalories);
+    if (!isNaN(cal) && (cal < 0 || cal > 10000)) {
+      return "Meal calories must be between 0 and 10,000 kcal.";
+    }
+  }
+
+  return null; // Valid
+}
+
+/**
  * POST /api/timeline
  */
 export async function POST(request: NextRequest) {
@@ -70,6 +111,11 @@ export async function POST(request: NextRequest) {
       { error: "userId, type, and payload are required" },
       { status: 400 }
     );
+  }
+
+  const validationError = validateTimelinePayload(type, payload);
+  if (validationError) {
+    return Response.json({ error: validationError }, { status: 400 });
   }
 
   try {

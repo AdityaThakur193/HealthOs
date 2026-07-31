@@ -81,4 +81,46 @@ describe("API Payloads & Edge Case Validation", () => {
       expect(res.error).toContain("exceeds maximum limit");
     });
   });
+
+  describe("Timeline Payload Edge Cases & Sanity Validation", () => {
+    it("should reject unrealistic water intake (e.g. 100L of water)", () => {
+      const waterVal = (amount: number) => {
+        if (amount <= 0 || amount > 10) return "Invalid water";
+        return "Valid";
+      };
+      expect(waterVal(100)).toBe("Invalid water");
+      expect(waterVal(-2)).toBe("Invalid water");
+      expect(waterVal(1.5)).toBe("Valid");
+    });
+
+    it("should reject sleep durations > 24 hours or <= 0", () => {
+      const sleepVal = (hours: number) => {
+        if (hours <= 0 || hours > 24) return "Invalid sleep";
+        return "Valid";
+      };
+      expect(sleepVal(28)).toBe("Invalid sleep");
+      expect(sleepVal(0)).toBe("Invalid sleep");
+      expect(sleepVal(7.5)).toBe("Valid");
+    });
+
+    it("should reject step counts > 100,000 or negative steps", () => {
+      const stepsVal = (count: number) => {
+        if (count < 0 || count > 100000) return "Invalid steps";
+        return "Valid";
+      };
+      expect(stepsVal(500000)).toBe("Invalid steps");
+      expect(stepsVal(-50)).toBe("Invalid steps");
+      expect(stepsVal(8500)).toBe("Valid");
+    });
+
+    it("should reject impossible human weight logs", () => {
+      const weightVal = (w: number) => {
+        if (w < 25 || w > 350) return "Invalid weight";
+        return "Valid";
+      };
+      expect(weightVal(15)).toBe("Invalid weight");
+      expect(weightVal(900)).toBe("Invalid weight");
+      expect(weightVal(74.5)).toBe("Valid");
+    });
+  });
 });

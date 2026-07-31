@@ -47,5 +47,7 @@ describe("Workout Engine & Progressive Overload", () => {
   it("should fallback to 4-day split when gymFrequency is undefined or invalid", () => {
     const planDefault = getTodaysWorkout({}, 2); // Tuesday
     expect(planDefault.name).toBe("Tuesday — Upper A");
+    const planNull = getTodaysWorkout(undefined, 2);
+    expect(planNull.name).toBe("Tuesday — Upper A");
   });
 });

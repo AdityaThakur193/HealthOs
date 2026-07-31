@@ -85,13 +85,13 @@ export function calculateHabitStrength(logs: HabitLogEntry[], targetValue: numbe
 }
 
 /**
- * Calculates consecutive daily/weekday completion streak count
+ * Calculates consecutive daily/weekday completion streak count with 1-day Streak Protection Freeze
  */
 export function calculateCurrentStreak(
   logs: HabitLogEntry[],
   frequency: "daily" | "weekdays" | "weekly_count" = "daily"
-): { currentStreak: number; bestStreak: number } {
-  if (!logs || logs.length === 0) return { currentStreak: 0, bestStreak: 0 };
+): { currentStreak: number; bestStreak: number; freezeUsed?: boolean } {
+  if (!logs || logs.length === 0) return { currentStreak: 0, bestStreak: 0, freezeUsed: false };
 
   const completedDates = new Set<string>();
   logs.forEach((l) => {
@@ -106,25 +106,45 @@ export function calculateCurrentStreak(
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayKey = formatDateKey(yesterday);
 
-  // Determine starting anchor date for current streak (today or yesterday)
   let checkDate = new Date(today);
+  let freezesAvailable = 1; // 1 Streak Freeze buffer allowed
+  let freezeUsed = false;
+
   if (!completedDates.has(todayKey) && !completedDates.has(yesterdayKey)) {
-    // If not checked today or yesterday, check if yesterday was weekend for weekdays habit
     if (frequency === "weekdays") {
-      const dayOfWeek = today.getDay(); // 0 is Sun, 1 is Mon
+      const dayOfWeek = today.getDay();
       if (dayOfWeek === 1) { // Monday
         const friday = new Date(today);
         friday.setDate(friday.getDate() - 3);
         const fridayKey = formatDateKey(friday);
         if (!completedDates.has(todayKey) && !completedDates.has(fridayKey)) {
-          return { currentStreak: 0, bestStreak: calculateBestStreak(completedDates) };
+          if (freezesAvailable > 0) {
+            freezesAvailable--;
+            freezeUsed = true;
+            checkDate = friday;
+          } else {
+            return { currentStreak: 0, bestStreak: calculateBestStreak(completedDates), freezeUsed: false };
+          }
+        } else {
+          checkDate = completedDates.has(todayKey) ? today : friday;
         }
-        checkDate = completedDates.has(todayKey) ? today : friday;
       } else {
-        return { currentStreak: 0, bestStreak: calculateBestStreak(completedDates) };
+        if (freezesAvailable > 0) {
+          freezesAvailable--;
+          freezeUsed = true;
+          checkDate = yesterday;
+        } else {
+          return { currentStreak: 0, bestStreak: calculateBestStreak(completedDates), freezeUsed: false };
+        }
       }
     } else {
-      return { currentStreak: 0, bestStreak: calculateBestStreak(completedDates) };
+      if (freezesAvailable > 0) {
+        freezesAvailable--;
+        freezeUsed = true;
+        checkDate = yesterday;
+      } else {
+        return { currentStreak: 0, bestStreak: calculateBestStreak(completedDates), freezeUsed: false };
+      }
     }
   } else if (!completedDates.has(todayKey) && completedDates.has(yesterdayKey)) {
     checkDate = yesterday;
@@ -138,7 +158,6 @@ export function calculateCurrentStreak(
     const isWeekend = curr.getDay() === 0 || curr.getDay() === 6;
 
     if (frequency === "weekdays" && isWeekend) {
-      // Skip weekend check for weekday habits
       curr.setDate(curr.getDate() - 1);
       continue;
     }
@@ -146,13 +165,18 @@ export function calculateCurrentStreak(
     if (completedDates.has(key)) {
       streak++;
       curr.setDate(curr.getDate() - 1);
+    } else if (freezesAvailable > 0 && streak > 0) {
+      // Consume 1 streak freeze buffer for mid-streak missed day
+      freezesAvailable--;
+      freezeUsed = true;
+      curr.setDate(curr.getDate() - 1);
     } else {
       break;
     }
   }
 
   const bestStreak = Math.max(streak, calculateBestStreak(completedDates));
-  return { currentStreak: streak, bestStreak };
+  return { currentStreak: streak, bestStreak, freezeUsed };
 }
 
 /**
@@ -221,31 +245,16 @@ export function get30DayHeatmap(
 }
 
 /**
- * Preset starter templates users can customize or delete
+ * Preset starter templates users can customize or delete.
+ * Focused 100% on physical health, nutrition, sleep, and recovery.
  */
 export function getStarterHabits(userId: string): HabitDefinition[] {
   const now = new Date().toISOString();
   return [
     {
-      id: "habit_pray_5",
+      id: "habit_mess_clean",
       userId,
-      title: "Pray 5 Times Daily",
-      category: "Spiritual",
-      targetType: "numeric",
-      targetValue: 5,
-      unit: "prayers",
-      frequency: "daily",
-      colorTag: "#a78bfa", // Purple
-      icon: "Sparkles",
-      status: "active",
-      notes: "Daily 5 prayers for spiritual discipline",
-      sortOrder: 1,
-      createdAt: now,
-    },
-    {
-      id: "habit_mess_food",
-      userId,
-      title: "Only Mess Food (No Junk)",
+      title: "Clean Nutrition (No Outside Junk)",
       category: "Health",
       targetType: "boolean",
       targetValue: 1,
@@ -253,38 +262,53 @@ export function getStarterHabits(userId: string): HabitDefinition[] {
       colorTag: "#34d399", // Emerald Green
       icon: "Soup",
       status: "active",
-      notes: "Stick to clean mess meals without outside junk",
+      notes: "Stick to clean mess & planned meals without unlogged junk snacks",
+      sortOrder: 1,
+      createdAt: now,
+    },
+    {
+      id: "habit_hydration",
+      userId,
+      title: "3.5L Daily Hydration",
+      category: "Health",
+      targetType: "numeric",
+      targetValue: 3.5,
+      unit: "L",
+      frequency: "daily",
+      colorTag: "#38bdf8", // Sky Blue
+      icon: "Droplet",
+      status: "active",
+      notes: "Maintain optimal hydration for metabolic performance",
       sortOrder: 2,
       createdAt: now,
     },
     {
-      id: "habit_leetcode",
+      id: "habit_sleep_hygiene",
       userId,
-      title: "Min 5 Leetcode Problems",
-      category: "Career",
-      targetType: "numeric",
-      targetValue: 5,
-      unit: "problems",
+      title: "Screen-Free 30m Before Bed",
+      category: "Health",
+      targetType: "boolean",
+      targetValue: 1,
       frequency: "daily",
-      colorTag: "#38bdf8", // Sky Blue
-      icon: "Code",
+      colorTag: "#a78bfa", // Purple
+      icon: "Moon",
       status: "active",
-      notes: "Consistent DSA problem solving for interview prep",
+      notes: "Wind down without blue light for deep sleep recovery",
       sortOrder: 3,
       createdAt: now,
     },
     {
-      id: "habit_self_growth",
+      id: "habit_mindful_stretch",
       userId,
-      title: "Better Than Yesterday",
-      category: "Self Growth",
+      title: "10m Stretch & Mobility",
+      category: "Health",
       targetType: "boolean",
       targetValue: 1,
       frequency: "daily",
       colorTag: "#fbbf24", // Amber
       icon: "TrendingUp",
       status: "active",
-      notes: "1% improvement in communication, skills, or mindset daily",
+      notes: "Morning or post-workout mobility to prevent stiffness & injury",
       sortOrder: 4,
       createdAt: now,
     },

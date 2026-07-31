@@ -287,31 +287,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, habitId: hId, message: "Custom habit saved successfully" });
     }
 
-    // ── ACTION 3: DELETE / ARCHIVE ──────────────────────────────────────────
-    if (action === "delete" || action === "archive") {
-      const { habitId } = body;
-      if (!habitId) {
-        return NextResponse.json({ success: false, error: "Missing habitId" }, { status: 400 });
-      }
-
+    // ── ACTION 4: RESET HABITS DATA ───────────────────────────────────────
+    if (action === "reset") {
       if (dbConnected && userObjectId) {
-        if (action === "delete") {
-          await Habit.deleteOne({ userId: userObjectId, habitId });
-          await HabitLog.deleteMany({ userId: userObjectId, habitId });
-        } else {
-          await Habit.findOneAndUpdate({ userId: userObjectId, habitId }, { status: "archived" });
+        await Habit.deleteMany({ userId: userObjectId });
+        await HabitLog.deleteMany({ userId: userObjectId });
+        const starter = getStarterHabits(userIdStr);
+        for (const s of starter) {
+          await Habit.create({
+            userId: userObjectId,
+            habitId: s.id,
+            title: s.title,
+            category: s.category,
+            targetType: s.targetType,
+            targetValue: s.targetValue,
+            unit: s.unit,
+            frequency: s.frequency,
+            colorTag: s.colorTag,
+            icon: s.icon,
+            status: s.status,
+            notes: s.notes,
+            sortOrder: s.sortOrder,
+          });
         }
       } else {
-        if (action === "delete") {
-          memoryHabits = memoryHabits.filter((h) => h.id !== habitId && h.habitId !== habitId);
-          memoryHabitLogs = memoryHabitLogs.filter((l) => l.habitId !== habitId);
-        } else {
-          const h = memoryHabits.find((x) => x.id === habitId || x.habitId === habitId);
-          if (h) h.status = "archived";
-        }
+        memoryHabits = getStarterHabits(userIdStr);
+        memoryHabitLogs = [];
       }
 
-      return NextResponse.json({ success: true, message: `Habit ${action}d successfully` });
+      return NextResponse.json({ success: true, message: "Habit data successfully reset and re-seeded with 100% health defaults." });
     }
 
     return NextResponse.json({ success: false, error: "Invalid action specified" }, { status: 400 });

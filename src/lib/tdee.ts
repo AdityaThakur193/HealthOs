@@ -73,11 +73,13 @@ export function calculateAdaptiveTdee(profile: any, events: any[]): TDEEResult {
   // x is time in fractional days since fourteenDaysAgo
   // y is weight in kg
   const t0 = fourteenDaysAgo.getTime();
-  const dataPoints = weightLogs.map((log) => {
-    const timeDiffDays = (new Date(log.timestamp).getTime() - t0) / (24 * 60 * 60 * 1000);
-    const weight = Number(log.payload?.weightKg);
-    return { x: timeDiffDays, y: weight };
-  });
+  const dataPoints = weightLogs
+    .map((log) => {
+      const timeDiffDays = (new Date(log.timestamp).getTime() - t0) / (24 * 60 * 60 * 1000);
+      const weight = Number(log.payload?.weightKg);
+      return { x: timeDiffDays, y: weight };
+    })
+    .filter((pt) => !isNaN(pt.y) && pt.y > 0);
 
   let sumX = 0;
   let sumY = 0;

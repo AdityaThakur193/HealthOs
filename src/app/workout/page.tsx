@@ -153,6 +153,19 @@ export default function WorkoutTracker() {
         if (ex.id === exerciseId) {
           const newSets = [...ex.sets];
           newSets[setIndex] = { ...newSets[setIndex], weight: safeWeight, reps: safeReps };
+          
+          // Gym Set Auto-Fill: If updating Set 1 (index 0), auto-fill weight/reps for uncompleted subsequent sets
+          if (setIndex === 0) {
+            for (let i = 1; i < newSets.length; i++) {
+              if (!newSets[i].completed) {
+                newSets[i] = {
+                  ...newSets[i],
+                  weight: safeWeight > 0 ? safeWeight : newSets[i].weight,
+                  reps: safeReps > 0 ? safeReps : newSets[i].reps,
+                };
+              }
+            }
+          }
           return { ...ex, sets: newSets };
         }
         return ex;
