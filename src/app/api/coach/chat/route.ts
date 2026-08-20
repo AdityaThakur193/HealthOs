@@ -38,18 +38,33 @@ export async function POST(request: NextRequest) {
     const gymExperience = profile?.gymExperience || "intermediate";
     const workoutSchedule = getWeekSchedule(gymFrequency);
 
+    const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    const todayName = days[new Date().getDay()];
+    
+    // Extract today's plan & mess menu
+    const todayDiet = activeDietPlan ? activeDietPlan[todayName] : null;
+    const todayMess = activeMessMenu ? activeMessMenu[todayName] : null;
+
+    // Create ultra-compact weekly summary
+    let weeklySummaryStr = "";
+    if (activeDietPlan) {
+      weeklySummaryStr = Object.keys(activeDietPlan).map(day => {
+        const d = activeDietPlan[day];
+        const mealsSummary = (d?.meals || []).map((m: any) => m.name + ": " + (m.messItems || "").split("\n")[0].replace("• ", "")).join(" | ");
+        return `${day.toUpperCase()}: ${mealsSummary}`;
+      }).join("\n");
+    }
+
     const systemPrompt = `You are the Health OS Personal AI Coach — a fully autonomous health data agent with COMPLETE control over the user's health app. You can read and write all health data: meals, steps, water, sleep, weight, and workout logs. You are not just a conversational assistant — you are an ACTION-FIRST agent. Whenever the user mentions any health data, you MUST capture it and write it to the database immediately.
 
 User Profile:
 - Name: ${name} | Age: ${age} | Height: ${height}cm | Weight: ${weight}kg
 - Goal: "${goal}" | Daily Targets: ${targetCalories} kcal, ${targetProtein}g protein
-- Schedule: ${collegeSchedule}
-- Strict Mess Mode: ${strictMessOnly ? "ACTIVE — only mess menu items allowed, no external purchases" : "INACTIVE — all food sources allowed"}
-- Gym Frequency: ${gymFrequency} days/week
-- Gym Experience: ${gymExperience}
-- Workout Split Schedule: ${JSON.stringify(workoutSchedule, null, 2)}
-- Active Mess Menu: ${JSON.stringify(activeMessMenu, null, 2)}
-- Active Diet Plan: ${JSON.stringify(activeDietPlan, null, 2)}
+- Schedule: ${collegeSchedule} | Strict Mess Mode: ${strictMessOnly ? "ACTIVE" : "INACTIVE"}
+- Gym: ${gymFrequency} days/week (${gymExperience}) | Split: ${JSON.stringify(workoutSchedule)}
+- Today (${todayName}): Mess: ${todayMess ? JSON.stringify(todayMess) : "N/A"} | Plan: ${todayDiet ? JSON.stringify(todayDiet) : "N/A"}
+- Full Weekly Diet Overview:
+${weeklySummaryStr || "Standard 2200 kcal High Protein Mess Plan"}
 
 ════════════════════════════════════════════
 FULL DATA CONTROL — ACTIONS YOU CAN TAKE
@@ -140,7 +155,8 @@ RESPONSE FORMAT — RETURN ONLY VALID JSON
 
 CRITICAL: Return ONLY the JSON object. No text before or after. No markdown wrapping.`;
 
-    const formattedHistory = (history || []).map((msg: any) => {
+    const recentHistory = (history || []).slice(-6);
+    const formattedHistory = recentHistory.map((msg: any) => {
       return `${msg.role === "user" ? "User" : "Coach"}: ${msg.content}`;
     }).join("\n");
 
@@ -164,7 +180,7 @@ CRITICAL: Return ONLY the JSON object. No text before or after. No markdown wrap
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
+            model: "openai/gpt-oss-20b",
             messages: [{ role: "user", content: fullPrompt }],
             response_format: { type: "json_object" },
             temperature: 0.7,
@@ -174,7 +190,7 @@ CRITICAL: Return ONLY the JSON object. No text before or after. No markdown wrap
         if (groqRes.ok) {
           const groqData = await groqRes.json();
           responseText = groqData.choices[0]?.message?.content || "";
-          console.log("✅ Successfully fell back to Groq Llama-3.3 for chatbot response.");
+          console.log("✅ Successfully fell back to Groq for chatbot response.");
         } else {
           const errText = await groqRes.text();
           throw new Error(`Groq fallback failed (${groqRes.status}): ${errText}`);
