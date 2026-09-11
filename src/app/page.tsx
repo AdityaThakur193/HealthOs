@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ProgressRing from "@/components/ProgressRing";
@@ -21,11 +21,14 @@ interface TodayState {
   sleepHours: number;
   steps: number;
   waterL: number;
+  burnedToday: number;
 }
 
 export default function Dashboard() {
   const router = useRouter();
   const { profile, setProfile, userId, loading: authLoading } = useAuthGuard();
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
   const [today, setToday] = useState<TodayState>({
     calories: 0,
     protein: 0,
@@ -35,6 +38,7 @@ export default function Dashboard() {
     sleepHours: 0,
     steps: 0,
     waterL: 0,
+    burnedToday: 0,
   });
   const [coachData, setCoachData] = useState<any>(null);
   const [coachLoading, setCoachLoading] = useState(true);
@@ -172,6 +176,7 @@ export default function Dashboard() {
         let sleep = 0;
         let stepCount = 0;
         let water = 0;
+        let burned = 0;
 
         events.forEach((event: any) => {
           // Check if event is from today
@@ -185,10 +190,13 @@ export default function Dashboard() {
               fatsVal += event.payload.totalFatG || event.payload.foods?.reduce((s: number, f: any) => s + (Number(f.fatG) || 0), 0) || 0;
             } else if (event.type === "workout") {
               wDone = true;
+              burned += Number(event.payload.caloriesBurned) || 0;
             } else if (event.type === "sleep") {
               sleep = Number(event.payload.hours) || 0;
             } else if (event.type === "steps") {
-              stepCount += Number(event.payload.count || event.payload.steps) || 0;
+              const count = Number(event.payload.count || event.payload.steps) || 0;
+              stepCount += count;
+              burned += Number(event.payload.caloriesBurned) || Math.round(count * 0.04);
             } else if (event.type === "water") {
               water += event.payload.amountL || 0;
             }
@@ -202,6 +210,15 @@ export default function Dashboard() {
         );
         setTodayEvents(todaysLogs);
 
+        let bmr = Number(profileRef.current?.bmr) || 0;
+        if (!bmr && typeof window !== "undefined") {
+          try {
+            const cached = localStorage.getItem("healthos_profile");
+            if (cached) bmr = Number(JSON.parse(cached)?.bmr) || 0;
+          } catch {}
+        }
+        const burnedToday = Math.round(bmr + burned);
+
         setToday({
           calories: Math.round(cal),
           protein: Math.round(prot),
@@ -211,6 +228,7 @@ export default function Dashboard() {
           sleepHours: Math.round(sleep * 10) / 10,
           steps: Math.round(stepCount),
           waterL: Math.round(water * 10) / 10,
+          burnedToday,
         });
       }
 
@@ -658,9 +676,21 @@ export default function Dashboard() {
               label=""
             />
           </div>
-          <div className="mt-4 flex items-baseline gap-2 text-left">
-            <span className="text-2xl font-black text-white font-heading tracking-tight">{today.calories}</span>
-            <span className="text-xs text-zinc-500 font-mono">/ {targetCal} kcal</span>
+          <div className="mt-4 flex items-end justify-between text-left">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black text-white font-heading tracking-tight">{today.calories}</span>
+              <span className="text-xs text-zinc-500 font-mono">/ {targetCal} kcal</span>
+            </div>
+            <div className="text-right text-[10px] font-mono text-zinc-400 space-y-0.5">
+              <div>Burned: <span className="text-emerald-400 font-bold">{today.burnedToday}</span> kcal</div>
+              <div>Net: <span className={today.calories - today.burnedToday > 0 ? "text-amber-400 font-bold" : "text-emerald-400 font-bold"}>
+                {today.calories - today.burnedToday > 0
+                  ? `+${today.calories - today.burnedToday} kcal (Surplus)`
+                  : today.calories - today.burnedToday < 0
+                  ? `${today.calories - today.burnedToday} kcal (Deficit)`
+                  : "0 kcal (Balanced)"}
+              </span></div>
+            </div>
           </div>
         </GlassCard>
 
@@ -1063,7 +1093,7 @@ export default function Dashboard() {
                   onClick={() => {
                     const count = parseInt(stepsInput);
                     if (count > 0) {
-                      handleQuickLog("steps", { count });
+                      handleQuickLog("steps", { count, steps: count, caloriesBurned: Math.round(count * 0.04) });
                       setStepsInput("");
                       setActiveForm("none");
                     }
@@ -1202,6 +1232,9 @@ export default function Dashboard() {
                       <span className="font-bold text-cyan-400">{profile?.tdee} kcal</span>
                     </div>
                   </div>
+                  <p className="text-[10px] text-zinc-400 leading-snug border-l-2 border-cyan-500/40 pl-2 mt-2">
+                    💡 <strong>Maintenance vs Daily Burn:</strong> This 14-day Adaptive TDEE is your smoothed baseline maintenance level. Your dashboard &quot;Burned Today&quot; reflects real-time expenditure (BMR + today&apos;s logged steps and workouts) and naturally fluctuates daily.
+                  </p>
                 </>
               ) : (
                 <>
@@ -1224,6 +1257,9 @@ export default function Dashboard() {
                   </div>
                   <p className="text-[10px] text-zinc-500 leading-snug">
                     💡 Tip: Try to log your morning weight and track every meal. Inconsistent logging extends calibration.
+                  </p>
+                  <p className="text-[10px] text-zinc-400 leading-snug border-l-2 border-amber-500/40 pl-2 mt-2">
+                    💡 <strong>Estimated BMR:</strong> Your resting metabolic rate is currently estimated at {profile?.bmr ? `${profile.bmr} kcal/day` : "your profile baseline"}. Real-time daily burn on your dashboard adds your logged steps and exercise to this baseline.
                   </p>
                 </>
               )}
@@ -1278,7 +1314,7 @@ export default function Dashboard() {
                 <div className="p-3 bg-white/5 rounded-xl space-y-2 text-[11px]">
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Your Base Metabolism (BMR):</span>
-                    <span className="font-semibold text-white">{profile?.bmr || 1964} kcal</span>
+                    <span className="font-semibold text-white">{profile?.bmr ? `${profile.bmr} kcal` : "—"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Activity Level Factor:</span>

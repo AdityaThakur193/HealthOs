@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 /**
  * Mirror of the dashboard aggregation logic in src/app/page.tsx
  */
-function aggregateEvents(events: any[], targetDate: Date = new Date()) {
+function aggregateEvents(events: any[], targetDate: Date = new Date(), bmr: number = 0) {
   const targetDateStr = targetDate.toDateString();
   let cal = 0;
   let prot = 0;
@@ -13,6 +13,7 @@ function aggregateEvents(events: any[], targetDate: Date = new Date()) {
   let sleep = 0;
   let stepCount = 0;
   let water = 0;
+  let burned = 0;
 
   events.forEach((event: any) => {
     const eventDate = new Date(event.timestamp).toDateString();
@@ -24,10 +25,13 @@ function aggregateEvents(events: any[], targetDate: Date = new Date()) {
         fatsVal += event.payload.totalFatG || event.payload.foods?.reduce((s: number, f: any) => s + (Number(f.fatG) || 0), 0) || 0;
       } else if (event.type === "workout") {
         wDone = true;
+        burned += Number(event.payload.caloriesBurned) || 0;
       } else if (event.type === "sleep") {
         sleep = Number(event.payload.hours) || 0;
       } else if (event.type === "steps") {
-        stepCount += Number(event.payload.count || event.payload.steps) || 0;
+        const count = Number(event.payload.count || event.payload.steps) || 0;
+        stepCount += count;
+        burned += Number(event.payload.caloriesBurned) || Math.round(count * 0.04);
       } else if (event.type === "water") {
         water += event.payload.amountL || 0;
       }
@@ -43,6 +47,7 @@ function aggregateEvents(events: any[], targetDate: Date = new Date()) {
     sleepHours: Math.round(sleep * 10) / 10,
     steps: Math.round(stepCount),
     waterL: Math.round(water * 10) / 10,
+    burnedToday: Math.round(bmr + burned),
   };
 }
 
@@ -120,6 +125,39 @@ describe("Dashboard Daily Stats Aggregation", () => {
 
     const stats = aggregateEvents(events, today);
     expect(stats.steps).toBe(3000);
+  });
+
+  it("should calculate burnedToday as BMR + steps caloriesBurned + workout caloriesBurned", () => {
+    const bmr = 2241;
+    const events = [
+      {
+        type: "steps",
+        timestamp: today.toISOString(),
+        payload: { count: 8500, caloriesBurned: 340 },
+      },
+      {
+        type: "workout",
+        timestamp: today.toISOString(),
+        payload: { workoutType: "Push Day", durationMin: 60, caloriesBurned: 420 },
+      },
+    ];
+
+    const stats = aggregateEvents(events, today, bmr);
+    expect(stats.burnedToday).toBe(3001); // 2241 + 340 + 420 = 3001
+  });
+
+  it("should fallback to steps * 0.04 when steps event lacks explicit caloriesBurned", () => {
+    const bmr = 2000;
+    const events = [
+      {
+        type: "steps",
+        timestamp: today.toISOString(),
+        payload: { count: 5000 }, // 5000 * 0.04 = 200
+      },
+    ];
+
+    const stats = aggregateEvents(events, today, bmr);
+    expect(stats.burnedToday).toBe(2200); // 2000 + 200 = 2200
   });
 });
 
