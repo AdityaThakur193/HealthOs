@@ -10,7 +10,7 @@ export interface IFCTItem {
   id: string;
   name: string;
   category: "cereal" | "pulse" | "dairy" | "meat" | "vegetable" | "snack" | "supplement";
-  standardUnit: "piece" | "katori" | "scoop" | "gram" | "plate";
+  standardUnit: "piece" | "katori" | "scoop" | "gram" | "plate" | "serving";
   unitWeightGrams: number;
   // Per 100g cooked/edible values
   caloriesPer100g: number;
@@ -202,7 +202,7 @@ export const IFCT_DATABASE: Record<string, IFCTItem> = {
     id: "paneer_raw",
     name: "Paneer (Fresh Cottage Cheese)",
     category: "dairy",
-    standardUnit: "gram",
+    standardUnit: "serving",
     unitWeightGrams: 100,
     caloriesPer100g: 305,
     proteinGPer100g: 18.9,
@@ -259,7 +259,7 @@ export const IFCT_DATABASE: Record<string, IFCTItem> = {
     id: "chicken_breast",
     name: "Boiled / Grilled Chicken Breast",
     category: "meat",
-    standardUnit: "gram",
+    standardUnit: "serving",
     unitWeightGrams: 100,
     caloriesPer100g: 150,
     proteinGPer100g: 31.0,
@@ -312,17 +312,38 @@ export const CAMPUS_PRESETS: CampusPreset[] = [
 /**
  * Fuzzy matches a dish name against official IFCT database items
  */
-export function findIFCTItem(queryName: string = ""): IFCTItem {
+export function findIFCTItem(queryName: string = ""): IFCTItem | null {
   const clean = (queryName || "").toLowerCase().trim();
 
+  // 1. Cereals & Breads
   if (clean.includes("roti") || clean.includes("chapati") || clean.includes("phulka")) {
     return IFCT_DATABASE.roti;
   }
-  if (clean.includes("dal makhani") || clean.includes("makhni")) {
-    return IFCT_DATABASE.dal_makhani;
+  if (clean.includes("brown rice")) {
+    return IFCT_DATABASE.brown_rice_cooked;
   }
-  if (clean.includes("toor") || clean.includes("arhar") || clean.includes("yellow dal") || clean.includes("dal")) {
-    return IFCT_DATABASE.dal_toor;
+  if (clean.includes("rice") || clean.includes("chawal")) {
+    return IFCT_DATABASE.rice_cooked;
+  }
+  if (clean.includes("poha")) {
+    return IFCT_DATABASE.poha;
+  }
+  if (clean.includes("upma")) {
+    return IFCT_DATABASE.upma;
+  }
+  if (clean.includes("idli")) {
+    return IFCT_DATABASE.idli;
+  }
+  if (clean.includes("masala dosa") || clean.includes("dosa masala")) {
+    return IFCT_DATABASE.dosa_masala;
+  }
+  if (clean.includes("dosa")) {
+    return IFCT_DATABASE.dosa_plain;
+  }
+
+  // 2. Pulses & Dals (Specific varieties must precede generic "dal")
+  if (clean.includes("dal makhani") || clean.includes("makhni") || clean.includes("makhani")) {
+    return IFCT_DATABASE.dal_makhani;
   }
   if (clean.includes("moong")) {
     return IFCT_DATABASE.dal_moong;
@@ -333,21 +354,34 @@ export function findIFCTItem(queryName: string = ""): IFCTItem {
   if (clean.includes("chole") || clean.includes("chana")) {
     return IFCT_DATABASE.chole_curry;
   }
-  if (clean.includes("brown rice")) {
-    return IFCT_DATABASE.brown_rice_cooked;
+  if (clean.includes("toor") || clean.includes("arhar") || clean.includes("yellow dal") || clean.includes("dal")) {
+    return IFCT_DATABASE.dal_toor;
   }
-  if (clean.includes("rice") || clean.includes("chawal")) {
-    return IFCT_DATABASE.rice_cooked;
-  }
+
+  // 3. Dairy & Liquid Nutrition
   if (clean.includes("curd") || clean.includes("dahi") || clean.includes("yogurt")) {
     return IFCT_DATABASE.curd;
   }
-  if (clean.includes("paneer sabzi") || clean.includes("paneer butter") || clean.includes("shahi paneer")) {
+  if (
+    clean.includes("paneer sabzi") ||
+    clean.includes("paneer butter") ||
+    clean.includes("shahi paneer") ||
+    clean.includes("paneer gravy") ||
+    clean.includes("paneer curry") ||
+    clean.includes("matar paneer") ||
+    clean.includes("palak paneer") ||
+    clean.includes("kadai paneer")
+  ) {
     return IFCT_DATABASE.paneer_gravy;
   }
   if (clean.includes("paneer")) {
     return IFCT_DATABASE.paneer_raw;
   }
+  if (clean.includes("milk") || clean.includes("doodh")) {
+    return IFCT_DATABASE.milk_toned;
+  }
+
+  // 4. Meat, Eggs & Poultry (Specific cuts/parts before generic)
   if (clean.includes("egg white") || clean.includes("egg-white")) {
     return IFCT_DATABASE.egg_white;
   }
@@ -360,24 +394,25 @@ export function findIFCTItem(queryName: string = ""): IFCTItem {
   if (clean.includes("chicken")) {
     return IFCT_DATABASE.chicken_curry;
   }
+
+  // 5. Supplements
   if (clean.includes("whey")) {
     return IFCT_DATABASE.whey_protein;
   }
-  if (clean.includes("poha")) {
-    return IFCT_DATABASE.poha;
-  }
-  if (clean.includes("upma")) {
-    return IFCT_DATABASE.upma;
-  }
-  if (clean.includes("idli")) {
-    return IFCT_DATABASE.idli;
-  }
-  if (clean.includes("dosa")) {
-    return IFCT_DATABASE.dosa_plain;
-  }
 
-  // Fallback to Toor Dal if unspecified pulse/soup, or Cooked Rice
-  return IFCT_DATABASE.rice_cooked;
+  // No matching IFCT dish found
+  return null;
+}
+
+/**
+ * Sensible upper bounds on single-serving meal quantities per unit to prevent VLM hallucinations
+ */
+export function getMaxUnitQuantity(unit: string = ""): number {
+  const u = (unit || "").toLowerCase().trim();
+  if (u === "gram" || u === "grams") return 800;
+  if (u === "scoop" || u === "scoops") return 3;
+  if (u === "katori" || u === "bowl" || u === "plate" || u === "serving") return 4;
+  return 8; // default cap for "piece" and other discrete items (rotis, eggs, idlis, dosas)
 }
 
 /**
@@ -398,10 +433,31 @@ export function calculateFoodMacros(
   proteinG: number;
   carbsG: number;
   fatG: number;
+  matched: boolean;
+  quantityClamped: boolean;
 } {
   const item = findIFCTItem(dishName);
-  const qty = Math.max(0.25, Number(quantity) || 1);
-  const finalUnit = unitType || item.standardUnit;
+  const rawQty = Math.max(0.25, Number(quantity) || 1);
+  const finalUnit = unitType || (item ? item.standardUnit : "piece");
+  const maxCap = getMaxUnitQuantity(finalUnit);
+  const quantityClamped = rawQty > maxCap;
+  const qty = quantityClamped ? maxCap : rawQty;
+
+  if (!item) {
+    return {
+      id: "unmatched",
+      name: dishName || "Unknown Food",
+      quantity: qty,
+      unitType: finalUnit,
+      weightGrams: 0,
+      calories: 0,
+      proteinG: 0,
+      carbsG: 0,
+      fatG: 0,
+      matched: false,
+      quantityClamped,
+    };
+  }
 
   // Calculate total weight in grams
   let totalWeightGrams = item.unitWeightGrams * qty;
@@ -439,5 +495,7 @@ export function calculateFoodMacros(
     proteinG,
     carbsG,
     fatG,
+    matched: true,
+    quantityClamped,
   };
 }
