@@ -76,4 +76,69 @@ describe("ICMR-NIN IFCT 2017 Portion Engine", () => {
     expect(res.fatG).toBe(0);
     expect(res.weightGrams).toBe(0);
   });
+
+  it("should correctly resolve moong dal to dal_moong instead of shadowing to dal_toor", () => {
+    const item = findIFCTItem("moong dal");
+    expect(item).not.toBeNull();
+    expect(item?.id).toBe("dal_moong");
+    expect(item?.name).toContain("Moong");
+  });
+
+  it("should correctly resolve masala dosa to dosa_masala instead of defaulting to dosa_plain", () => {
+    const item = findIFCTItem("masala dosa");
+    expect(item).not.toBeNull();
+    expect(item?.id).toBe("dosa_masala");
+    expect(item?.unitWeightGrams).toBe(150);
+  });
+
+  it("should correctly resolve toned milk to milk_toned instead of returning null", () => {
+    const item = findIFCTItem("toned milk");
+    expect(item).not.toBeNull();
+    expect(item?.id).toBe("milk_toned");
+  });
+
+  it("should correctly resolve curry/sabzi paneer dishes to paneer_gravy instead of paneer_raw", () => {
+    expect(findIFCTItem("matar paneer")?.id).toBe("paneer_gravy");
+    expect(findIFCTItem("paneer curry")?.id).toBe("paneer_gravy");
+    expect(findIFCTItem("palak paneer")?.id).toBe("paneer_gravy");
+    expect(findIFCTItem("fresh paneer")?.id).toBe("paneer_raw");
+  });
+
+  describe("G-2: Quantity Ceiling & Plausibility Clamping", () => {
+    it("should clamp quantity 15 for piece-type item (roti) to 8 and set quantityClamped: true", () => {
+      const res = calculateFoodMacros("Roti", 15, "piece");
+      expect(res.quantity).toBe(8);
+      expect(res.quantityClamped).toBe(true);
+      // 8 rotis = 8 * 35g = 280g
+      expect(res.weightGrams).toBe(280);
+    });
+
+    it("should pass normal quantity (e.g. 2 rotis) through unchanged with quantityClamped: false", () => {
+      const res = calculateFoodMacros("Roti", 2, "piece");
+      expect(res.quantity).toBe(2);
+      expect(res.quantityClamped).toBe(false);
+      expect(res.weightGrams).toBe(70);
+    });
+
+    it("should clamp quantity 1000 with unitType 'gram' to 800 and set quantityClamped: true", () => {
+      const res = calculateFoodMacros("Paneer", 1000, "gram");
+      expect(res.quantity).toBe(800);
+      expect(res.quantityClamped).toBe(true);
+      expect(res.weightGrams).toBe(800);
+    });
+
+    it("should clamp katori items (dal/rice) to max 4 katoris", () => {
+      const res = calculateFoodMacros("Yellow Dal", 7, "katori");
+      expect(res.quantity).toBe(4);
+      expect(res.quantityClamped).toBe(true);
+      expect(res.weightGrams).toBe(600);
+    });
+
+    it("should clamp scoop items (whey) to max 3 scoops", () => {
+      const res = calculateFoodMacros("Whey Protein", 5, "scoop");
+      expect(res.quantity).toBe(3);
+      expect(res.quantityClamped).toBe(true);
+      expect(res.weightGrams).toBe(96);
+    });
+  });
 });

@@ -30,6 +30,24 @@ describe("Vision Route isMock Flag Correctness", () => {
       expect(() => enrichMealAnalysisWithIFCT({ foods: null } as any)).toThrow("foods array missing or invalid");
       expect(() => enrichMealAnalysisWithIFCT({ foods: "invalid" as any } as any)).toThrow("foods array missing or invalid");
     });
+
+    it("should clamp excessive quantities and append a warning to notes", () => {
+      const result = enrichMealAnalysisWithIFCT({
+        foods: [
+          { name: "Roti", dishName: "roti", quantity: 15, unitType: "piece" },
+          { name: "Yellow Dal", dishName: "dal_toor", quantity: 1, unitType: "katori" },
+        ],
+        totalCalories: 0,
+        totalProteinG: 0,
+        confidence: 0.95,
+      });
+
+      expect(result.foods[0].quantity).toBe(8);
+      expect(result.foods[0].quantityClamped).toBe(true);
+      expect(result.foods[1].quantity).toBe(1);
+      expect(result.foods[1].quantityClamped).toBe(false);
+      expect(result.notes).toContain("Quantity adjusted to maximum plausible limit for: Roti — please verify.");
+    });
   });
 
   describe("POST /api/vision image route (Gemini path)", () => {

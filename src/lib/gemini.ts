@@ -78,6 +78,7 @@ export interface DetectedFoodItem {
   fatG?: number;
   weightGrams?: number;
   unmatched?: boolean;
+  quantityClamped?: boolean;
 }
 
 export interface MealAnalysis {

@@ -124,7 +124,7 @@ export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnaly
       ...food,
       name: food.name || computed.name,
       dishName: food.dishName || computed.id,
-      quantity: qty,
+      quantity: computed.quantity,
       unitType: (computed.unitType as any) || "piece",
       estimatedCalories: computed.calories,
       proteinG: computed.proteinG,
@@ -132,6 +132,7 @@ export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnaly
       fatG: computed.fatG,
       weightGrams: computed.weightGrams,
       unmatched: !computed.matched,
+      quantityClamped: computed.quantityClamped,
     };
   });
 
@@ -143,13 +144,20 @@ export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnaly
   const isNonFoodFiltered = enrichedFoods.length === 0 && rawAnalysis.foods.length > 0;
   const hasUnmatched = enrichedFoods.some((f) => f.unmatched);
   const unmatchedNames = enrichedFoods.filter((f) => f.unmatched).map((f) => f.name).join(", ");
+  const clampedItems = enrichedFoods.filter((f) => f.quantityClamped).map((f) => f.name);
 
   let finalNotes = rawAnalysis.notes || "";
   if (isNonFoodFiltered) {
     finalNotes = "Non-food item or plain water detected — 0 calories logged.";
-  } else if (hasUnmatched) {
-    const warning = `Couldn't identify macros for: ${unmatchedNames} — please edit manually.`;
-    finalNotes = finalNotes ? `${finalNotes} (${warning})` : warning;
+  } else {
+    if (hasUnmatched) {
+      const warning = `Couldn't identify macros for: ${unmatchedNames} — please edit manually.`;
+      finalNotes = finalNotes ? `${finalNotes} (${warning})` : warning;
+    }
+    if (clampedItems.length > 0) {
+      const clampWarning = `Quantity adjusted to maximum plausible limit for: ${clampedItems.join(", ")} — please verify.`;
+      finalNotes = finalNotes ? `${finalNotes} (${clampWarning})` : clampWarning;
+    }
   }
 
   return {
