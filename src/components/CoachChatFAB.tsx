@@ -208,18 +208,23 @@ export default function CoachChatFAB() {
     try {
       // ── 1. LOG MEAL ──────────────────────────────────────────────────────
       if (action === "log_meal") {
+        const totalCalories = updatedData.totalCalories || updatedData.calories || 0;
+        const totalProteinG = updatedData.totalProtein || updatedData.totalProteinG || updatedData.protein || 0;
+        const totalCarbsG = updatedData.totalCarbs || updatedData.totalCarbsG || updatedData.carbs || (updatedData.items || []).reduce((s: number, f: any) => s + (f.carbsG || 0), 0);
+        const totalFatG = updatedData.totalFat || updatedData.totalFatG || updatedData.fat || (updatedData.items || []).reduce((s: number, f: any) => s + (f.fatG || 0), 0);
+
         const ok = await postTimeline("meal", {
           mealType: updatedData.mealType || "meal",
           foods: updatedData.items || [],
-          totalCalories: updatedData.totalCalories || 0,
-          totalProteinG: updatedData.totalProtein || 0,
-          totalCarbsG: updatedData.totalCarbs || (updatedData.items || []).reduce((s: number, f: any) => s + (f.carbsG || 0), 0),
-          totalFatG: updatedData.totalFat || (updatedData.items || []).reduce((s: number, f: any) => s + (f.fatG || 0), 0),
+          totalCalories,
+          totalProteinG,
+          totalCarbsG,
+          totalFatG,
           notes: updatedData.notes || "",
           loggedVia: "chatbot",
         }, [updatedData.mealType || "meal", "chatbot"]);
         if (ok) {
-          confirm(`✅ **${(updatedData.mealType || "meal").replace(/^\w/, (c: string) => c.toUpperCase())} Logged!** ${updatedData.totalCalories || 0} kcal · ${updatedData.totalProtein || 0}g protein saved to your timeline 🍽️`);
+          confirm(`✅ **${(updatedData.mealType || "meal").replace(/^\w/, (c: string) => c.toUpperCase())} Logged!** ${totalCalories} kcal · ${totalProteinG}g protein saved to your timeline 🍽️`);
           window.dispatchEvent(new Event("mealLogged"));
         }
         return;
@@ -227,7 +232,7 @@ export default function CoachChatFAB() {
 
       // ── 2. LOG STEPS ─────────────────────────────────────────────────────
       if (action === "log_steps") {
-        const steps = updatedData.steps || 0;
+        const steps = updatedData.steps || updatedData.count || 0;
         const distKm = updatedData.distanceKm || parseFloat((steps * 0.00075).toFixed(2));
         const kcal = updatedData.caloriesBurned || Math.round(steps * 0.04);
         const ok = await postTimeline("steps", { count: steps, steps, distanceKm: distKm, caloriesBurned: kcal, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["steps", "chatbot"]);
@@ -240,8 +245,8 @@ export default function CoachChatFAB() {
 
       // ── 3. LOG WATER ─────────────────────────────────────────────────────
       if (action === "log_water") {
-        const glasses = updatedData.glasses || Math.round((updatedData.amountMl || 0) / 250);
-        const ml = updatedData.amountMl || glasses * 250;
+        const ml = updatedData.amountMl || (updatedData.amountL ? Math.round(updatedData.amountL * 1000) : (updatedData.glasses ? updatedData.glasses * 250 : 0));
+        const glasses = updatedData.glasses || Math.round(ml / 250);
         const ok = await postTimeline("water", { amountL: +(ml / 1000).toFixed(2), amountMl: ml, glasses, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["water", "chatbot"]);
         if (ok) {
           confirm(`✅ **Water Logged!** ${glasses} glass${glasses !== 1 ? "es" : ""} (${ml}ml) 💧`);

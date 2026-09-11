@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { analyzeMealImage, MealAnalysis, DetectedFoodItem } from "@/lib/gemini";
+import { analyzeMealImage, analyzeMealTextWithGroq, MealAnalysis, DetectedFoodItem } from "@/lib/gemini";
 import { calculateFoodMacros } from "@/lib/ifctData";
 
-function getMockMealAnalysis(): MealAnalysis {
+export function getMockMealAnalysis(): MealAnalysis {
   const item1 = calculateFoodMacros("Roti", 2, "piece");
   const item2 = calculateFoodMacros("Yellow Dal", 1, "katori", "thin_mess");
   const item3 = calculateFoodMacros("Curd", 1, "katori");
@@ -66,13 +66,54 @@ function getMockMealAnalysis(): MealAnalysis {
 /**
  * Post-processes visual AI candidate detections with deterministic ICMR-NIN IFCT 2017 math
  */
-function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnalysis {
-  if (!rawAnalysis.foods || !Array.isArray(rawAnalysis.foods)) {
-    return getMockMealAnalysis();
+function isNonFoodOrDrink(name: string): boolean {
+  const clean = (name || "").toLowerCase().trim();
+  if (!clean) return true;
+  if (
+    clean === "water" ||
+    clean === "plain water" ||
+    clean === "glass of water" ||
+    clean === "bottle of water" ||
+    clean === "drinking water" ||
+    clean.startsWith("water ") ||
+    /\b(glass|bottle|cup) of water\b/.test(clean)
+  ) {
+    return true;
+  }
+  const nonFoodList = [
+    "empty plate",
+    "empty bowl",
+    "empty dish",
+    "empty thali",
+    "empty glass",
+    "empty cup",
+    "napkin",
+    "tissue",
+    "cutlery",
+    "spoon",
+    "fork",
+    "plate",
+    "table",
+    "person",
+  ];
+  return nonFoodList.includes(clean) || clean.startsWith("empty ");
+}
+
+/**
+ * Post-processes visual AI candidate detections with deterministic ICMR-NIN IFCT 2017 math
+ */
+export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnalysis {
+  if (!rawAnalysis || !rawAnalysis.foods || !Array.isArray(rawAnalysis.foods)) {
+    throw new Error("Invalid AI response: foods array missing or invalid");
   }
 
-  const enrichedFoods: DetectedFoodItem[] = rawAnalysis.foods.map((food) => {
-    const dishQuery = food.dishName || food.name || "Roti";
+  const validCandidates = rawAnalysis.foods.filter((food) => {
+    const dishQuery = food.dishName || food.name;
+    return Boolean(dishQuery && !isNonFoodOrDrink(dishQuery));
+  });
+
+  const enrichedFoods: DetectedFoodItem[] = validCandidates.map((food) => {
+    const dishQuery = food.dishName || food.name!;
     const qty = food.quantity && food.quantity > 0 ? food.quantity : 1;
     const unit = food.unitType || "piece";
     const prep = food.preparationStyle || "standard";
@@ -90,6 +131,7 @@ function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnalysis {
       carbsG: computed.carbsG,
       fatG: computed.fatG,
       weightGrams: computed.weightGrams,
+      unmatched: !computed.matched,
     };
   });
 
@@ -98,15 +140,27 @@ function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnalysis {
   const totalCarbsG = Math.round(enrichedFoods.reduce((sum, f) => sum + (f.carbsG || 0), 0) * 10) / 10;
   const totalFatG = Math.round(enrichedFoods.reduce((sum, f) => sum + (f.fatG || 0), 0) * 10) / 10;
 
+  const isNonFoodFiltered = enrichedFoods.length === 0 && rawAnalysis.foods.length > 0;
+  const hasUnmatched = enrichedFoods.some((f) => f.unmatched);
+  const unmatchedNames = enrichedFoods.filter((f) => f.unmatched).map((f) => f.name).join(", ");
+
+  let finalNotes = rawAnalysis.notes || "";
+  if (isNonFoodFiltered) {
+    finalNotes = "Non-food item or plain water detected — 0 calories logged.";
+  } else if (hasUnmatched) {
+    const warning = `Couldn't identify macros for: ${unmatchedNames} — please edit manually.`;
+    finalNotes = finalNotes ? `${finalNotes} (${warning})` : warning;
+  }
+
   return {
     foods: enrichedFoods,
     totalCalories,
     totalProteinG,
     totalCarbsG,
     totalFatG,
-    confidence: rawAnalysis.confidence || 0.9,
-    plateType: rawAnalysis.plateType || "single_dish",
-    notes: rawAnalysis.notes || "",
+    confidence: isNonFoodFiltered ? 0 : (rawAnalysis.confidence || 0.9),
+    plateType: isNonFoodFiltered ? "single_dish" : (rawAnalysis.plateType || "single_dish"),
+    notes: finalNotes,
   };
 }
 
@@ -115,17 +169,30 @@ const visionCache = new Map<string, MealAnalysis>();
 /**
  * POST /api/vision
  *
- * Takes a base64 image and processes it via Gemini 2.5 Flash Vision.
- * Post-processes candidate dish detections against ICMR-NIN IFCT 2017 database for 100% accurate macros.
+ * Accepts imageBase64 or mealText.
+ * Uses Gemini 2.5 Flash Vision for image capture, with Groq AI (openai/gpt-oss-20b) + ICMR-NIN IFCT 2017 fallback!
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageBase64, mimeType } = body;
+    const { imageBase64, mimeType, mealText } = body;
+
+    // Handle pure text meal analysis request
+    if (mealText && !imageBase64) {
+      try {
+        console.log(`⚡ Analyzing text meal description using Groq AI + IFCT 2017: "${mealText}"...`);
+        const rawAnalysis = await analyzeMealTextWithGroq(mealText);
+        const analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
+        return Response.json({ analysis, isMock: false, source: "groq_text" });
+      } catch (groqErr) {
+        console.warn("⚠️ Groq text meal analysis failed, using mock fallback:", groqErr);
+        return Response.json({ analysis: getMockMealAnalysis(), isMock: true, source: "mock" });
+      }
+    }
 
     if (!imageBase64) {
       return Response.json(
-        { error: "imageBase64 is required" },
+        { error: "imageBase64 or mealText is required" },
         { status: 400 }
       );
     }
@@ -135,32 +202,62 @@ export async function POST(request: NextRequest) {
 
     if (visionCache.has(imageKey)) {
       console.log("⚡ Returning cached Vision Analysis result for identical image submission...");
-      return Response.json({ analysis: visionCache.get(imageKey)!, isMock: false });
+      return Response.json({ analysis: visionCache.get(imageKey)!, isMock: false, source: "cache" });
     }
 
     let analysis: MealAnalysis = getMockMealAnalysis();
-    let isMock = false;
+    let isMock = true;
+    let source = "mock";
 
     const geminiKey = process.env.GEMINI_API_KEY;
 
     if (geminiKey && geminiKey !== "your_gemini_api_key_here") {
       try {
-        console.log("⚡ Analyzing meal using Structured Vision Contract + IFCT 2017 Engine...");
+        console.log("⚡ Analyzing meal image using Gemini Vision + IFCT 2017 Engine...");
         const rawAnalysis = await analyzeMealImage(cleanBase64, mimeType || "image/jpeg");
         analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
         visionCache.set(imageKey, analysis);
+        isMock = false;
+        source = "gemini_vision";
       } catch (geminiError: any) {
-        console.warn("⚠️ Vision API call failed, using mock fallback:", geminiError);
+        console.warn("⚠️ Gemini Vision API call failed, attempting Groq text fallback:", geminiError);
+        if (mealText) {
+          try {
+            const rawAnalysis = await analyzeMealTextWithGroq(mealText);
+            analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
+            isMock = false;
+            source = "groq_text_fallback";
+          } catch (groqError) {
+            analysis = getMockMealAnalysis();
+            isMock = true;
+            source = "mock";
+          }
+        } else {
+          analysis = getMockMealAnalysis();
+          isMock = true;
+          source = "mock";
+        }
+      }
+    } else if (mealText) {
+      try {
+        console.log("⚡ No Gemini key; analyzing meal text using Groq AI...");
+        const rawAnalysis = await analyzeMealTextWithGroq(mealText);
+        analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
+        isMock = false;
+        source = "groq_text";
+      } catch (groqError) {
         analysis = getMockMealAnalysis();
         isMock = true;
+        source = "mock";
       }
     } else {
       console.log("⚠️ No Gemini API key configured. Using mock IFCT analysis.");
       analysis = getMockMealAnalysis();
       isMock = true;
+      source = "mock";
     }
 
-    return Response.json({ analysis, isMock });
+    return Response.json({ analysis, isMock, source });
   } catch (error) {
     console.error("Vision API error:", error);
     return Response.json(

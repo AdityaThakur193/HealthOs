@@ -38,4 +38,42 @@ describe("ICMR-NIN IFCT 2017 Portion Engine", () => {
     expect(res.calories).toBe(610);
     expect(res.proteinG).toBe(37.8);
   });
+
+  it("should calculate correct macros for 1 portion of Paneer (305 kcal, not 3 kcal undercount)", () => {
+    // Calling with quantity: 1 and no unit (defaults to standardUnit "serving" = 100g)
+    const resNoUnit = calculateFoodMacros("Paneer", 1);
+    expect(resNoUnit.calories).toBe(305);
+    expect(resNoUnit.proteinG).toBe(18.9);
+    expect(resNoUnit.weightGrams).toBe(100);
+    expect(resNoUnit.unitType).toBe("serving");
+  });
+
+  it("should calculate exact small gram weights for Paneer (e.g. 3g = ~9 kcal, not 300g)", () => {
+    const res = calculateFoodMacros("Paneer", 3, "gram");
+    expect(res.weightGrams).toBe(3);
+    // 3g of raw paneer (305 kcal / 100g) = 9.15 kcal -> 9 kcal, 0.567g protein -> 0.6g protein
+    expect(res.calories).toBe(9);
+    expect(res.proteinG).toBe(0.6);
+    expect(res.unitType).toBe("gram");
+  });
+
+  it("should calculate correct macros for 1 portion of Chicken Breast (150 kcal, not 1.5 kcal undercount)", () => {
+    const res = calculateFoodMacros("Chicken Breast", 1);
+    expect(res.calories).toBe(150);
+    expect(res.proteinG).toBe(31.0);
+    expect(res.weightGrams).toBe(100);
+  });
+
+  it("should return null from findIFCTItem and matched: false with 0 macros from calculateFoodMacros for non-matching dishes", () => {
+    const item = findIFCTItem("bowl of soup");
+    expect(item).toBeNull();
+
+    const res = calculateFoodMacros("bowl of soup", 1, "piece");
+    expect(res.matched).toBe(false);
+    expect(res.calories).toBe(0);
+    expect(res.proteinG).toBe(0);
+    expect(res.carbsG).toBe(0);
+    expect(res.fatG).toBe(0);
+    expect(res.weightGrams).toBe(0);
+  });
 });

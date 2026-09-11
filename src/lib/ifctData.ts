@@ -10,7 +10,7 @@ export interface IFCTItem {
   id: string;
   name: string;
   category: "cereal" | "pulse" | "dairy" | "meat" | "vegetable" | "snack" | "supplement";
-  standardUnit: "piece" | "katori" | "scoop" | "gram" | "plate";
+  standardUnit: "piece" | "katori" | "scoop" | "gram" | "plate" | "serving";
   unitWeightGrams: number;
   // Per 100g cooked/edible values
   caloriesPer100g: number;
@@ -202,7 +202,7 @@ export const IFCT_DATABASE: Record<string, IFCTItem> = {
     id: "paneer_raw",
     name: "Paneer (Fresh Cottage Cheese)",
     category: "dairy",
-    standardUnit: "gram",
+    standardUnit: "serving",
     unitWeightGrams: 100,
     caloriesPer100g: 305,
     proteinGPer100g: 18.9,
@@ -259,7 +259,7 @@ export const IFCT_DATABASE: Record<string, IFCTItem> = {
     id: "chicken_breast",
     name: "Boiled / Grilled Chicken Breast",
     category: "meat",
-    standardUnit: "gram",
+    standardUnit: "serving",
     unitWeightGrams: 100,
     caloriesPer100g: 150,
     proteinGPer100g: 31.0,
@@ -312,7 +312,7 @@ export const CAMPUS_PRESETS: CampusPreset[] = [
 /**
  * Fuzzy matches a dish name against official IFCT database items
  */
-export function findIFCTItem(queryName: string = ""): IFCTItem {
+export function findIFCTItem(queryName: string = ""): IFCTItem | null {
   const clean = (queryName || "").toLowerCase().trim();
 
   if (clean.includes("roti") || clean.includes("chapati") || clean.includes("phulka")) {
@@ -376,8 +376,8 @@ export function findIFCTItem(queryName: string = ""): IFCTItem {
     return IFCT_DATABASE.dosa_plain;
   }
 
-  // Fallback to Toor Dal if unspecified pulse/soup, or Cooked Rice
-  return IFCT_DATABASE.rice_cooked;
+  // No matching IFCT dish found
+  return null;
 }
 
 /**
@@ -398,10 +398,26 @@ export function calculateFoodMacros(
   proteinG: number;
   carbsG: number;
   fatG: number;
+  matched: boolean;
 } {
   const item = findIFCTItem(dishName);
   const qty = Math.max(0.25, Number(quantity) || 1);
-  const finalUnit = unitType || item.standardUnit;
+  const finalUnit = unitType || (item ? item.standardUnit : "piece");
+
+  if (!item) {
+    return {
+      id: "unmatched",
+      name: dishName || "Unknown Food",
+      quantity: qty,
+      unitType: finalUnit,
+      weightGrams: 0,
+      calories: 0,
+      proteinG: 0,
+      carbsG: 0,
+      fatG: 0,
+      matched: false,
+    };
+  }
 
   // Calculate total weight in grams
   let totalWeightGrams = item.unitWeightGrams * qty;
@@ -439,5 +455,6 @@ export function calculateFoodMacros(
     proteinG,
     carbsG,
     fatG,
+    matched: true,
   };
 }

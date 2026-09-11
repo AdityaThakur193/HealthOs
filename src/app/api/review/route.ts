@@ -169,15 +169,31 @@ export async function GET(request: NextRequest) {
     const sleepEvents = events.filter((e) => e.type === "sleep");
     const stepsEvents = events.filter((e) => e.type === "steps");
 
-    const daysWithSleep = sleepEvents.length;
-    const daysWithSteps = stepsEvents.length;
+    // Group sleep by calendar day (latest event of the day takes precedence)
+    const dailySleep: Record<string, number> = {};
+    sleepEvents.forEach((s) => {
+      const dateStr = new Date(s.timestamp).toDateString();
+      dailySleep[dateStr] = Number((s.payload as any)?.hours) || 0;
+    });
 
+    const sleepDates = Object.keys(dailySleep);
+    const daysWithSleep = sleepDates.length;
     const avgSleepHours = daysWithSleep > 0
-      ? Math.round((sleepEvents.reduce((sum, s) => sum + ((s.payload as any).hours || 0), 0) / daysWithSleep) * 10) / 10
+      ? Math.round((sleepDates.reduce((sum, d) => sum + dailySleep[d], 0) / daysWithSleep) * 10) / 10
       : 0;
 
+    // Group steps by calendar day (accumulating all steps logged in that day, supporting count or steps)
+    const dailySteps: Record<string, number> = {};
+    stepsEvents.forEach((s) => {
+      const dateStr = new Date(s.timestamp).toDateString();
+      const count = Number((s.payload as any)?.count || (s.payload as any)?.steps) || 0;
+      dailySteps[dateStr] = (dailySteps[dateStr] || 0) + count;
+    });
+
+    const stepsDates = Object.keys(dailySteps);
+    const daysWithSteps = stepsDates.length;
     const avgSteps = daysWithSteps > 0
-      ? Math.round(stepsEvents.reduce((sum, s) => sum + ((s.payload as any).count || 0), 0) / daysWithSteps)
+      ? Math.round(stepsDates.reduce((sum, d) => sum + dailySteps[d], 0) / daysWithSteps)
       : 0;
 
     const review = {

@@ -77,6 +77,7 @@ export interface DetectedFoodItem {
   carbsG?: number;
   fatG?: number;
   weightGrams?: number;
+  unmatched?: boolean;
 }
 
 export interface MealAnalysis {
@@ -99,6 +100,10 @@ export async function analyzeMealImage(
 
   const prompt = `You are a world-class Indian Culinary Computer Vision Specialist.
 Analyze this food image and return a JSON object with strict visual identification. Do NOT attempt raw calorie/protein math; focus on accurate visual dish identification, preparation style, and standard unit counting.
+
+IMPORTANT NEGATIVE CONSTRAINTS:
+- If the image contains NO food (e.g. an empty plate, glass/bottle of plain water, a person, desk, gym equipment, or non-food objects), return "foods": [], "confidence": 0.0, "plateType": "single_dish", and describe what is visible in "notes".
+- Do NOT guess or hallucinate food dishes if no edible food is clearly visible. Plain water and empty plates must NEVER be identified as food.
 
 ${learnedContext ? `LEARNED USER PLATE CONTEXT:\n${learnedContext}\n` : ""}
 
@@ -134,6 +139,61 @@ STRICT RULE: Return ONLY valid JSON, no markdown code fences.`;
 
   const text = result.response.text();
   return JSON.parse(sanitizeJsonOutput(text)) as MealAnalysis;
+}
+
+export async function analyzeMealTextWithGroq(description: string): Promise<MealAnalysis> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey === "your_groq_api_key_here") {
+    throw new Error("GROQ_API_KEY is not configured for meal analysis fallback.");
+  }
+
+  const prompt = `You are an Indian Culinary Specialist AI.
+Analyze this meal text description: "${description}"
+Extract dish names, canonical dish IDs, quantities, and unit types for ICMR-NIN IFCT 2017 macro calculation.
+
+IMPORTANT: If the text describes only water, non-food items, fasting, or contains no edible food, return "foods": [], "confidence": 0.0, and explain in "notes". Do NOT guess food if none was described.
+
+Return ONLY a JSON object matching:
+{
+  "foods": [
+    {
+      "name": "string (e.g. Boiled Egg, Roti, Dal Tadka, Chicken Curry, Curd)",
+      "dishName": "string (canonical name: roti | dal_toor | rice_cooked | curd | paneer_raw | egg_whole | chicken_curry | soya | etc)",
+      "preparationStyle": "string (e.g. thin_mess | plain | ghee | thick_home | steamed)",
+      "quantity": number (e.g. 4 for eggs, 2 for rotis, 1 for katori dal),
+      "unitType": "piece" | "katori" | "scoop" | "gram" | "plate",
+      "portionSize": "small" | "medium" | "large"
+    }
+  ],
+  "confidence": 0.95,
+  "plateType": "single_dish",
+  "notes": "string"
+}`;
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "openai/gpt-oss-20b",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.2
+    })
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Groq Meal Analysis error (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  const rawText = data.choices[0]?.message?.content;
+  if (!rawText) throw new Error("Empty response from Groq Meal Analysis");
+
+  return JSON.parse(sanitizeJsonOutput(rawText)) as MealAnalysis;
 }
 
 /* ─────────────────────────────────────────────

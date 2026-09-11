@@ -186,9 +186,9 @@ export default function Dashboard() {
             } else if (event.type === "workout") {
               wDone = true;
             } else if (event.type === "sleep") {
-              sleep = event.payload.hours || 0;
+              sleep = Number(event.payload.hours) || 0;
             } else if (event.type === "steps") {
-              stepCount = event.payload.count || 0;
+              stepCount += Number(event.payload.count || event.payload.steps) || 0;
             } else if (event.type === "water") {
               water += event.payload.amountL || 0;
             }
@@ -208,8 +208,8 @@ export default function Dashboard() {
           carbs: Math.round(carbsVal),
           fats: Math.round(fatsVal),
           workoutDone: wDone,
-          sleepHours: sleep,
-          steps: stepCount,
+          sleepHours: Math.round(sleep * 10) / 10,
+          steps: Math.round(stepCount),
           waterL: Math.round(water * 10) / 10,
         });
       }
