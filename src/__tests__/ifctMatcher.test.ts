@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchIngredient, computeFuzzySimilarity, hasStructuralConflict, TIER1_SEED_MAP } from "../lib/ifctMatcher";
+import { matchIngredient, computeFuzzySimilarity, hasStructuralConflict, TIER1_SEED_MAP, resolveCulinaryPortion } from "../lib/ifctMatcher";
 import { calculateFoodMacros, IFCT_DATABASE } from "../lib/ifctData";
 
 describe("IFCT 3-Tier Matcher Engine (src/lib/ifctMatcher.ts)", () => {
@@ -345,6 +345,20 @@ describe("IFCT 3-Tier Matcher Engine (src/lib/ifctMatcher.ts)", () => {
       expect(kaju?.tier).toBe("tier1_synonym");
     });
 
+    it("should resolve cooked and garnish synonyms in Tier 1", () => {
+      expect(matchIngredient("cooked rice")?.id).toBe("A015");
+      expect(matchIngredient("cooked basmati rice")?.id).toBe("A015");
+      expect(matchIngredient("roti")?.id).toBe("A019");
+      expect(matchIngredient("chapati")?.id).toBe("A019");
+      expect(matchIngredient("naan")?.id).toBe("A018");
+      expect(matchIngredient("cooked toor dal")?.id).toBe("B021");
+      expect(matchIngredient("cooked moong dal")?.id).toBe("B010");
+      expect(matchIngredient("cooked chicken")?.id).toBe("N003");
+      expect(matchIngredient("birista")?.id).toBe("G017");
+      expect(matchIngredient("fried onion")?.id).toBe("G017");
+      expect(matchIngredient("fried onions")?.id).toBe("G017");
+    });
+
     it("should confirm existing ifctData.ts and IFCT_DATABASE remain untouched and valid", () => {
       // Verify existing 21-item database is completely unchanged
       expect(Object.keys(IFCT_DATABASE).length).toBeGreaterThanOrEqual(20);
@@ -352,6 +366,77 @@ describe("IFCT 3-Tier Matcher Engine (src/lib/ifctMatcher.ts)", () => {
       expect(res.matched).toBe(true);
       expect(res.calories).toBeGreaterThanOrEqual(165);
       expect(res.proteinG).toBe(6.4);
+    });
+  });
+
+  describe("Sourced Culinary Transforms Engine (resolveCulinaryPortion)", () => {
+    it("should correctly convert cooked basmati rice (220g) to raw commodity weight via ICMR-NIN divisor 2.73", () => {
+      const resolved = resolveCulinaryPortion("A015", "cooked basmati rice", 220);
+      expect(resolved.effectiveWeightGrams).toBe(80.6);
+      expect(resolved.supplementalOilGrams).toBe(0);
+      expect(resolved.transformApplied?.source).toContain("ICMR-NIN");
+      expect(resolved.auditNote).toContain("220g cooked / 2.73 -> 80.6g raw commodity");
+    });
+
+    it("should correctly convert cooked plain roti (40g) to dry atta via USDA/ICMR divisor 1.43", () => {
+      const resolved = resolveCulinaryPortion("A019", "roti", 40);
+      expect(resolved.effectiveWeightGrams).toBe(28.0);
+      expect(resolved.supplementalOilGrams).toBe(0);
+      expect(resolved.transformApplied?.hydrationDivisor).toBe(1.43);
+    });
+
+    it("should correctly convert baked naan matrix (90g) to dry maida via CFTRI divisor 1.38", () => {
+      const resolved = resolveCulinaryPortion("A018", "maida", 90);
+      expect(resolved.effectiveWeightGrams).toBe(65.2);
+      expect(resolved.supplementalOilGrams).toBe(0);
+      expect(resolved.transformApplied?.hydrationDivisor).toBe(1.38);
+    });
+
+    it("should correctly convert cooked toor dal (150g) to raw pulse via ICMR divisor 3.85", () => {
+      const resolved = resolveCulinaryPortion("B021", "cooked toor dal", 150);
+      expect(resolved.effectiveWeightGrams).toBe(39.0);
+      expect(resolved.supplementalOilGrams).toBe(0);
+      expect(resolved.transformApplied?.hydrationDivisor).toBe(3.85);
+    });
+
+    it("should correctly convert cooked moong dal (150g) to raw pulse via ICMR divisor 3.85", () => {
+      const resolved = resolveCulinaryPortion("B010", "cooked moong dal", 150);
+      expect(resolved.effectiveWeightGrams).toBe(39.0);
+      expect(resolved.supplementalOilGrams).toBe(0);
+      expect(resolved.transformApplied?.hydrationDivisor).toBe(3.85);
+    });
+
+    it("should correctly unpack birista (10g) into raw onion (25g) + absorbed oil (3.5g) via expansionMultiplier", () => {
+      const resolved = resolveCulinaryPortion("G017", "birista", 10);
+      expect(resolved.effectiveWeightGrams).toBe(25.0); // 10 * 2.50
+      expect(resolved.supplementalOilGrams).toBe(3.5);  // 10 * 0.35
+      expect(resolved.transformApplied?.expansionMultiplier).toBe(2.50);
+      expect(resolved.transformApplied?.absorbedOilRatio).toBe(0.35);
+      expect(resolved.auditNote).toContain("10g fried -> 25g raw onion + 3.5g absorbed oil");
+    });
+
+    it("should passthrough meats, dairy, eggs, and raw produce 1:1 without dividing", () => {
+      const chicken = resolveCulinaryPortion("N003", "cooked chicken", 100);
+      expect(chicken.effectiveWeightGrams).toBe(100);
+      expect(chicken.supplementalOilGrams).toBe(0);
+
+      const curd = resolveCulinaryPortion("SUPP_CURD", "curd", 80);
+      expect(curd.effectiveWeightGrams).toBe(80);
+
+      const egg = resolveCulinaryPortion("M004", "boiled egg", 50);
+      expect(egg.effectiveWeightGrams).toBe(50);
+
+      const cucumber = resolveCulinaryPortion("D026", "cucumber", 20);
+      expect(cucumber.effectiveWeightGrams).toBe(20);
+    });
+
+    it("should preserve explicitly labeled raw/dry ingredients 1:1 without dividing", () => {
+      const rawRice = resolveCulinaryPortion("A015", "raw rice", 100);
+      expect(rawRice.effectiveWeightGrams).toBe(100);
+      expect(rawRice.auditNote).toContain("Explicit raw/dry label: passthrough");
+
+      const dryAtta = resolveCulinaryPortion("A019", "dry atta", 50);
+      expect(dryAtta.effectiveWeightGrams).toBe(50);
     });
   });
 });
