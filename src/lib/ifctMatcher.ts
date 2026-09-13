@@ -31,7 +31,103 @@ export interface MatchedIngredient {
   nutrientsPer100g: IFCTSourceNutrients;
   originalSourceEnergyZero: boolean;
   rawFood: IFCTNormalizedFood;
+  source?: string;
 }
+
+export interface SupplementalStandard {
+  id: string;
+  name: string;
+  category: string;
+  source: string;
+  energyKcal: number;
+  energyKj: number;
+  proteinG: number;
+  fatG: number;
+  carbG: number;
+  fiberG: number;
+  waterG: number;
+}
+
+/**
+ * Authoritative Supplemental Culinary Standards for universal staples omitted by IFCT 2017.
+ * Every entry strictly cites its regulatory / laboratory analytical source.
+ */
+export const SUPPLEMENTAL_CULINARY_STANDARDS: Record<string, SupplementalStandard> = {
+  butter: {
+    id: "SUPP_BUTTER",
+    name: "Butter, salted",
+    category: "Dairy and Egg Products",
+    source: "USDA FoodData Central FDC ID 173410",
+    energyKcal: 717.0,
+    energyKj: 2999.0,
+    proteinG: 0.85,
+    fatG: 81.11,
+    carbG: 0.06,
+    fiberG: 0.0,
+    waterG: 16.17,
+  },
+  cream: {
+    id: "SUPP_CREAM",
+    name: "Fresh Cream / Malai (25% fat)",
+    category: "Dairy Products",
+    source: "Indian commercial fresh cooking cream standard (25% milk fat, Amul Fresh Cream panel)",
+    energyKcal: 246.0,
+    energyKj: 1030.0,
+    proteinG: 2.7,
+    fatG: 25.0,
+    carbG: 3.7,
+    fiberG: 0.0,
+    waterG: 67.8,
+  },
+  curd: {
+    id: "SUPP_CURD",
+    name: "Curd / Dahi (whole milk)",
+    category: "Dairy Products",
+    source: "USDA FoodData Central FDC ID 171284",
+    energyKcal: 61.0,
+    energyKj: 255.0,
+    proteinG: 3.47,
+    fatG: 3.25,
+    carbG: 4.66,
+    fiberG: 0.0,
+    waterG: 87.9,
+  },
+  cheese: {
+    id: "SUPP_CHEESE",
+    name: "Cheese, cheddar / processed",
+    category: "Dairy and Egg Products",
+    source: "USDA FoodData Central FDC ID 173414",
+    energyKcal: 403.0,
+    energyKj: 1686.0,
+    proteinG: 24.9,
+    fatG: 33.14,
+    carbG: 1.33,
+    fiberG: 0.0,
+    waterG: 36.75,
+  },
+};
+
+export const SUPPLEMENTAL_ALIASES: Record<string, string> = {
+  butter: "butter",
+  "table butter": "butter",
+  "salted butter": "butter",
+  "unsalted butter": "butter",
+  makhan: "butter",
+  makkhan: "butter",
+  cream: "cream",
+  "fresh cream": "cream",
+  "cooking cream": "cream",
+  malai: "cream",
+  "heavy cream": "cream",
+  curd: "curd",
+  dahi: "curd",
+  yogurt: "curd",
+  yoghurt: "curd",
+  cheese: "cheese",
+  "cheddar cheese": "cheese",
+  "processed cheese": "cheese",
+  mozzarella: "cheese",
+};
 
 const typedDataset = ifctDataset as unknown as IFCT542Dataset;
 const FOOD_MAP = new Map<string, IFCTNormalizedFood>();
@@ -298,6 +394,13 @@ export const TIER1_SEED_MAP: Record<string, string> = {
   "prawn": "Q007",
   "shrimp": "Q007",
   "jhinga": "Q007",
+
+  // ── Nuts & Oilseeds (Group H) ──
+  "cashew": "H005",
+  "cashew nut": "H005",
+  "cashews": "H005",
+  "kaju": "H005",
+  "kaju paste": "H005",
 };
 
 /**
@@ -566,6 +669,57 @@ export function matchIngredient(query: string): MatchedIngredient | null {
     return null;
   }
 
+  // ── Supplemental Authoritative Culinary Standards (Universal commodities missing from IFCT) ──
+  const suppKey = SUPPLEMENTAL_ALIASES[norm];
+  if (suppKey && SUPPLEMENTAL_CULINARY_STANDARDS[suppKey]) {
+    const s = SUPPLEMENTAL_CULINARY_STANDARDS[suppKey];
+    return {
+      id: s.id,
+      name: s.name,
+      category: s.category,
+      tier: "tier1_synonym",
+      confidence: 1.0,
+      matchedQuery: query,
+      matchedAlias: norm,
+      requiresReview: false,
+      structuralParts: [],
+      source: s.source,
+      nutrientsPer100g: {
+        energyKcal: s.energyKcal,
+        energyKj: s.energyKj,
+        proteinG: s.proteinG,
+        fatG: s.fatG,
+        carbG: s.carbG,
+        fiberG: s.fiberG,
+        waterG: s.waterG,
+        ashG: 0,
+      },
+      originalSourceEnergyZero: false,
+      rawFood: {
+        id: s.id,
+        code: s.id,
+        name: s.name,
+        scientificName: "",
+        groupLetter: "L",
+        category: s.category,
+        sourceEnergyZero: false,
+        tags: [],
+        nutrientsPer100g: {
+          energyKcal: s.energyKcal,
+          energyKj: s.energyKj,
+          proteinG: s.proteinG,
+          fatG: s.fatG,
+          carbG: s.carbG,
+          fiberG: s.fiberG,
+          waterG: s.waterG,
+          ashG: 0,
+        },
+        aliases: [],
+        structuralParts: [],
+      },
+    };
+  }
+
   // ── Tier 1: Curated Canonical Synonym Map ──
   const tier1Id = TIER1_SEED_MAP[norm];
   if (tier1Id) {
@@ -581,6 +735,7 @@ export function matchIngredient(query: string): MatchedIngredient | null {
         matchedAlias: norm,
         requiresReview: false,
         structuralParts: food.structuralParts,
+        source: "ICMR-NIN IFCT 2017",
         nutrientsPer100g: resolveNutrientsWithAtwater(food),
         originalSourceEnergyZero: food.sourceEnergyZero,
         rawFood: food,
@@ -603,6 +758,7 @@ export function matchIngredient(query: string): MatchedIngredient | null {
         matchedAlias: tier2Match.aliasName,
         requiresReview: false,
         structuralParts: food.structuralParts,
+        source: "ICMR-NIN IFCT 2017",
         nutrientsPer100g: resolveNutrientsWithAtwater(food),
         originalSourceEnergyZero: food.sourceEnergyZero,
         rawFood: food,
@@ -676,6 +832,7 @@ export function matchIngredient(query: string): MatchedIngredient | null {
       matchedAlias: bestAlias,
       requiresReview: true, // Tier 3 always flagged for UI review
       structuralParts: bestFood.structuralParts,
+      source: "ICMR-NIN IFCT 2017",
       nutrientsPer100g: resolveNutrientsWithAtwater(bestFood),
       originalSourceEnergyZero: bestFood.sourceEnergyZero,
       rawFood: bestFood,
