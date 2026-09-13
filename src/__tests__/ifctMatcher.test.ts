@@ -302,6 +302,49 @@ describe("IFCT 3-Tier Matcher Engine (src/lib/ifctMatcher.ts)", () => {
       expect(matchIngredient("hing")?.id).toBe("G019");
     });
 
+    it("should resolve supplemental standards for butter, cream, curd, and cheese with explicit sources", () => {
+      const butter = matchIngredient("butter");
+      expect(butter).not.toBeNull();
+      expect(butter?.id).toBe("SUPP_BUTTER");
+      expect(butter?.source).toBe("USDA FoodData Central FDC ID 173410");
+      expect(butter?.nutrientsPer100g.energyKcal).toBe(717.0);
+      expect(butter?.nutrientsPer100g.fatG).toBe(81.11);
+      expect(butter?.nutrientsPer100g.proteinG).toBe(0.85);
+
+      const makhan = matchIngredient("makhan");
+      expect(makhan?.id).toBe("SUPP_BUTTER");
+
+      const cream = matchIngredient("fresh cream");
+      expect(cream).not.toBeNull();
+      expect(cream?.id).toBe("SUPP_CREAM");
+      expect(cream?.source).toContain("commercial fresh cooking cream standard");
+      expect(cream?.nutrientsPer100g.energyKcal).toBe(246.0);
+      expect(cream?.nutrientsPer100g.fatG).toBe(25.0);
+
+      const malai = matchIngredient("malai");
+      expect(malai?.id).toBe("SUPP_CREAM");
+
+      const curd = matchIngredient("curd");
+      expect(curd?.id).toBe("SUPP_CURD");
+      expect(curd?.nutrientsPer100g.energyKcal).toBe(61.0);
+
+      const cheese = matchIngredient("cheese");
+      expect(cheese?.id).toBe("SUPP_CHEESE");
+      expect(cheese?.nutrientsPer100g.energyKcal).toBe(403.0);
+    });
+
+    it("should resolve cashew and kaju directly in Tier 1 to H005", () => {
+      const cashew = matchIngredient("cashew");
+      expect(cashew).not.toBeNull();
+      expect(cashew?.id).toBe("H005");
+      expect(cashew?.tier).toBe("tier1_synonym");
+      expect(cashew?.nutrientsPer100g.energyKcal).toBe(582.7);
+
+      const kaju = matchIngredient("kaju");
+      expect(kaju?.id).toBe("H005");
+      expect(kaju?.tier).toBe("tier1_synonym");
+    });
+
     it("should confirm existing ifctData.ts and IFCT_DATABASE remain untouched and valid", () => {
       // Verify existing 21-item database is completely unchanged
       expect(Object.keys(IFCT_DATABASE).length).toBeGreaterThanOrEqual(20);

@@ -64,6 +64,11 @@ export function sanitizeJsonOutput(text: string): string {
  * nutrition estimates. Camera-first capture.
  * ───────────────────────────────────────────── */
 
+export interface FoodIngredient {
+  name: string;
+  estimatedGrams: number;
+}
+
 export interface DetectedFoodItem {
   name: string;
   dishName: string;
@@ -72,12 +77,15 @@ export interface DetectedFoodItem {
   quantity: number;
   unitType: "piece" | "katori" | "scoop" | "gram" | "plate";
   portionSize?: "small" | "medium" | "large";
+  ingredients?: FoodIngredient[];
   estimatedCalories?: number;
   proteinG?: number;
   carbsG?: number;
   fatG?: number;
   weightGrams?: number;
   unmatched?: boolean;
+  partialMatch?: boolean;
+  unmatchedIngredients?: string[];
   quantityClamped?: boolean;
 }
 
@@ -100,7 +108,7 @@ export async function analyzeMealImage(
   const model = getVisionModel();
 
   const prompt = `You are a world-class Indian Culinary Computer Vision Specialist.
-Analyze this food image and return a JSON object with strict visual identification. Do NOT attempt raw calorie/protein math; focus on accurate visual dish identification, preparation style, and standard unit counting.
+Analyze this food image and return a JSON object with strict visual identification. Do NOT attempt raw calorie/protein math; focus on accurate visual dish identification, preparation style, standard unit counting, and ingredient decomposition.
 
 IMPORTANT NEGATIVE CONSTRAINTS:
 - If the image contains NO food (e.g. an empty plate, glass/bottle of plain water, a person, desk, gym equipment, or non-food objects), return "foods": [], "confidence": 0.0, "plateType": "single_dish", and describe what is visible in "notes".
@@ -108,17 +116,31 @@ IMPORTANT NEGATIVE CONSTRAINTS:
 
 ${learnedContext ? `LEARNED USER PLATE CONTEXT:\n${learnedContext}\n` : ""}
 
+INGREDIENT DECOMPOSITION RULES:
+- For each food item, provide an "ingredients" array decomposing the dish into its raw/cooked constituent ingredients with "estimatedGrams".
+- For simple single-ingredient items (e.g. "boiled egg", "plain rice", "banana"), provide a single ingredient entry matching the dish (e.g. [{ "name": "egg", "estimatedGrams": 50 }]).
+- For composite dishes (curries, dals, sabzis, biryanis), decompose into primary protein/vegetable, cooking fat, and major gravies/aromatics (e.g. [{ "name": "mutton", "estimatedGrams": 150 }, { "name": "mustard oil", "estimatedGrams": 15 }, { "name": "onion", "estimatedGrams": 40 }, { "name": "tomato", "estimatedGrams": 30 }]).
+- CRITICAL FAT RULE: Fried, sautéed, tadka, or curry preparations MUST include cooking oil, ghee, or butter as a separate ingredient line with realistic estimated grams (e.g. 10-15g for home curry, 5-10g for tadka/omelette, 15-20g for restaurant/deep-fried). Never omit cooking fat for cooked dishes.
+- Use standard, specific ingredient names (e.g. "chicken", "mutton", "mustard oil", "ghee", "toor dal", "onion", "tomato", "paneer", "potato"). Do NOT use generic dish descriptors like "curry", "gravy", "sabzi", or "masala" as ingredient names.
+- Do NOT calculate calories, protein, carbs, or fat. Output only visual identification, dish metadata, and ingredient gram estimates.
+
 Return a JSON object matching this structure:
 {
   "foods": [
     {
-      "name": "string (e.g. Yellow Dal, Whole Wheat Roti, Cooked White Rice)",
+      "name": "string (e.g. Yellow Dal, Whole Wheat Roti, Cooked White Rice, Mutton Curry)",
       "dishName": "string (canonical name: roti | dal_toor | rice_cooked | curd | paneer_raw | egg_whole | etc)",
-      "preparationStyle": "string (e.g. thin_mess | plain | ghee | thick_home | steamed)",
+      "preparationStyle": "string (e.g. thin_mess | plain | ghee | thick_home | steamed | fried)",
       "visualCues": "string (e.g. watery yellow turmeric dal, 2 circular whole wheat flatbreads)",
       "quantity": number (e.g. 2 for rotis, 1 for katori dal),
       "unitType": "piece" | "katori" | "scoop" | "gram" | "plate",
-      "portionSize": "small" | "medium" | "large"
+      "portionSize": "small" | "medium" | "large",
+      "ingredients": [
+        {
+          "name": "string (specific ingredient: e.g. mutton, mustard oil, onion, tomato)",
+          "estimatedGrams": number (estimated weight in grams for this ingredient in the portion)
+        }
+      ]
     }
   ],
   "confidence": number (0.0 to 1.0),
@@ -150,20 +172,34 @@ export async function analyzeMealTextWithGroq(description: string): Promise<Meal
 
   const prompt = `You are an Indian Culinary Specialist AI.
 Analyze this meal text description: "${description}"
-Extract dish names, canonical dish IDs, quantities, and unit types for ICMR-NIN IFCT 2017 macro calculation.
+Extract dish names, canonical dish IDs, quantities, unit types, and ingredient decompositions for ICMR-NIN IFCT 2017 macro calculation.
 
 IMPORTANT: If the text describes only water, non-food items, fasting, or contains no edible food, return "foods": [], "confidence": 0.0, and explain in "notes". Do NOT guess food if none was described.
+
+INGREDIENT DECOMPOSITION RULES:
+- For each food item, provide an "ingredients" array decomposing the dish into its constituent ingredients with "estimatedGrams".
+- For simple single-ingredient items (e.g. "boiled egg", "plain rice"), provide a single ingredient entry matching the dish.
+- For composite dishes (curries, dals, sabzis), decompose into primary protein/vegetable, cooking fat, and major gravies/aromatics.
+- CRITICAL FAT RULE: Fried, sautéed, tadka, or curry preparations MUST include cooking oil, ghee, or butter as a separate ingredient line with realistic estimated grams (e.g. 10-15g for home curry, 5-10g for tadka/omelette). Never omit cooking fat for cooked dishes.
+- Use standard, specific ingredient names (e.g. "chicken", "mutton", "mustard oil", "ghee", "toor dal", "onion", "tomato", "paneer"). Do NOT use generic dish descriptors like "curry", "gravy", "sabzi", or "masala" as ingredient names.
+- Do NOT calculate calories, protein, carbs, or fat.
 
 Return ONLY a JSON object matching:
 {
   "foods": [
     {
-      "name": "string (e.g. Boiled Egg, Roti, Dal Tadka, Chicken Curry, Curd)",
+      "name": "string (e.g. Boiled Egg, Roti, Dal Tadka, Chicken Curry, Curd, Mutton Curry)",
       "dishName": "string (canonical name: roti | dal_toor | rice_cooked | curd | paneer_raw | egg_whole | chicken_curry | soya | etc)",
-      "preparationStyle": "string (e.g. thin_mess | plain | ghee | thick_home | steamed)",
+      "preparationStyle": "string (e.g. thin_mess | plain | ghee | thick_home | steamed | fried)",
       "quantity": number (e.g. 4 for eggs, 2 for rotis, 1 for katori dal),
       "unitType": "piece" | "katori" | "scoop" | "gram" | "plate",
-      "portionSize": "small" | "medium" | "large"
+      "portionSize": "small" | "medium" | "large",
+      "ingredients": [
+        {
+          "name": "string (specific ingredient: e.g. chicken, mustard oil, onion, tomato)",
+          "estimatedGrams": number
+        }
+      ]
     }
   ],
   "confidence": 0.95,

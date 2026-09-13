@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { analyzeMealImage, analyzeMealTextWithGroq, MealAnalysis, DetectedFoodItem } from "@/lib/gemini";
 import { calculateFoodMacros } from "@/lib/ifctData";
+import { matchIngredient } from "@/lib/ifctMatcher";
 
 export function getMockMealAnalysis(): MealAnalysis {
   const item1 = calculateFoodMacros("Roti", 2, "piece");
@@ -113,6 +114,54 @@ export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnaly
   });
 
   const enrichedFoods: DetectedFoodItem[] = validCandidates.map((food) => {
+    // New Pipeline: Decompose dish into ingredients if ingredients array is provided and non-empty
+    if (food.ingredients && Array.isArray(food.ingredients) && food.ingredients.length > 0) {
+      let dishCalories = 0;
+      let dishProteinG = 0;
+      let dishCarbsG = 0;
+      let dishFatG = 0;
+      let dishWeightGrams = 0;
+      let matchedCount = 0;
+      const unmatchedIngredients: string[] = [];
+
+      for (const ing of food.ingredients) {
+        const grams = ing.estimatedGrams && ing.estimatedGrams > 0 ? ing.estimatedGrams : 0;
+        dishWeightGrams += grams;
+        const match = matchIngredient(ing.name);
+        if (match) {
+          matchedCount++;
+          const factor = grams / 100;
+          dishCalories += match.nutrientsPer100g.energyKcal * factor;
+          dishProteinG += match.nutrientsPer100g.proteinG * factor;
+          dishCarbsG += match.nutrientsPer100g.carbG * factor;
+          dishFatG += match.nutrientsPer100g.fatG * factor;
+        } else {
+          unmatchedIngredients.push(ing.name);
+        }
+      }
+
+      const isFullyUnmatched = matchedCount === 0;
+      const isPartialMatch = matchedCount > 0 && unmatchedIngredients.length > 0;
+
+      return {
+        ...food,
+        name: food.name,
+        dishName: food.dishName || food.name,
+        quantity: food.quantity && food.quantity > 0 ? food.quantity : 1,
+        unitType: food.unitType || "plate",
+        estimatedCalories: Math.round(dishCalories),
+        proteinG: Math.round(dishProteinG * 10) / 10,
+        carbsG: Math.round(dishCarbsG * 10) / 10,
+        fatG: Math.round(dishFatG * 10) / 10,
+        weightGrams: Math.round(dishWeightGrams),
+        unmatched: isFullyUnmatched,
+        partialMatch: isPartialMatch,
+        unmatchedIngredients: isPartialMatch ? unmatchedIngredients : undefined,
+        quantityClamped: false,
+      };
+    }
+
+    // Fallback: Legacy ifctData.ts calculateFoodMacros path
     const dishQuery = food.dishName || food.name!;
     const qty = food.quantity && food.quantity > 0 ? food.quantity : 1;
     const unit = food.unitType || "piece";
@@ -136,7 +185,7 @@ export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnaly
     };
   });
 
-  const totalCalories = enrichedFoods.reduce((sum, f) => sum + (f.estimatedCalories || 0), 0);
+  const totalCalories = Math.round(enrichedFoods.reduce((sum, f) => sum + (f.estimatedCalories || 0), 0));
   const totalProteinG = Math.round(enrichedFoods.reduce((sum, f) => sum + (f.proteinG || 0), 0) * 10) / 10;
   const totalCarbsG = Math.round(enrichedFoods.reduce((sum, f) => sum + (f.carbsG || 0), 0) * 10) / 10;
   const totalFatG = Math.round(enrichedFoods.reduce((sum, f) => sum + (f.fatG || 0), 0) * 10) / 10;
@@ -145,6 +194,9 @@ export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnaly
   const hasUnmatched = enrichedFoods.some((f) => f.unmatched);
   const unmatchedNames = enrichedFoods.filter((f) => f.unmatched).map((f) => f.name).join(", ");
   const clampedItems = enrichedFoods.filter((f) => f.quantityClamped).map((f) => f.name);
+  const partialItems = enrichedFoods.filter(
+    (f) => f.partialMatch && f.unmatchedIngredients && f.unmatchedIngredients.length > 0
+  );
 
   let finalNotes = rawAnalysis.notes || "";
   if (isNonFoodFiltered) {
@@ -153,6 +205,13 @@ export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnaly
     if (hasUnmatched) {
       const warning = `Couldn't identify macros for: ${unmatchedNames} — please edit manually.`;
       finalNotes = finalNotes ? `${finalNotes} (${warning})` : warning;
+    }
+    if (partialItems.length > 0) {
+      const partialSummary = partialItems
+        .map((f) => `${f.name} (unmatched: ${f.unmatchedIngredients!.join(", ")})`)
+        .join("; ");
+      const partialWarning = `Partial macro match for: ${partialSummary} — some ingredients could not be identified.`;
+      finalNotes = finalNotes ? `${finalNotes} (${partialWarning})` : partialWarning;
     }
     if (clampedItems.length > 0) {
       const clampWarning = `Quantity adjusted to maximum plausible limit for: ${clampedItems.join(", ")} — please verify.`;
