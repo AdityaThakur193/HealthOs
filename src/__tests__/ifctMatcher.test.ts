@@ -263,6 +263,24 @@ describe("IFCT 3-Tier Matcher Engine (src/lib/ifctMatcher.ts)", () => {
       expect(sunflowerOil?.originalSourceEnergyZero).toBe(true);
       expect(sunflowerOil?.nutrientsPer100g.energyKcal).toBe(900.0);
     });
+
+    it("should resolve cooking oil and vegetable oil synonyms to Sunflower oil (T012)", () => {
+      const cookingOil = matchIngredient("cooking oil");
+      expect(cookingOil).not.toBeNull();
+      expect(cookingOil?.id).toBe("T012");
+      expect(cookingOil?.tier).toBe("tier1_synonym");
+      expect(cookingOil?.nutrientsPer100g.energyKcal).toBe(900.0);
+      expect(cookingOil?.nutrientsPer100g.fatG).toBe(100.0);
+
+      const vegOil = matchIngredient("vegetable oil");
+      expect(vegOil?.id).toBe("T012");
+
+      const refinedOil = matchIngredient("refined oil");
+      expect(refinedOil?.id).toBe("T012");
+
+      const refinedVegOil = matchIngredient("refined vegetable oil");
+      expect(refinedVegOil?.id).toBe("T012");
+    });
   });
 
   // ── 6. Negative Matching & Architectural Isolation ──
@@ -289,6 +307,12 @@ describe("IFCT 3-Tier Matcher Engine (src/lib/ifctMatcher.ts)", () => {
       expect(matchIngredient("masala")).toBeNull();
     });
 
+    it("should return null for bare generic category terms (oil, fish) preserving collision guards", () => {
+      expect(matchIngredient("oil")).toBeNull();
+      expect(matchIngredient("fish")).toBeNull();
+      expect(matchIngredient("meat")).toBeNull();
+    });
+
     it("should verify audited vegetables and spices resolve to exact IFCT items", () => {
       expect(matchIngredient("spinach")?.id).toBe("C033");
       expect(matchIngredient("palak")?.id).toBe("C033");
@@ -302,7 +326,7 @@ describe("IFCT 3-Tier Matcher Engine (src/lib/ifctMatcher.ts)", () => {
       expect(matchIngredient("hing")?.id).toBe("G019");
     });
 
-    it("should resolve supplemental standards for butter, cream, curd, and cheese with explicit sources", () => {
+    it("should resolve supplemental standards for butter, cream, curd, cheese, and mayonnaise with explicit sources", () => {
       const butter = matchIngredient("butter");
       expect(butter).not.toBeNull();
       expect(butter?.id).toBe("SUPP_BUTTER");
@@ -331,6 +355,20 @@ describe("IFCT 3-Tier Matcher Engine (src/lib/ifctMatcher.ts)", () => {
       const cheese = matchIngredient("cheese");
       expect(cheese?.id).toBe("SUPP_CHEESE");
       expect(cheese?.nutrientsPer100g.energyKcal).toBe(403.0);
+
+      const mayo = matchIngredient("mayonnaise");
+      expect(mayo).not.toBeNull();
+      expect(mayo?.id).toBe("SUPP_MAYONNAISE");
+      expect(mayo?.source).toBe("USDA FoodData Central FDC ID 171009");
+      expect(mayo?.nutrientsPer100g.energyKcal).toBe(680.0);
+      expect(mayo?.nutrientsPer100g.fatG).toBe(74.85);
+      expect(mayo?.nutrientsPer100g.proteinG).toBe(0.96);
+      expect(mayo?.nutrientsPer100g.carbG).toBe(0.57);
+
+      expect(matchIngredient("mayo")?.id).toBe("SUPP_MAYONNAISE");
+      expect(matchIngredient("toum")?.id).toBe("SUPP_MAYONNAISE");
+      expect(matchIngredient("garlic mayo")?.id).toBe("SUPP_MAYONNAISE");
+      expect(matchIngredient("garlic mayonnaise")?.id).toBe("SUPP_MAYONNAISE");
     });
 
     it("should resolve cashew and kaju directly in Tier 1 to H005", () => {

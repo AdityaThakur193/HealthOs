@@ -105,6 +105,19 @@ export const SUPPLEMENTAL_CULINARY_STANDARDS: Record<string, SupplementalStandar
     fiberG: 0.0,
     waterG: 36.75,
   },
+  mayonnaise: {
+    id: "SUPP_MAYONNAISE",
+    name: "Salad dressing, mayonnaise, regular",
+    category: "Fats and Oils",
+    source: "USDA FoodData Central FDC ID 171009",
+    energyKcal: 680.0,
+    energyKj: 2844.0,
+    proteinG: 0.96,
+    fatG: 74.85,
+    carbG: 0.57,
+    fiberG: 0.0,
+    waterG: 21.65,
+  },
 };
 
 export const SUPPLEMENTAL_ALIASES: Record<string, string> = {
@@ -127,6 +140,11 @@ export const SUPPLEMENTAL_ALIASES: Record<string, string> = {
   "cheddar cheese": "cheese",
   "processed cheese": "cheese",
   mozzarella: "cheese",
+  mayonnaise: "mayonnaise",
+  mayo: "mayonnaise",
+  toum: "mayonnaise",
+  "garlic mayo": "mayonnaise",
+  "garlic mayonnaise": "mayonnaise",
 };
 
 /**
@@ -380,6 +398,10 @@ export const TIER1_SEED_MAP: Record<string, string> = {
   "rice bran oil": "T008",
   "vanaspati": "T014",
   "dalda": "T014",
+  "cooking oil": "T012",
+  "vegetable oil": "T012",
+  "refined oil": "T012",
+  "refined vegetable oil": "T012",
 
   // ── Grains, Flours & Millets (Group A & F) ──
   "atta": "A019",
