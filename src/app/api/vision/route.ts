@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { analyzeMealImage, analyzeMealTextWithGroq, MealAnalysis, DetectedFoodItem } from "@/lib/gemini";
 import { calculateFoodMacros } from "@/lib/ifctData";
-import { matchIngredient } from "@/lib/ifctMatcher";
+import { matchIngredient, resolveCulinaryPortion } from "@/lib/ifctMatcher";
 
 export function getMockMealAnalysis(): MealAnalysis {
   const item1 = calculateFoodMacros("Roti", 2, "piece");
@@ -130,11 +130,19 @@ export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnaly
         const match = matchIngredient(ing.name);
         if (match) {
           matchedCount++;
-          const factor = grams / 100;
+          const resolved = resolveCulinaryPortion(match.id, ing.name, grams);
+          const factor = resolved.effectiveWeightGrams / 100;
           dishCalories += match.nutrientsPer100g.energyKcal * factor;
           dishProteinG += match.nutrientsPer100g.proteinG * factor;
           dishCarbsG += match.nutrientsPer100g.carbG * factor;
           dishFatG += match.nutrientsPer100g.fatG * factor;
+
+          // Add supplemental absorbed lipid (e.g. deep-fried birista)
+          if (resolved.supplementalOilGrams > 0) {
+            const oilFactor = resolved.supplementalOilGrams / 100;
+            dishCalories += 900 * oilFactor; // Cooking oil: 900 kcal / 100g
+            dishFatG += 100 * oilFactor;     // 100g lipid / 100g
+          }
         } else {
           unmatchedIngredients.push(ing.name);
         }

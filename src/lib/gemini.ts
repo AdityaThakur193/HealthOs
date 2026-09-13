@@ -117,11 +117,24 @@ IMPORTANT NEGATIVE CONSTRAINTS:
 ${learnedContext ? `LEARNED USER PLATE CONTEXT:\n${learnedContext}\n` : ""}
 
 INGREDIENT DECOMPOSITION RULES:
-- For each food item, provide an "ingredients" array decomposing the dish into its raw/cooked constituent ingredients with "estimatedGrams".
+- For each food item, provide an "ingredients" array decomposing the dish into its visible, finished plate components with "estimatedGrams".
+- VISIBLE COOKED WEIGHT RULE: Always estimate the VISIBLE FINISHED COOKED WEIGHT of each component as it appears on the plate (e.g. ~150-220g for a serving of cooked rice, ~150g for a bowl of cooked dal, ~40g for a cooked roti, ~90g for a baked naan, ~100g for cooked chicken meat). Do NOT attempt to calculate dry raw grain weights or reverse hydration; the database pipeline handles culinary conversions deterministically.
+- SCALE & REFERENCE-OBJECT ANCHORING RULES:
+  Establish physical geometry and absolute portion mass using standard reference objects visible in food photography:
+  1. Dipping Katoris / Ramekins: Standard stainless-steel katoris or sauce cups are 6-8 cm in diameter and hold ~50-60g of liquid/dip.
+  2. Bone-in Chicken Quarter: A standard cooked leg quarter (thigh + drumstick) yields ~180-220g edible meat. Two visible quarters = ~360-440g edible meat.
+  3. Garnishes: A single lemon wedge is ~15-20g; single sliced raw onion/cucumber rounds are ~5g each.
+  4. Platter Scale Calibration:
+     - If the plate diameter is ~3x the width of a katori (~25 cm / 10 in), it is an individual plate: cooked rice is ~200-300g.
+     - If the platter diameter is >5x the width of a katori (e.g. ~45 cm / 18 in communal Mandi/Biryani thaal), it is a sharing platter: the cooked rice bed is typically ~800-1000g, NOT thousands of grams.
+- COMPOSITE PLATTER SEGMENTATION RULE:
+  For composite rice dishes served with cooked protein on top (e.g. Chicken Mandi, Chicken Biryani, Kabsa), ALWAYS group the seasoned rice bed, primary meat, cooking fat, and direct garnishes together into ONE unified primary food item (e.g. "Chicken Mandi" with ingredients: rice, chicken, cooking fat, fried onions, cashews). Do NOT splinter the rice bed and the meat into disconnected standalone dishes. Separate only distinct side items like dipping sauces, chutneys, and raw side salads into their own food entries.
 - For simple single-ingredient items (e.g. "boiled egg", "plain rice", "banana"), provide a single ingredient entry matching the dish (e.g. [{ "name": "egg", "estimatedGrams": 50 }]).
 - For composite dishes (curries, dals, sabzis, biryanis), decompose into primary protein/vegetable, cooking fat, and major gravies/aromatics (e.g. [{ "name": "mutton", "estimatedGrams": 150 }, { "name": "mustard oil", "estimatedGrams": 15 }, { "name": "onion", "estimatedGrams": 40 }, { "name": "tomato", "estimatedGrams": 30 }]).
-- CRITICAL FAT RULE: Fried, sautéed, tadka, or curry preparations MUST include cooking oil, ghee, or butter as a separate ingredient line with realistic estimated grams (e.g. 10-15g for home curry, 5-10g for tadka/omelette, 15-20g for restaurant/deep-fried). Never omit cooking fat for cooked dishes.
-- Use standard, specific ingredient names (e.g. "chicken", "mutton", "mustard oil", "ghee", "toor dal", "onion", "tomato", "paneer", "potato"). Do NOT use generic dish descriptors like "curry", "gravy", "sabzi", or "masala" as ingredient names.
+- CRITICAL FAT RULE: Fried, sautéed, tadka, or curry preparations MUST include cooking oil, ghee, or butter as a separate ingredient line with realistic estimated grams (e.g. 10-15g for home curry, 5-10g for tadka/omelette, 15-20g for restaurant/deep-fried, 5-10g butter/ghee glazed on breads). Never omit cooking fat for cooked dishes.
+- BREADS & GRAINS: Flatbreads and grains should list the base grain/flour (e.g. "atta" or "roti" for chapati, "maida" for naan, "basmati rice" for biryani/rice). Any visible glaze (ghee, butter) MUST be a separate ingredient line.
+- GARNISHES: Dehydrated/fried toppings like crispy fried onions (birista) should be listed explicitly (e.g. [{ "name": "birista", "estimatedGrams": 10 }]).
+- Use standard, specific ingredient names (e.g. "chicken", "mutton", "mustard oil", "ghee", "butter", "toor dal", "onion", "tomato", "paneer", "potato", "birista"). Do NOT use generic dish descriptors like "curry", "gravy", "sabzi", or "masala" as ingredient names.
 - Do NOT calculate calories, protein, carbs, or fat. Output only visual identification, dish metadata, and ingredient gram estimates.
 
 Return a JSON object matching this structure:
@@ -177,11 +190,14 @@ Extract dish names, canonical dish IDs, quantities, unit types, and ingredient d
 IMPORTANT: If the text describes only water, non-food items, fasting, or contains no edible food, return "foods": [], "confidence": 0.0, and explain in "notes". Do NOT guess food if none was described.
 
 INGREDIENT DECOMPOSITION RULES:
-- For each food item, provide an "ingredients" array decomposing the dish into its constituent ingredients with "estimatedGrams".
-- For simple single-ingredient items (e.g. "boiled egg", "plain rice"), provide a single ingredient entry matching the dish.
-- For composite dishes (curries, dals, sabzis), decompose into primary protein/vegetable, cooking fat, and major gravies/aromatics.
-- CRITICAL FAT RULE: Fried, sautéed, tadka, or curry preparations MUST include cooking oil, ghee, or butter as a separate ingredient line with realistic estimated grams (e.g. 10-15g for home curry, 5-10g for tadka/omelette). Never omit cooking fat for cooked dishes.
-- Use standard, specific ingredient names (e.g. "chicken", "mutton", "mustard oil", "ghee", "toor dal", "onion", "tomato", "paneer"). Do NOT use generic dish descriptors like "curry", "gravy", "sabzi", or "masala" as ingredient names.
+- For each food item, provide an "ingredients" array decomposing the dish into its visible, finished plate components with "estimatedGrams".
+- VISIBLE COOKED WEIGHT RULE: Always estimate the VISIBLE FINISHED COOKED WEIGHT of each component as it appears on the plate (e.g. ~150-220g for a serving of cooked rice, ~150g for a bowl of cooked dal, ~40g for a cooked roti, ~90g for a baked naan, ~100g for cooked chicken meat). Do NOT attempt to calculate dry raw grain weights or reverse hydration; the database pipeline handles culinary conversions deterministically.
+- For simple single-ingredient items (e.g. "boiled egg", "plain rice", "banana"), provide a single ingredient entry matching the dish.
+- For composite dishes (curries, dals, sabzis, biryanis), decompose into primary protein/vegetable, cooking fat, and major gravies/aromatics.
+- CRITICAL FAT RULE: Fried, sautéed, tadka, or curry preparations MUST include cooking oil, ghee, or butter as a separate ingredient line with realistic estimated grams (e.g. 10-15g for home curry, 5-10g for tadka/omelette, 5-10g butter/ghee on breads). Never omit cooking fat for cooked dishes.
+- BREADS & GRAINS: Flatbreads and grains should list the base grain/flour (e.g. "atta" or "roti" for chapati, "maida" for naan, "basmati rice" for biryani/rice). Any visible glaze (ghee, butter) MUST be a separate ingredient line.
+- GARNISHES: Dehydrated/fried toppings like crispy fried onions (birista) should be listed explicitly (e.g. [{ "name": "birista", "estimatedGrams": 10 }]).
+- Use standard, specific ingredient names (e.g. "chicken", "mutton", "mustard oil", "ghee", "butter", "toor dal", "onion", "tomato", "paneer", "birista"). Do NOT use generic dish descriptors like "curry", "gravy", "sabzi", or "masala" as ingredient names.
 - Do NOT calculate calories, protein, carbs, or fat.
 
 Return ONLY a JSON object matching:

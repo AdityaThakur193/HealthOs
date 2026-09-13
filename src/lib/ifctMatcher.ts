@@ -105,6 +105,19 @@ export const SUPPLEMENTAL_CULINARY_STANDARDS: Record<string, SupplementalStandar
     fiberG: 0.0,
     waterG: 36.75,
   },
+  mayonnaise: {
+    id: "SUPP_MAYONNAISE",
+    name: "Salad dressing, mayonnaise, regular",
+    category: "Fats and Oils",
+    source: "USDA FoodData Central FDC ID 171009",
+    energyKcal: 680.0,
+    energyKj: 2844.0,
+    proteinG: 0.96,
+    fatG: 74.85,
+    carbG: 0.57,
+    fiberG: 0.0,
+    waterG: 21.65,
+  },
 };
 
 export const SUPPLEMENTAL_ALIASES: Record<string, string> = {
@@ -127,7 +140,195 @@ export const SUPPLEMENTAL_ALIASES: Record<string, string> = {
   "cheddar cheese": "cheese",
   "processed cheese": "cheese",
   mozzarella: "cheese",
+  mayonnaise: "mayonnaise",
+  mayo: "mayonnaise",
+  toum: "mayonnaise",
+  "garlic mayo": "mayonnaise",
+  "garlic mayonnaise": "mayonnaise",
 };
+
+/**
+ * ── Sourced Culinary Transforms (Cooked-to-Raw Hydration & Processing Ratios) ──
+ *
+ * Principle: "Use software for certainty; use AI for uncertainty."
+ * Gemini/Groq estimates visible finished cooked weight on the plate (e.g. 220g cooked rice, 40g roti).
+ * The transformation engine converts these cooked/processed weights into their raw IFCT commodity baselines.
+ */
+export type CulinaryTransformCategory = "cereal_grain" | "pulse_dal" | "flatbread_dough" | "dehydrated_fried";
+
+export interface CulinaryTransform {
+  id: string;
+  name: string;
+  category: CulinaryTransformCategory;
+  source: string;
+  /**
+   * For hydrated items (grains, dals, flatbreads where raw item absorbed water or dough retained water):
+   * Divisor applied to visible cooked weight: rawGrams = visibleCookedGrams / hydrationDivisor.
+   * Always > 1.0.
+   */
+  hydrationDivisor?: number;
+  /**
+   * For dehydrated items (e.g. birista where raw item lost water during frying):
+   * Multiplier applied to visible fried weight: rawGrams = visibleFriedGrams * expansionMultiplier.
+   * Always > 1.0.
+   */
+  expansionMultiplier?: number;
+  /**
+   * Fraction of visible weight consisting of absorbed cooking fat (for deep-fried dehydrated garnishes).
+   * e.g. 0.35 means 35% of visible weight is absorbed oil.
+   */
+  absorbedOilRatio?: number;
+  notes: string;
+}
+
+export const CULINARY_TRANSFORMS: Record<string, CulinaryTransform> = {
+  // ── Grains (Cooked -> Raw) ──
+  A015: {
+    id: "A015",
+    name: "Cooked White / Basmati Rice",
+    category: "cereal_grain",
+    source: "ICMR-NIN Nutritive Value of Indian Foods (NVIF) Table of Cooked Dishes (150g cooked katori = 55g raw rice, yield factor 2.73)",
+    hydrationDivisor: 2.73,
+    notes: "150g cooked katori = 55g raw rice (yield factor 2.73). Energy density reduces from 356.4 kcal (raw) to ~130 kcal/100g (cooked).",
+  },
+  A013: {
+    id: "A013",
+    name: "Cooked Brown Rice",
+    category: "cereal_grain",
+    source: "USDA FDC 169704/169705 & IFCT 2017 A013",
+    hydrationDivisor: 2.50,
+    notes: "Brown rice bran layer reduces water absorption; yield factor 2.50.",
+  },
+
+  // ── Indian Flatbreads (Baked Bread Matrix -> Raw Flour) ──
+  A019: {
+    id: "A019",
+    name: "Whole Wheat Roti / Chapati",
+    category: "flatbread_dough",
+    source: "USDA FDC ID 172844 (Chapati) & ICMR-NIN Dietary Guidelines for Indians",
+    hydrationDivisor: 1.43,
+    notes: "40g plain roti = 28g dry atta. Moisture 37.8% in baked roti vs 11.1% in dry flour.",
+  },
+  A018: {
+    id: "A018",
+    name: "Tandoori Naan / Refined Flour Flatbread",
+    category: "flatbread_dough",
+    source: "CFTRI Tandoor Baking Technology studies & standard commercial naan dough formulation",
+    hydrationDivisor: 1.38,
+    notes: "90g plain baked naan matrix = 65.2g dry maida (yield 1.38x). Excludes separate surface butter glaze.",
+  },
+
+  // ── Pulses & Dals (Cooked Dal -> Raw Pulse) ──
+  B021: {
+    id: "B021",
+    name: "Cooked Yellow Dal (Toor / Arhar)",
+    category: "pulse_dal",
+    source: "ICMR-NIN NVIF Cooked Dishes (150g katori = 39g raw dal, yield factor 3.85)",
+    hydrationDivisor: 3.85,
+    notes: "Standard medium home dal consistency (82-85% moisture). 150g katori yields ~105-129 kcal depending on dilution.",
+  },
+  B010: {
+    id: "B010",
+    name: "Cooked Moong Dal (Dhuli Moong)",
+    category: "pulse_dal",
+    source: "ICMR-NIN NVIF Cooked Dishes & IFCT 2017 B010",
+    hydrationDivisor: 3.85,
+    notes: "Standard cooked moong dal consistency yielding ~75 kcal/100g.",
+  },
+
+  // ── Dehydrated Garnishes (Inverse Hydration + Oil Absorption) ──
+  birista: {
+    id: "birista",
+    name: "Fried Onions / Birista Garnish",
+    category: "dehydrated_fried",
+    source: "Culinary deep-frying allium standard (derived from USDA FDC 168926 & IFCT G017 moisture delta)",
+    expansionMultiplier: 2.50, // 10g fried -> 10 * 2.50 = 25g raw onion
+    absorbedOilRatio: 0.35,    // 10g fried -> 10 * 0.35 = 3.5g absorbed oil
+    notes: "Raw onion is ~88% water. Deep-frying dehydrates onion to ~25-30% original weight while absorbing ~35% oil.",
+  },
+};
+
+export interface ResolvedCulinaryPortion {
+  effectiveWeightGrams: number;
+  supplementalOilGrams: number;
+  transformApplied?: CulinaryTransform;
+  auditNote: string;
+}
+
+/**
+ * Resolves visible cooked/finished plate grams into effective raw IFCT commodity grams.
+ * For example:
+ * - 220g cooked basmati rice -> 80.6g raw rice (divisor 2.73)
+ * - 40g cooked plain roti -> 28.0g raw atta (divisor 1.43)
+ * - 90g baked naan matrix -> 65.2g raw maida (divisor 1.38)
+ * - 150g cooked toor dal -> 39.0g raw toor dal (divisor 3.85)
+ * - 10g fried onions / birista -> 25.0g raw onion + 3.5g absorbed cooking oil (multiplier 2.50, oil 0.35)
+ * - 100g cooked chicken -> 100g passthrough (1:1)
+ * - 80g curd -> 80g passthrough (1:1)
+ */
+export function resolveCulinaryPortion(
+  matchedId: string,
+  rawIngredientName: string,
+  visibleWeightGrams: number
+): ResolvedCulinaryPortion {
+  if (visibleWeightGrams <= 0) {
+    return { effectiveWeightGrams: 0, supplementalOilGrams: 0, auditNote: "Zero weight" };
+  }
+
+  const norm = normalizeTerm(rawIngredientName);
+
+  // Guard: If user/AI explicitly labeled the ingredient as raw or dry flour, do not divide
+  // e.g. "raw rice", "dry atta", "dry maida", "uncooked dal"
+  const isExplicitlyRaw = /\b(raw|dry|uncooked|kacha|sukha)\b/.test(norm);
+  if (isExplicitlyRaw) {
+    return {
+      effectiveWeightGrams: visibleWeightGrams,
+      supplementalOilGrams: 0,
+      auditNote: "Explicit raw/dry label: passthrough (1:1)",
+    };
+  }
+
+  // 1. Check for dehydrated fried garnish (birista / fried onions)
+  if (
+    norm.includes("birista") ||
+    norm.includes("fried onion") ||
+    norm.includes("fried onions") ||
+    norm.includes("brown onion") ||
+    norm.includes("brown onions") ||
+    norm.includes("tali hui pyaz")
+  ) {
+    const transform = CULINARY_TRANSFORMS["birista"];
+    const mult = transform.expansionMultiplier || 2.50;
+    const oilRatio = transform.absorbedOilRatio || 0.35;
+    const rawGrams = Math.round(visibleWeightGrams * mult * 10) / 10;
+    const oilGrams = Math.round(visibleWeightGrams * oilRatio * 10) / 10;
+    return {
+      effectiveWeightGrams: rawGrams,
+      supplementalOilGrams: oilGrams,
+      transformApplied: transform,
+      auditNote: `Dehydrated garnish (${transform.name}): ${visibleWeightGrams}g fried -> ${rawGrams}g raw onion + ${oilGrams}g absorbed oil`,
+    };
+  }
+
+  // 2. Check for hydrated IFCT items (rice, roti/atta, naan/maida, dals)
+  const transform = CULINARY_TRANSFORMS[matchedId];
+  if (transform && transform.hydrationDivisor && transform.hydrationDivisor > 1.0) {
+    const rawGrams = Math.round((visibleWeightGrams / transform.hydrationDivisor) * 10) / 10;
+    return {
+      effectiveWeightGrams: rawGrams,
+      supplementalOilGrams: 0,
+      transformApplied: transform,
+      auditNote: `Hydration adjusted (${transform.category}): ${visibleWeightGrams}g cooked / ${transform.hydrationDivisor} -> ${rawGrams}g raw commodity`,
+    };
+  }
+
+  // 3. Passthrough (Meats, Dairy, Pure Fats, Raw Vegetables, Eggs, etc.)
+  return {
+    effectiveWeightGrams: visibleWeightGrams,
+    supplementalOilGrams: 0,
+    auditNote: "Passthrough (1:1 visible weight)",
+  };
+}
 
 const typedDataset = ifctDataset as unknown as IFCT542Dataset;
 const FOOD_MAP = new Map<string, IFCTNormalizedFood>();
@@ -143,6 +344,7 @@ export const TIER1_SEED_MAP: Record<string, string> = {
   // ── Poultry & Meats (Group N & O) ──
   "chicken": "N003",
   "chicken breast": "N003",
+  "cooked chicken": "N003",
   "chicken thigh": "N002",
   "chicken leg": "N001",
   "chicken curry cut": "N001",
@@ -196,15 +398,26 @@ export const TIER1_SEED_MAP: Record<string, string> = {
   "rice bran oil": "T008",
   "vanaspati": "T014",
   "dalda": "T014",
+  "cooking oil": "T012",
+  "vegetable oil": "T012",
+  "refined oil": "T012",
+  "refined vegetable oil": "T012",
 
   // ── Grains, Flours & Millets (Group A & F) ──
   "atta": "A019",
   "gehu ka atta": "A019",
   "wheat flour": "A019",
   "whole wheat flour": "A019",
+  "roti": "A019",
+  "chapati": "A019",
+  "chapatti": "A019",
+  "phulka": "A019",
   "maida": "A018",
   "all purpose flour": "A018",
   "refined flour": "A018",
+  "naan": "A018",
+  "butter naan": "A018",
+  "tandoori naan": "A018",
   "sooji": "A022",
   "suji": "A022",
   "rava": "A022",
@@ -213,7 +426,11 @@ export const TIER1_SEED_MAP: Record<string, string> = {
   "white rice": "A015",
   "chawal": "A015",
   "basmati rice": "A015",
+  "cooked rice": "A015",
+  "cooked basmati rice": "A015",
+  "cooked white rice": "A015",
   "brown rice": "A013",
+  "cooked brown rice": "A013",
   "parboiled rice": "A014",
   "sela rice": "A014",
   "poha": "A011",
@@ -239,9 +456,14 @@ export const TIER1_SEED_MAP: Record<string, string> = {
   "tuvar dal": "B021",
   "arhar dal": "B021",
   "red gram": "B021",
+  "cooked dal": "B021",
+  "cooked toor dal": "B021",
+  "cooked yellow dal": "B021",
+  "yellow dal": "B021",
   "moong dal": "B010",
   "green gram dal": "B010",
   "dhuli moong": "B010",
+  "cooked moong dal": "B010",
   "sabut moong": "B011",
   "whole green gram": "B011",
   "chana dal": "B001",
@@ -269,6 +491,13 @@ export const TIER1_SEED_MAP: Record<string, string> = {
   "pyaz": "G017",
   "pyaaz": "G017",
   "kanda": "G017",
+  "birista": "G017",
+  "fried onion": "G017",
+  "fried onions": "G017",
+  "crispy fried onions": "G017",
+  "brown onion": "G017",
+  "brown onions": "G017",
+  "tali hui pyaz": "G017",
   "tomato": "D075",
   "tamatar": "D075",
   "tamator": "D075",
