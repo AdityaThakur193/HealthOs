@@ -23,6 +23,7 @@ interface FoodItem {
   carbsG?: number;
   fatG?: number;
   weightGrams?: number;
+  unmatched?: boolean;
 }
 
 
@@ -141,6 +142,19 @@ export default function MealCapture() {
     setFoods((prev) =>
       prev.map((f, i) => {
         if (i !== index) return f;
+        const isUnmatched = Boolean(f.unmatched || !calculateFoodMacros(f.dishName || f.name, 1).matched);
+        if (isUnmatched) {
+          const oldQty = Math.max(0.5, f.quantity || 1);
+          const ratio = newQty / oldQty;
+          return {
+            ...f,
+            quantity: newQty,
+            estimatedCalories: Math.round((f.estimatedCalories || 0) * ratio),
+            proteinG: Math.round(((f.proteinG || 0) * ratio) * 10) / 10,
+            carbsG: Math.round(((f.carbsG || 0) * ratio) * 10) / 10,
+            fatG: Math.round(((f.fatG || 0) * ratio) * 10) / 10,
+          };
+        }
         const computed = calculateFoodMacros(f.dishName || f.name, newQty, f.unitType, f.preparationStyle);
         return {
           ...f,
@@ -153,6 +167,10 @@ export default function MealCapture() {
         };
       })
     );
+  };
+
+  const handleUpdateFood = (index: number, updatedFood: FoodItem) => {
+    setFoods((prev) => prev.map((f, i) => (i === index ? updatedFood : f)));
   };
 
   const handleRemoveFood = (index: number) => {
@@ -554,14 +572,24 @@ export default function MealCapture() {
           {/* Summary header */}
           <div className="p-4 bg-brand-500/5 border border-brand-500/20 rounded-2xl flex items-center justify-between">
             <div>
-              <span className="badge-success">Confidence: {Math.round(confidence * 100)}%</span>
+              {foods.some((f) => f.unmatched || !calculateFoodMacros(f.dishName || f.name, 1).matched) ? (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 w-fit">
+                  <AlertTriangle className="w-3 h-3" /> Unmatched Food Detected
+                </span>
+              ) : (
+                <span className="badge-success">Confidence: {Math.round(confidence * 100)}%</span>
+              )}
               <h4 className="text-sm font-bold text-white mt-2">Adjust portions to finalize</h4>
             </div>
             <div className="text-right">
               <span className="text-lg font-black text-brand-400">
                 {foods.reduce((sum, f) => sum + (f.estimatedCalories || 0), 0)}
               </span>
-              <p className="text-[10px] text-zinc-500">IFCT 2017 Verified kcal</p>
+              <p className="text-[10px] text-zinc-500">
+                {foods.some((f) => f.unmatched || !calculateFoodMacros(f.dishName || f.name, 1).matched)
+                  ? "Estimated / User-Edited kcal"
+                  : "IFCT 2017 Verified kcal"}
+              </p>
             </div>
           </div>
 
@@ -576,6 +604,7 @@ export default function MealCapture() {
                   food={food}
                   onQuantityChange={(newQty) => handleQuantityChange(i, newQty)}
                   onRemove={() => handleRemoveFood(i)}
+                  onFoodChange={(updated) => handleUpdateFood(i, updated)}
                 />
               ))
             )}
