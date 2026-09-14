@@ -90,6 +90,9 @@ function validateTimelinePayload(type: string, payload: any): string | null {
   }
 
   if (type === "meal") {
+    if (payload.isMock === true || payload.source === "mock") {
+      return "Cannot log demo or mock meal data to timeline.";
+    }
     const cal = Number(payload.totalCalories);
     if (!isNaN(cal) && (cal < 0 || cal > 10000)) {
       return "Meal calories must be between 0 and 10,000 kcal.";
@@ -105,6 +108,13 @@ function validateTimelinePayload(type: string, payload: any): string | null {
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { userId, type, timestamp, payload, tags, source } = body;
+
+  if (source === "mock") {
+    return Response.json(
+      { error: "Cannot log demo or mock meal data to timeline." },
+      { status: 400 }
+    );
+  }
 
   if (!userId || !type || !payload) {
     return Response.json(

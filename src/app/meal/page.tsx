@@ -42,6 +42,7 @@ export default function MealCapture() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isMock, setIsMock] = useState(false);
+  const [mockReason, setMockReason] = useState<"quota_exceeded" | "api_error" | "missing_key" | null>(null);
 
   const { popupState, showCustomAlert } = useConfirmDialog();
 
@@ -114,6 +115,7 @@ export default function MealCapture() {
         setFoods(data.analysis.foods || []);
         setConfidence(data.analysis.confidence || 0.9);
         setIsMock(data.isMock === true);
+        setMockReason(data.mockReason || null);
         setState("results");
       } else if (res.status === 429) {
         const data = await res.json();
@@ -178,6 +180,15 @@ export default function MealCapture() {
   };
 
   const handleSaveMeal = async () => {
+    if (isMock) {
+      showCustomAlert(
+        "Cannot Log Demo Data",
+        "AI image analysis was unavailable for this photo. Please enter your meal manually or try again.",
+        "warning"
+      );
+      return;
+    }
+
     const userId = localStorage.getItem("healthos_userId");
     if (!userId) return;
 
@@ -200,8 +211,9 @@ export default function MealCapture() {
             totalCarbsG,
             totalFatG,
             imagePreview,
+            isMock,
           },
-          source: "ai_vision",
+          source: isMock ? "mock" : "ai_vision",
         }),
       });
 
@@ -560,12 +572,27 @@ export default function MealCapture() {
           className="space-y-5"
         >
           {isMock && (
-            <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-center space-y-1">
-              <p className="text-xs font-bold text-yellow-400 flex items-center justify-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Demo Result — Not Your Actual Food</p>
-              <p className="text-[10px] text-yellow-600 leading-snug">
-                Gemini API quota reached (20 req/day on free tier). Resets daily at midnight UTC, or enable billing at{" "}
-                <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline">console.cloud.google.com</a>
-                {" "}for higher limits.
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center space-y-1.5">
+              <p className="text-xs font-bold text-amber-400 flex items-center justify-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" /> Demo Preview — Cannot Be Logged
+              </p>
+              <p className="text-[11px] text-zinc-400 leading-snug">
+                {mockReason === "quota_exceeded" ? (
+                  <>
+                    Gemini Vision API quota limit reached. Resets daily at midnight UTC, or enable billing in Google Cloud Console.
+                  </>
+                ) : mockReason === "missing_key" ? (
+                  <>
+                    Gemini API key is not configured. Live image recognition is disabled.
+                  </>
+                ) : (
+                  <>
+                    AI photo recognition is currently unavailable. This sample thali cannot be saved to your timeline.
+                  </>
+                )}
+              </p>
+              <p className="text-[10px] text-amber-300/80 font-medium">
+                Please enter your meal manually or take another photo to retry.
               </p>
             </div>
           )}
@@ -617,16 +644,29 @@ export default function MealCapture() {
               type="button"
               className="btn-ghost flex-1 py-3"
             >
-              Cancel
+              {isMock ? "Try Again" : "Cancel"}
             </button>
-            <button
-              onClick={handleSaveMeal}
-              type="button"
-              className="btn-primary flex-[2] py-3 text-center"
-              disabled={foods.length === 0}
-            >
-              Log Meal
-            </button>
+            {isMock ? (
+              <button
+                onClick={() => {
+                  setState("idle");
+                  setMode("manual");
+                }}
+                type="button"
+                className="btn-primary flex-[2] py-3 text-center bg-amber-500 hover:bg-amber-400 text-black font-bold flex items-center justify-center gap-1.5"
+              >
+                Enter Manually Instead
+              </button>
+            ) : (
+              <button
+                onClick={handleSaveMeal}
+                type="button"
+                className="btn-primary flex-[2] py-3 text-center"
+                disabled={foods.length === 0}
+              >
+                Log Meal
+              </button>
+            )}
           </div>
         </motion.div>
       )}
