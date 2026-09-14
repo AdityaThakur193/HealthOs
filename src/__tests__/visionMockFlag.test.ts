@@ -67,7 +67,46 @@ describe("Vision Route isMock Flag Correctness", () => {
 
       expect(data.isMock).toBe(true);
       expect(data.source).toBe("mock");
+      expect(data.mockReason).toBe("quota_exceeded");
       expect(data.analysis.plateType).toBe("hostel_mess_thali");
+    });
+
+    it("should return isMock: true and mockReason: 'api_error' when Gemini fails with a non-quota error", async () => {
+      vi.mocked(geminiModule.analyzeMealImage).mockRejectedValueOnce(new Error("500 Internal Server Error"));
+
+      const req = new NextRequest("http://localhost:3000/api/vision", {
+        method: "POST",
+        body: JSON.stringify({
+          imageBase64: "base64_sample_image_data_test_1b",
+          mimeType: "image/jpeg",
+        }),
+      });
+
+      const res = await POST(req);
+      const data = await res.json();
+
+      expect(data.isMock).toBe(true);
+      expect(data.source).toBe("mock");
+      expect(data.mockReason).toBe("api_error");
+    });
+
+    it("should return isMock: true and mockReason: 'missing_key' when GEMINI_API_KEY is not configured", async () => {
+      process.env.GEMINI_API_KEY = "your_gemini_api_key_here";
+
+      const req = new NextRequest("http://localhost:3000/api/vision", {
+        method: "POST",
+        body: JSON.stringify({
+          imageBase64: "base64_sample_image_data_test_1c",
+          mimeType: "image/jpeg",
+        }),
+      });
+
+      const res = await POST(req);
+      const data = await res.json();
+
+      expect(data.isMock).toBe(true);
+      expect(data.source).toBe("mock");
+      expect(data.mockReason).toBe("missing_key");
     });
 
     it("should return isMock: true when Gemini returns an invalid response (missing foods array)", async () => {
@@ -91,6 +130,7 @@ describe("Vision Route isMock Flag Correctness", () => {
 
       expect(data.isMock).toBe(true);
       expect(data.source).toBe("mock");
+      expect(data.mockReason).toBe("api_error");
       expect(data.analysis.plateType).toBe("hostel_mess_thali");
     });
 
@@ -123,6 +163,7 @@ describe("Vision Route isMock Flag Correctness", () => {
 
       expect(data.isMock).toBe(false);
       expect(data.source).toBe("gemini_vision");
+      expect(data.mockReason).toBeUndefined();
       expect(data.analysis.foods.length).toBe(1);
     });
   });
@@ -143,6 +184,7 @@ describe("Vision Route isMock Flag Correctness", () => {
 
       expect(data.isMock).toBe(true);
       expect(data.source).toBe("mock");
+      expect(data.mockReason).toBe("quota_exceeded");
       expect(data.analysis.plateType).toBe("hostel_mess_thali");
     });
 
@@ -166,6 +208,7 @@ describe("Vision Route isMock Flag Correctness", () => {
 
       expect(data.isMock).toBe(true);
       expect(data.source).toBe("mock");
+      expect(data.mockReason).toBe("api_error");
       expect(data.analysis.plateType).toBe("hostel_mess_thali");
     });
 
@@ -191,6 +234,120 @@ describe("Vision Route isMock Flag Correctness", () => {
 
       expect(data.isMock).toBe(true);
       expect(data.source).toBe("mock");
+      expect(data.mockReason).toBe("api_error");
+    });
+  });
+
+  describe("Timeline Mock Data Ingestion Guard (POST /api/timeline)", () => {
+    it("should reject saving meal event when source is 'mock'", async () => {
+      const { POST: timelinePOST } = await import("../app/api/timeline/route");
+
+      const req = new NextRequest("http://localhost:3000/api/timeline", {
+        method: "POST",
+        body: JSON.stringify({
+          userId: "user_test_mock_guard_1",
+          type: "meal",
+          source: "mock",
+          payload: {
+            foods: [{ name: "Roti", estimatedCalories: 170 }],
+            totalCalories: 170,
+          },
+        }),
+      });
+
+      const res = await timelinePOST(req);
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toBe("Cannot log demo or mock meal data to timeline.");
+    });
+
+    it("should reject saving meal event when payload contains isMock: true", async () => {
+      const { POST: timelinePOST } = await import("../app/api/timeline/route");
+
+      const req = new NextRequest("http://localhost:3000/api/timeline", {
+        method: "POST",
+        body: JSON.stringify({
+          userId: "user_test_mock_guard_2",
+          type: "meal",
+          source: "ai_vision",
+          payload: {
+            isMock: true,
+            foods: [{ name: "Yellow Dal", estimatedCalories: 150 }],
+            totalCalories: 150,
+          },
+        }),
+      });
+
+      const res = await timelinePOST(req);
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toBe("Cannot log demo or mock meal data to timeline.");
+    });
+
+    it("should reject the exact payload constructed by handleSaveMeal when isMock is true (client bypass scenario)", async () => {
+      const { POST: timelinePOST } = await import("../app/api/timeline/route");
+
+      // Exact structure generated by handleSaveMeal() if client-side check were bypassed
+      const bypassPayload = {
+        userId: "user_test_mock_guard_bypass",
+        type: "meal",
+        payload: {
+          foods: [
+            { name: "Roti", dishName: "roti", quantity: 2, estimatedCalories: 170 },
+            { name: "Yellow Dal", dishName: "dal_toor", quantity: 1, estimatedCalories: 105 },
+            { name: "Curd", dishName: "curd", quantity: 1, estimatedCalories: 61 },
+          ],
+          totalCalories: 336,
+          totalProteinG: 12.8,
+          totalCarbsG: 52.4,
+          totalFatG: 6.8,
+          imagePreview: "data:image/jpeg;base64,mockpreviewdata",
+          isMock: true,
+        },
+        source: "mock",
+      };
+
+      const req = new NextRequest("http://localhost:3000/api/timeline", {
+        method: "POST",
+        body: JSON.stringify(bypassPayload),
+      });
+
+      const res = await timelinePOST(req);
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toBe("Cannot log demo or mock meal data to timeline.");
+    });
+
+    it("should allow saving genuine meals when isMock is false and source is 'ai_vision'", async () => {
+      const { POST: timelinePOST } = await import("../app/api/timeline/route");
+
+      const legitimatePayload = {
+        userId: "user_test_legit_meal",
+        type: "meal",
+        payload: {
+          foods: [
+            { name: "Roti", dishName: "roti", quantity: 2, estimatedCalories: 170 },
+          ],
+          totalCalories: 170,
+          totalProteinG: 6.4,
+          totalCarbsG: 34.0,
+          totalFatG: 1.0,
+          imagePreview: "data:image/jpeg;base64,legitdata",
+          isMock: false,
+        },
+        source: "ai_vision",
+      };
+
+      const req = new NextRequest("http://localhost:3000/api/timeline", {
+        method: "POST",
+        body: JSON.stringify(legitimatePayload),
+      });
+
+      const res = await timelinePOST(req);
+      expect(res.status).toBe(201);
+      const data = await res.json();
+      expect(data.event).toBeDefined();
+      expect(data.event.type).toBe("meal");
     });
   });
 });

@@ -259,9 +259,16 @@ export async function POST(request: NextRequest) {
         const rawAnalysis = await analyzeMealTextWithGroq(mealText);
         const analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
         return Response.json({ analysis, isMock: false, source: "groq_text" });
-      } catch (groqErr) {
+      } catch (groqErr: any) {
         console.warn("⚠️ Groq text meal analysis failed, using mock fallback:", groqErr);
-        return Response.json({ analysis: getMockMealAnalysis(), isMock: true, source: "mock" });
+        const errMsg = groqErr?.message || String(groqErr);
+        const isQuota = /quota|429|resource_exhausted|rate limit/i.test(errMsg);
+        return Response.json({
+          analysis: getMockMealAnalysis(),
+          isMock: true,
+          source: "mock",
+          mockReason: isQuota ? "quota_exceeded" : "api_error",
+        });
       }
     }
 
@@ -283,6 +290,7 @@ export async function POST(request: NextRequest) {
     let analysis: MealAnalysis = getMockMealAnalysis();
     let isMock = true;
     let source = "mock";
+    let mockReason: "quota_exceeded" | "api_error" | "missing_key" | undefined;
 
     const geminiKey = process.env.GEMINI_API_KEY;
 
@@ -296,6 +304,8 @@ export async function POST(request: NextRequest) {
         source = "gemini_vision";
       } catch (geminiError: any) {
         console.warn("⚠️ Gemini Vision API call failed, attempting Groq text fallback:", geminiError);
+        const errMsg = geminiError?.message || String(geminiError);
+        const isQuota = /quota|429|resource_exhausted|rate limit/i.test(errMsg);
         if (mealText) {
           try {
             const rawAnalysis = await analyzeMealTextWithGroq(mealText);
@@ -306,11 +316,13 @@ export async function POST(request: NextRequest) {
             analysis = getMockMealAnalysis();
             isMock = true;
             source = "mock";
+            mockReason = isQuota ? "quota_exceeded" : "api_error";
           }
         } else {
           analysis = getMockMealAnalysis();
           isMock = true;
           source = "mock";
+          mockReason = isQuota ? "quota_exceeded" : "api_error";
         }
       }
     } else if (mealText) {
@@ -320,19 +332,23 @@ export async function POST(request: NextRequest) {
         analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
         isMock = false;
         source = "groq_text";
-      } catch (groqError) {
+      } catch (groqError: any) {
         analysis = getMockMealAnalysis();
         isMock = true;
         source = "mock";
+        const errMsg = groqError?.message || String(groqError);
+        const isQuota = /quota|429|resource_exhausted|rate limit/i.test(errMsg);
+        mockReason = isQuota ? "quota_exceeded" : "api_error";
       }
     } else {
       console.log("⚠️ No Gemini API key configured. Using mock IFCT analysis.");
       analysis = getMockMealAnalysis();
       isMock = true;
       source = "mock";
+      mockReason = "missing_key";
     }
 
-    return Response.json({ analysis, isMock, source });
+    return Response.json({ analysis, isMock, source, mockReason });
   } catch (error) {
     console.error("Vision API error:", error);
     return Response.json(
