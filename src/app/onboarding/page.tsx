@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ChipSelect from "@/components/ChipSelect";
 import StepIndicator from "@/components/StepIndicator";
-import { Flame, Dumbbell, Zap, Scale, Heart } from "lucide-react";
+import { Flame, Dumbbell, Zap, Scale, Heart, AlertCircle } from "lucide-react";
 
 function OnboardingContent() {
   const router = useRouter();
@@ -712,6 +712,16 @@ function OnboardingContent() {
                     ))}
                   </div>
                 )}
+                
+                <div className="mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-xl">
+                  <p className="text-[10px] text-red-400 leading-tight flex gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                    <span>
+                      <strong className="block text-red-300 mb-0.5">Medical Disclaimer</strong>
+                      Health OS is an educational tracking tool. It does not diagnose, treat, or prevent any disease. Always consult a physician before adopting diet or workout changes based on these conditions.
+                    </span>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
