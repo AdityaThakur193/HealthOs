@@ -35,9 +35,6 @@ export async function POST(req: Request) {
       `,
     });
 
-    // FOR DEVELOPMENT: Log the OTP to the console so you can test it without sending emails
-    console.log(`[DEV ONLY] OTP for ${email} is: ${otp}`);
-
     // 4. Return the encrypted hash to the client
     // The client MUST save this hash (e.g. in state) and send it back during verification
     return NextResponse.json({ 

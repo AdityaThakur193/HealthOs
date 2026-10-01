@@ -279,7 +279,7 @@ export default function HabitsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "reset",
-          email: email || "adityath2305@gmail.com",
+          email: email || "user@example.com",
         }),
       });
       if (res.ok) {
