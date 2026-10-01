@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { generateRandomOtp, generateOtpHash } from "@/lib/auth/otp";
 import { Resend } from "resend";
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend (with a fallback to prevent build-time crashes if env var is missing during Vercel build)
+const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy_key_for_build");
 
 export async function POST(req: Request) {
   try {
