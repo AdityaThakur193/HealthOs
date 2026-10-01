@@ -1,5 +1,0 @@
-Most health apps treat you like an unpaid data entry clerk.
-
-We built Health OS: an automated personal health operating system that turns raw biometrics into deterministic decisions. 
-
-Evidence-based gym double progression, 14-day empirical adaptive TDEE, and action-first AI coaching — 100% open source.
