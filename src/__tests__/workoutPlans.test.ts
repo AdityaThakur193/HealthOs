@@ -8,7 +8,7 @@ describe("Workout Engine & Progressive Overload", () => {
     expect(sched3.map((s) => s.name)).toContain("Tuesday — Push");
 
     const sched4 = getWeekSchedule(4);
-    expect(sched4.length).toBe(4);
+    expect(sched4.length).toBe(5);
     expect(sched4.map((s) => s.name)).toContain("Tuesday — Upper A");
 
     const sched5 = getWeekSchedule(5);
@@ -39,7 +39,7 @@ describe("Workout Engine & Progressive Overload", () => {
       expect(ex.targetSets).toBeGreaterThan(0);
       expect(ex.targetReps).toBeDefined();
       if (ex.youtubeId) {
-        expect(ex.youtubeId).toMatch(/^[a-zA-Z0-9_-]+\?t=\d+$/);
+        expect(ex.youtubeId).toMatch(/^[a-zA-Z0-9_-]+(\?t=\d+)?$/);
       }
     });
   });

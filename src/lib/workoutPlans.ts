@@ -24,6 +24,7 @@ const EXERCISE_LIBRARY: Record<string, Omit<Exercise, "targetSets" | "targetReps
   pec_deck_fly: { id: "pec_deck_fly", name: "Pec Deck Fly", muscle: "chest", equipment: "machine", youtubeId: "fGm-ef-4PVk?t=669" },
   incline_smith_press: { id: "incline_smith_press", name: "Incline Smith Press", muscle: "chest", equipment: "machine", youtubeId: "fGm-ef-4PVk?t=586" },
   machine_chest_press: { id: "machine_chest_press", name: "Machine Chest Press", muscle: "chest", equipment: "machine", youtubeId: "fGm-ef-4PVk?t=276" },
+  high_to_low_cable_fly: { id: "high_to_low_cable_fly", name: "High-to-Low Cable Fly", muscle: "chest", equipment: "cable", youtubeId: "5SrkaIbDth4" },
 
   // Back / Lats
   wide_grip_lat_pulldown: { id: "wide_grip_lat_pulldown", name: "Wide Grip Lat Pulldown", muscle: "back", equipment: "machine", youtubeId: "jLvqKgW-_G8?t=218" },
@@ -98,7 +99,8 @@ export function getWeekSchedule(gymFrequency: number): { day: number; name: stri
       return [
         { day: 2, name: "Tuesday — Upper A" },
         { day: 3, name: "Wednesday — Lower A" },
-        { day: 5, name: "Friday — Upper B" },
+        { day: 4, name: "Thursday — Chest & Back" },
+        { day: 5, name: "Friday — Lower Body (Custom)" },
         { day: 6, name: "Saturday — Lower B" },
       ];
     case 5:
@@ -208,6 +210,17 @@ export function getTodaysWorkout(
         { id: "rope_pushdown", sets: 3, reps: "10-12", rest: 60 },
         { id: "bayesian_curl", sets: 3, reps: "10-12", rest: 60 }
       );
+    } else if (name.includes("Chest & Back")) {
+      focus = "Chest & Back";
+      duration = 60;
+      exerciseSpecs.push(
+        { id: "bench_press", sets: 3, reps: "5-8", rest: 120 },
+        { id: "incline_db_press", sets: 3, reps: "8-12", rest: 90 },
+        { id: "high_to_low_cable_fly", sets: 2, reps: "10-15", rest: 90 },
+        { id: "neutral_grip_pulldown", sets: 3, reps: "8-12", rest: 90 },
+        { id: "seated_cable_row", sets: 3, reps: "8-12", rest: 90 },
+        { id: "single_arm_cable_row", sets: 2, reps: "10-15", rest: 90 }
+      );
     } else if (name.includes("Lower A")) {
       focus = "Lower Body Quad Strength, Hamstrings & Core";
       duration = 55;
@@ -219,16 +232,17 @@ export function getTodaysWorkout(
         { id: "standing_calf_raise", sets: 3, reps: "12-15", rest: 60 },
         { id: "cable_crunch", sets: 3, reps: "12-15", rest: 60 }
       );
-    } else if (name.includes("Upper B")) {
-      focus = "Upper Body Vertical Pull, 3D Shoulders & Arms";
-      duration = 55;
+    } else if (name.includes("Lower Body (Custom)")) {
+      focus = "Quads, Hamstrings, Glutes, Calves & Core";
+      duration = 60;
       exerciseSpecs.push(
-        { id: "neutral_grip_pulldown", sets: 3, reps: "8-10", rest: 90 },
-        { id: "seated_db_shoulder_press", sets: 3, reps: "8-10", rest: 90 },
-        { id: "cable_chest_fly", sets: 3, reps: "12-15", rest: 75 },
-        { id: "face_pull", sets: 3, reps: "15", rest: 60 },
-        { id: "preacher_curl", sets: 3, reps: "10-12", rest: 60 },
-        { id: "overhead_cable_extension", sets: 3, reps: "10-12", rest: 60 }
+        { id: "hack_squat", sets: 3, reps: "6-10", rest: 150 },
+        { id: "romanian_deadlift", sets: 3, reps: "8-10", rest: 150 },
+        { id: "leg_press", sets: 2, reps: "10-15", rest: 120 },
+        { id: "seated_leg_curl", sets: 3, reps: "10-15", rest: 90 },
+        { id: "leg_extension", sets: 2, reps: "12-15", rest: 75 },
+        { id: "standing_calf_raise", sets: 3, reps: "10-15", rest: 75 },
+        { id: "cable_crunch", sets: 2, reps: "8-15", rest: 60 }
       );
     } else if (name.includes("Lower B")) {
       focus = "Lower Body Posterior Chain, Glutes & Obliques";

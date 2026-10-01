@@ -1185,6 +1185,16 @@ export default function Dashboard() {
           </GlassCard>
         </div>
       )}
+      
+      {/* Medical Disclaimer */}
+      <div className="mt-8 mb-4 px-4">
+        <div className="p-3 bg-red-900/10 border border-red-500/20 rounded-xl">
+          <p className="text-[10px] text-zinc-500 leading-tight">
+            <strong>Medical Disclaimer:</strong> Health OS is an informational wellness tool, not a medical device. It does not diagnose, treat, or prevent any disease. Always consult a physician or registered dietitian before modifying your diet or exercise routine.
+          </p>
+        </div>
+      </div>
+
       {/* TDEE Calibration Info Drawer Modal */}
       {showTdeeModal && (
         <div className="fixed inset-0 bg-[#0c0f0d]/70 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in">

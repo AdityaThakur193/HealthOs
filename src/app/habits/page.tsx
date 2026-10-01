@@ -82,9 +82,10 @@ export default function HabitsPage() {
   });
 
   const fetchHabits = async () => {
+    if (!email) return;
     try {
       setLoading(true);
-      const res = await fetch(`/api/habits?email=${encodeURIComponent(email || "adityath2305@gmail.com")}`);
+      const res = await fetch(`/api/habits?email=${encodeURIComponent(email)}`);
       const data = await res.json();
       if (data.success) {
         setHabits(data.habits || []);
