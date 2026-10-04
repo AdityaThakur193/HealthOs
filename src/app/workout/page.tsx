@@ -42,11 +42,19 @@ export default function WorkoutTracker() {
     if (!userId || !profile) return;
     setFetchingHistory(true);
     try {
-      const todaysPlan = getTodaysWorkout({
-        gymFrequency: profile.gymFrequency,
-        gymExperience: profile.gymExperience,
-        goal: profile.goal,
-      }, selectedDay);
+      let todaysPlan: WorkoutPlan;
+      
+      // Override with DB-stored personalized plan if available
+      if ((profile as any).customWorkoutPlan && (profile as any).customWorkoutPlan[selectedDay]) {
+        todaysPlan = (profile as any).customWorkoutPlan[selectedDay];
+      } else {
+        todaysPlan = getTodaysWorkout({
+          gymFrequency: profile.gymFrequency,
+          gymExperience: profile.gymExperience,
+          goal: profile.goal,
+        }, selectedDay);
+      }
+      
       setPlan(todaysPlan);
 
       // If rest day, no exercises to load
@@ -411,7 +419,16 @@ export default function WorkoutTracker() {
       {/* Weekly Program Split HUD */}
       {profile && (() => {
         const frequency = profile.gymFrequency ?? 4;
-        const schedule = getWeekSchedule(frequency);
+        let schedule = getWeekSchedule(frequency);
+        
+        // If DB custom plan is active, map the names dynamically
+        if ((profile as any).customWorkoutPlan) {
+          schedule = [0, 1, 2, 3, 4, 5, 6].map(day => ({
+            day,
+            name: (profile as any).customWorkoutPlan[day] ? (profile as any).customWorkoutPlan[day].name : "Rest Day"
+          })).filter(s => s.name !== "Rest Day");
+        }
+
         const daysOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
         const currentDay = new Date().getDay();
         const getDayLabel = (d: number) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d];
