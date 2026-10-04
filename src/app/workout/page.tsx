@@ -42,11 +42,11 @@ export default function WorkoutTracker() {
     if (!userId || !profile) return;
     setFetchingHistory(true);
     try {
-      let todaysPlan;
+      let todaysPlan: WorkoutPlan;
       
       // Override with DB-stored personalized plan if available
-      if (profile.customWorkoutPlan && profile.customWorkoutPlan[selectedDay]) {
-        todaysPlan = profile.customWorkoutPlan[selectedDay];
+      if ((profile as any).customWorkoutPlan && (profile as any).customWorkoutPlan[selectedDay]) {
+        todaysPlan = (profile as any).customWorkoutPlan[selectedDay];
       } else {
         todaysPlan = getTodaysWorkout({
           gymFrequency: profile.gymFrequency,
@@ -422,10 +422,10 @@ export default function WorkoutTracker() {
         let schedule = getWeekSchedule(frequency);
         
         // If DB custom plan is active, map the names dynamically
-        if (profile.customWorkoutPlan) {
+        if ((profile as any).customWorkoutPlan) {
           schedule = [0, 1, 2, 3, 4, 5, 6].map(day => ({
             day,
-            name: profile.customWorkoutPlan[day] ? profile.customWorkoutPlan[day].name : "Rest Day"
+            name: (profile as any).customWorkoutPlan[day] ? (profile as any).customWorkoutPlan[day].name : "Rest Day"
           })).filter(s => s.name !== "Rest Day");
         }
 
