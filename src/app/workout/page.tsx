@@ -270,6 +270,7 @@ export default function WorkoutTracker() {
             totalVolumeKg: totalVolume,
             completedSets: loggedSetsCount,
             exercises: exercisesLogged,
+              caloriesBurned: Math.round((plan.targetDurationMin || 45) * 6)
           },
           source: "manual",
         }),
