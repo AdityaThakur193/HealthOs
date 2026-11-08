@@ -14,7 +14,7 @@ graph TD
         MealUI["AI Vision Meal Capture (/meal)"]
         WorkoutUI["Progressive Gym HUD (/workout)"]
         ReviewUI["Weekly Review (/review)"]
-        SW["Service Worker (sw.js Push Notifications)"]
+        SW["Service Worker (sw.js)"]
     end
 
     subgraph API ["Serverless API Layer (Node.js / Edge)"]
@@ -58,14 +58,14 @@ flowchart TD
     Start([User Logs Weight & Meals Daily]) --> QueryTimeline["Query Last 14 Days of Timeline Events from MongoDB"]
     QueryTimeline --> FilterData["Filter Valid Daily Weight Entries & Total Calorie Intakes"]
     
-    FilterData --> CheckCount{"Valid Weight Days >= 7?"}
+    FilterData --> CheckCount{"3+ Weigh-in Days and 7+ Calorie Days?"}
     CheckCount -- No --> ReturnBMR["Return Static BMR/TDEE (Status: Calibrating)"]
     
     CheckCount -- Yes --> CalcRegression["Calculate Linear Regression Slope of Weight Delta (kg/day)"]
     CalcRegression --> ConvertEnergy["Convert Weight Delta to Daily Energy Balance (1 kg fat ~ 7700 kcal)"]
     ConvertEnergy --> CalcUnclamped["Compute Unclamped Expenditure: TDEE = Daily Intake - (Weight Slope * 7700)"]
     
-    CalcUnclamped --> ClampSpikes["Apply Water Weight Spike Clamping (Max Δ ±200 kcal/day)"]
+    CalcUnclamped --> ClampSpikes["Clamp to BMR x Activity Baseline ±200 kcal"]
     ClampSpikes --> EnforceBounds["Enforce Safety Boundaries [1200 kcal, 4500 kcal]"]
     
     EnforceBounds --> UpdateProfile["Update UserProfile.tdee & Recalibrate Maintenance Calories"]
@@ -139,8 +139,8 @@ stateDiagram-v2
     LoadWorkout --> CompleteSet: User logs performed weight and reps
     
     state ProgressiveOverload {
-        CompleteSet --> CheckReps: Hit upper boundary of rep target (e.g. 12 reps on all sets)?
-        CheckReps --> AutoIncrement: YES -> Auto-increment next session weight (+2.5kg compound / +2.0kg isolation)
+        CompleteSet --> CheckReps: Hit upper boundary of rep target (e.g. 12 reps on all top sets)?
+        CheckReps --> AutoIncrement: YES -> Auto-increment next session weight (+2.5kg, or +2.0kg dumbbell and lateral work)
         CheckReps --> MaintainWeight: NO -> Maintain weight, target higher reps next session
     }
 
@@ -156,7 +156,7 @@ stateDiagram-v2
 Stores identity, physical biometrics, calculated TDEE, mess menu configurations, and generated diet plans.
 
 Key Compound Indexes:
-- `{ email: 1 }` (Unique Index)
+- `{ email: 1 }` (Unique Index, stored lowercase)
 
 ### 2. `TimelineEvent` Schema (`src/lib/db/models.ts`)
 Central event log storing all user health activities (meals, workouts, weights, sleep, water).
@@ -171,4 +171,13 @@ Key Compound Indexes:
 
 Health OS uses a **dual-layer database connection manager** (`src/lib/mongodb.ts` & `src/lib/db/fallback.ts`):
 1. **Primary Layer**: `connectDB()` attaches the Mongoose connection promise to `global._mongooseCache` to prevent connection pool exhaustion across serverless cold starts.
-2. **Offline Fallback Layer**: If MongoDB Atlas is unreachable, the system gracefully falls back to local JSON file persistence (`local_db.json`), ensuring uninterrupted user experience.
+2. **Development Fallback Layer**: In development only, if MongoDB is unreachable the system falls back to local JSON file persistence (`local_db.json`). In production these routes return `503` instead.
+
+---
+
+## 🔐 Authentication & Data Isolation
+
+- **Login**: A 6-digit code is emailed to the user. Challenges are stored in the `OtpChallenge` collection as HMAC hashes, are single-use, expire after 5 minutes, and lock after 5 wrong guesses. Sending is limited to one code per 30 seconds and 5 per hour.
+- **Sessions**: A successful login sets an HTTP-only, `SameSite=Lax` cookie signed with HMAC-SHA256 using `AUTH_SECRET` (`src/lib/auth/session.ts`). Sessions are stateless and last 30 days, so they cannot be revoked individually before expiry. Rotating `AUTH_SECRET` ends all of them.
+- **Isolation**: API routes take the user's identity only from the session, and every event lookup filters by the session's `userId`. A test fails if a route outside `/api/auth` does not check the session.
+- **Timezones**: The browser's timezone is stored in the session, so "today", streaks, and weekly windows follow the user's calendar rather than the server's UTC clock (`src/lib/dateUtils.ts`).

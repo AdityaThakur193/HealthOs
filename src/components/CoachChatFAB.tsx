@@ -1,11 +1,19 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { MessageSquare, X, Send, Loader2, Sparkles, User } from "lucide-react";
-import GlassCard from "./GlassCard";
+import { X, Send, Loader2, Sparkles } from "lucide-react";
 import { COACH_AVATAR_URL } from "@/lib/constants";
 import { formatMessageContent } from "@/lib/markdownFormat";
+import { CoachActionData, normalizeCoachMeal, normalizeCoachSteps, normalizeCoachWater } from "@/lib/coachActions";
 import { motion, AnimatePresence } from "framer-motion";
+
+type ChatProfile = Record<string, unknown> & { name?: string; weightKg?: number };
+
+interface ChatHabit {
+  id: string;
+  title: string;
+  targetValue: number;
+}
 
 interface Message {
   role: "user" | "model";
@@ -18,7 +26,7 @@ export default function CoachChatFAB() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<ChatProfile | null>(null);
   const [dragConstraints, setDragConstraints] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -76,10 +84,18 @@ export default function CoachChatFAB() {
     const email = localStorage.getItem("healthos_email");
     if (!email) return;
     try {
-      const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}&t=${Date.now()}`);
+      const res = await fetch(`/api/profile?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setProfile(data.profile);
+        if (data.profile) {
+          const name = data.profile.name ? data.profile.name.split(" ")[0] : "there";
+          setMessages((prev) =>
+            prev.length > 0
+              ? prev
+              : [{ role: "model", content: `Hey ${name}! I'm your AI health coach. Need to tweak your diet plan, customize your gym workouts, or ask a question? Talk to me here!` }]
+          );
+        }
       }
     } catch (err) {
       console.error("Chatbot failed to load user profile:", err);
@@ -88,26 +104,11 @@ export default function CoachChatFAB() {
 
   useEffect(() => {
     if (isOpen) {
+      // Fetches context from the server; state only changes once it responds.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadProfile();
     }
   }, [isOpen]);
-
-  // Load first greeting
-  useEffect(() => {
-    if (!profile) return;
-    setMessages((prev) => {
-      if (prev.length === 0) {
-        const name = profile?.name ? profile.name.split(" ")[0] : (localStorage.getItem("healthos_name") || "there");
-        return [
-          { 
-            role: "model", 
-            content: `Hey ${name}! I'm your AI health coach. Need to tweak your diet plan, customize your gym workouts, or ask a question? Talk to me here!` 
-          }
-        ];
-      }
-      return prev;
-    });
-  }, [profile]);
 
   useEffect(() => {
     // Listen for profile changes from elsewhere to keep context updated
@@ -135,7 +136,7 @@ export default function CoachChatFAB() {
 
     try {
       // Fetch latest profile again to ensure freshest context
-      const profRes = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
+      const profRes = await fetch("/api/profile");
       let currentProfile = profile;
       if (profRes.ok) {
         const profData = await profRes.json();
@@ -148,10 +149,8 @@ export default function CoachChatFAB() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
           message: userMsg,
           history: messages.slice(-10), // Send last 10 messages for context
-          profile: currentProfile,
         }),
       });
 
@@ -174,11 +173,10 @@ export default function CoachChatFAB() {
     }
   };
 
-  const saveUpdatedPlan = async (action: string, updatedData: any, currentProfile: any) => {
+  const saveUpdatedPlan = async (action: string, updatedData: CoachActionData, currentProfile: ChatProfile | null) => {
     const email = localStorage.getItem("healthos_email");
     if (!email || !currentProfile) return;
     // Use the stored ObjectId string from localStorage (same format as handleQuickLog)
-    const userId = localStorage.getItem("healthos_userId") || String(currentProfile._id || email);
 
     // Helper: post a timeline event
     const postTimeline = async (type: string, payload: object, tags: string[] = []) => {
@@ -186,7 +184,7 @@ export default function CoachChatFAB() {
         const res = await fetch("/api/timeline", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, type, timestamp: new Date().toISOString(), payload, tags, source: "chatbot" }),
+          body: JSON.stringify({ type, timestamp: new Date().toISOString(), payload, tags, source: "chatbot" }),
         });
         if (!res.ok) {
           const err = await res.text();
@@ -208,21 +206,9 @@ export default function CoachChatFAB() {
     try {
       // ── 1. LOG MEAL ──────────────────────────────────────────────────────
       if (action === "log_meal") {
-        const totalCalories = updatedData.totalCalories || updatedData.calories || 0;
-        const totalProteinG = updatedData.totalProtein || updatedData.totalProteinG || updatedData.protein || 0;
-        const totalCarbsG = updatedData.totalCarbs || updatedData.totalCarbsG || updatedData.carbs || (updatedData.items || []).reduce((s: number, f: any) => s + (f.carbsG || 0), 0);
-        const totalFatG = updatedData.totalFat || updatedData.totalFatG || updatedData.fat || (updatedData.items || []).reduce((s: number, f: any) => s + (f.fatG || 0), 0);
-
-        const ok = await postTimeline("meal", {
-          mealType: updatedData.mealType || "meal",
-          foods: updatedData.items || [],
-          totalCalories,
-          totalProteinG,
-          totalCarbsG,
-          totalFatG,
-          notes: updatedData.notes || "",
-          loggedVia: "chatbot",
-        }, [updatedData.mealType || "meal", "chatbot"]);
+        const meal = normalizeCoachMeal(updatedData);
+        const { totalCalories, totalProteinG } = meal;
+        const ok = await postTimeline("meal", meal, [meal.mealType, "chatbot"]);
         if (ok) {
           confirm(`✅ **${(updatedData.mealType || "meal").replace(/^\w/, (c: string) => c.toUpperCase())} Logged!** ${totalCalories} kcal · ${totalProteinG}g protein saved to your timeline 🍽️`);
           window.dispatchEvent(new Event("mealLogged"));
@@ -232,10 +218,9 @@ export default function CoachChatFAB() {
 
       // ── 2. LOG STEPS ─────────────────────────────────────────────────────
       if (action === "log_steps") {
-        const steps = updatedData.steps || updatedData.count || 0;
-        const distKm = updatedData.distanceKm || parseFloat((steps * 0.00075).toFixed(2));
-        const kcal = updatedData.caloriesBurned || Math.round(steps * 0.04);
-        const ok = await postTimeline("steps", { count: steps, steps, distanceKm: distKm, caloriesBurned: kcal, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["steps", "chatbot"]);
+        const stepsPayload = normalizeCoachSteps(updatedData);
+        const { steps, distanceKm: distKm, caloriesBurned: kcal } = stepsPayload;
+        const ok = await postTimeline("steps", stepsPayload, ["steps", "chatbot"]);
         if (ok) {
           confirm(`✅ **Steps Logged!** ${steps.toLocaleString()} steps · ${distKm}km · ~${kcal} kcal burned 👟`);
           window.dispatchEvent(new Event("stepsLogged"));
@@ -245,9 +230,9 @@ export default function CoachChatFAB() {
 
       // ── 3. LOG WATER ─────────────────────────────────────────────────────
       if (action === "log_water") {
-        const ml = updatedData.amountMl || (updatedData.amountL ? Math.round(updatedData.amountL * 1000) : (updatedData.glasses ? updatedData.glasses * 250 : 0));
-        const glasses = updatedData.glasses || Math.round(ml / 250);
-        const ok = await postTimeline("water", { amountL: +(ml / 1000).toFixed(2), amountMl: ml, glasses, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["water", "chatbot"]);
+        const waterPayload = normalizeCoachWater(updatedData);
+        const { amountMl: ml, glasses } = waterPayload;
+        const ok = await postTimeline("water", waterPayload, ["water", "chatbot"]);
         if (ok) {
           confirm(`✅ **Water Logged!** ${glasses} glass${glasses !== 1 ? "es" : ""} (${ml}ml) 💧`);
           window.dispatchEvent(new Event("waterLogged"));
@@ -274,13 +259,15 @@ export default function CoachChatFAB() {
 
       // ── 5. LOG WEIGHT ────────────────────────────────────────────────────
       if (action === "log_weight") {
-        await postTimeline("weight", { weightKg: updatedData.weightKg, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["weight", "chatbot"]);
+        const logged = await postTimeline("weight", { weightKg: updatedData.weightKg, notes: updatedData.notes || "", loggedVia: "chatbot" }, ["weight", "chatbot"]);
+        if (!logged) return;
         await fetch("/api/profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...currentProfile, email, weightKg: updatedData.weightKg }),
+          body: JSON.stringify({ ...currentProfile, weightKg: updatedData.weightKg }),
         });
-        const diff = (updatedData.weightKg - (currentProfile.weightKg || updatedData.weightKg)).toFixed(1);
+        const newWeight = updatedData.weightKg as number;
+        const diff = (newWeight - (currentProfile.weightKg || newWeight)).toFixed(1);
         const diffStr = parseFloat(diff) !== 0 ? ` (${parseFloat(diff) > 0 ? "+" : ""}${diff}kg from last)` : "";
         confirm(`✅ **Weight Logged!** ${updatedData.weightKg}kg${diffStr} — profile updated ⚖️`);
         window.dispatchEvent(new Event("profileUpdated"));
@@ -293,6 +280,7 @@ export default function CoachChatFAB() {
         const dur = updatedData.durationMin || 60;
         const kcal = updatedData.caloriesBurned || Math.round(dur * 7);
         const ok = await postTimeline("workout", {
+          name: updatedData.workoutName || "Gym Session",
           workoutName: updatedData.workoutName || "Gym Session",
           durationMin: dur,
           musclesWorked: updatedData.musclesWorked || [],
@@ -313,7 +301,7 @@ export default function CoachChatFAB() {
         const res = await fetch("/api/profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...currentProfile, email, dietPlan: { generatedPlan: updatedData, generatedAt: new Date().toISOString() } }),
+          body: JSON.stringify({ ...currentProfile, dietPlan: { generatedPlan: updatedData, generatedAt: new Date().toISOString() } }),
         });
         if (res.ok) window.dispatchEvent(new Event("profileUpdated"));
         return;
@@ -321,13 +309,13 @@ export default function CoachChatFAB() {
 
       // ── 8. UPDATE WORKOUT PLAN ───────────────────────────────────────────
       if (action === "update_workout") {
-        const newFrequency = updatedData && typeof updatedData === "object" && "gymFrequency" in updatedData
-          ? (updatedData as any).gymFrequency
-          : updatedData;
+        const newFrequency = updatedData?.gymFrequency;
+        const gymFrequency = parseInt(String(newFrequency));
+        if (![3, 4, 5, 6].includes(gymFrequency)) return;
         const res = await fetch("/api/profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...currentProfile, email, gymFrequency: parseInt(String(newFrequency)) || 4 }),
+          body: JSON.stringify({ ...currentProfile, gymFrequency }),
         });
         if (res.ok) window.dispatchEvent(new Event("profileUpdated"));
         return;
@@ -335,12 +323,13 @@ export default function CoachChatFAB() {
 
       // ── 9. LOG HABIT ─────────────────────────────────────────────
       if (action === "log_habit") {
-        const habitTitle = updatedData?.habitTitle || "";
-        const hRes = await fetch(`/api/habits?email=${encodeURIComponent(email)}`);
+        const habitTitle = String(updatedData?.habitTitle || "").trim();
+        if (!habitTitle) return;
+        const hRes = await fetch("/api/habits");
         const hData = await hRes.json();
         if (hData.success && hData.habits) {
           const matched = hData.habits.find(
-            (h: any) => h.title.toLowerCase().includes(habitTitle.toLowerCase()) || habitTitle.toLowerCase().includes(h.title.toLowerCase())
+            (h: ChatHabit) => h.title.toLowerCase().includes(habitTitle.toLowerCase()) || habitTitle.toLowerCase().includes(h.title.toLowerCase())
           );
           if (matched) {
             await fetch("/api/habits", {
@@ -348,11 +337,10 @@ export default function CoachChatFAB() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 action: "checkin",
-                email,
                 checkin: {
                   habitId: matched.id,
                   completed: updatedData?.completed !== undefined ? updatedData.completed : true,
-                  value: updatedData?.value !== undefined ? updatedData.value : matched.targetValue,
+                  value: updatedData?.value !== undefined ? updatedData.value : updatedData?.completed === false ? 0 : matched.targetValue,
                 },
               }),
             });

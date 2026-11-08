@@ -27,6 +27,9 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      - name: Run ESLint
+        run: npm run lint
+
       - name: Run TypeScript Strict Type Check
         run: npm run type-check
 
@@ -39,3 +42,4 @@ jobs:
           MONGODB_URI: "mongodb://localhost:27017/test"
           GEMINI_API_KEY: "mock_ci_key"
           GROQ_API_KEY: "mock_ci_key"
+          AUTH_SECRET: "ci-only-secret-at-least-32-characters-long"

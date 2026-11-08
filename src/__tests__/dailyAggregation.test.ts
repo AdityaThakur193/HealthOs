@@ -1,55 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-/**
- * Mirror of the dashboard aggregation logic in src/app/page.tsx
- */
-function aggregateEvents(events: any[], targetDate: Date = new Date(), bmr: number = 0) {
-  const targetDateStr = targetDate.toDateString();
-  let cal = 0;
-  let prot = 0;
-  let carbsVal = 0;
-  let fatsVal = 0;
-  let wDone = false;
-  let sleep = 0;
-  let stepCount = 0;
-  let water = 0;
-  let burned = 0;
-
-  events.forEach((event: any) => {
-    const eventDate = new Date(event.timestamp).toDateString();
-    if (eventDate === targetDateStr) {
-      if (event.type === "meal") {
-        cal += event.payload.totalCalories || 0;
-        prot += event.payload.totalProteinG || 0;
-        carbsVal += event.payload.totalCarbsG || event.payload.foods?.reduce((s: number, f: any) => s + (Number(f.carbsG) || 0), 0) || 0;
-        fatsVal += event.payload.totalFatG || event.payload.foods?.reduce((s: number, f: any) => s + (Number(f.fatG) || 0), 0) || 0;
-      } else if (event.type === "workout") {
-        wDone = true;
-        burned += Number(event.payload.caloriesBurned) || 0;
-      } else if (event.type === "sleep") {
-        sleep = Number(event.payload.hours) || 0;
-      } else if (event.type === "steps") {
-        const count = Number(event.payload.count || event.payload.steps) || 0;
-        stepCount += count;
-        burned += Number(event.payload.caloriesBurned) || Math.round(count * 0.04);
-      } else if (event.type === "water") {
-        water += event.payload.amountL || 0;
-      }
-    }
-  });
-
-  return {
-    calories: Math.round(cal),
-    protein: Math.round(prot),
-    carbs: Math.round(carbsVal),
-    fats: Math.round(fatsVal),
-    workoutDone: wDone,
-    sleepHours: Math.round(sleep * 10) / 10,
-    steps: Math.round(stepCount),
-    waterL: Math.round(water * 10) / 10,
-    burnedToday: Math.round(bmr + burned),
-  };
-}
+import { aggregateDailyEvents as aggregateEvents, TimelineEntry } from "../lib/timelineUtils";
 
 describe("Dashboard Daily Stats Aggregation", () => {
   const today = new Date();
@@ -164,14 +114,14 @@ describe("Dashboard Daily Stats Aggregation", () => {
 /**
  * Mirror of Recovery Metrics calculation in src/app/api/review/route.ts
  */
-function aggregateWeeklyRecoveryMetrics(events: any[]) {
+function aggregateWeeklyRecoveryMetrics(events: Pick<TimelineEntry, "type" | "timestamp" | "payload">[]) {
   const sleepEvents = events.filter((e) => e.type === "sleep");
   const stepsEvents = events.filter((e) => e.type === "steps");
 
   const dailySleep: Record<string, number> = {};
   sleepEvents.forEach((s) => {
     const dateStr = new Date(s.timestamp).toDateString();
-    dailySleep[dateStr] = Number((s.payload as any)?.hours) || 0;
+    dailySleep[dateStr] = Number(s.payload?.hours) || 0;
   });
 
   const sleepDates = Object.keys(dailySleep);
@@ -183,7 +133,7 @@ function aggregateWeeklyRecoveryMetrics(events: any[]) {
   const dailySteps: Record<string, number> = {};
   stepsEvents.forEach((s) => {
     const dateStr = new Date(s.timestamp).toDateString();
-    const count = Number((s.payload as any)?.count || (s.payload as any)?.steps) || 0;
+    const count = Number(s.payload?.count || s.payload?.steps) || 0;
     dailySteps[dateStr] = (dailySteps[dateStr] || 0) + count;
   });
 

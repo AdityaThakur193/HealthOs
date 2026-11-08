@@ -1,10 +1,14 @@
 import { NextRequest } from "next/server";
 import connectDB from "@/lib/mongodb";
-import { UserProfile, TimelineEvent } from "@/lib/db/models";
+import { LeanUserProfile, UserProfile, TimelineEvent } from "@/lib/db/models";
 import { getLocalProfile, saveLocalProfile, getLocalEvents } from "@/lib/db/fallback";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { calculateAdaptiveTdee } from "@/lib/tdee";
-import { calculateMealMacroAllocation, auditAndFixDietPlanMath } from "@/lib/dietEngine";
+import { calculateAdaptiveTdee, goalCalorieTarget, TimelineLike } from "@/lib/tdee";
+import { calculateMealMacroAllocation, auditAndFixDietPlanMath, DietPlan, isCompleteDietPlan } from "@/lib/dietEngine";
+import { sanitizeJsonOutput } from "@/lib/gemini";
+import { requireUserSession } from "@/lib/auth/session";
+import { checkRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
+import { readJsonObject } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -16,37 +20,57 @@ function getGenAI(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(apiKey);
 }
 
-function sanitizeJsonOutput(text: string): string {
-  let cleaned = text.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+function additionsForPreference(dietPreference: string, targetProtein: number): string {
+  const intro = `Since mess food is typically low in protein, you MUST suggest specific additions/supplements in the "additions" field to hit the daily target of ${targetProtein}g protein.
+Guidelines for additions based on ICMR-NIN IFCT 2017 benchmarks and preference ("${dietPreference}"):`;
+
+  const whey = "Whey protein powder (1 scoop 32g = 120 kcal, 24g protein)";
+  const paneer = "Fresh Paneer (100g = 305 kcal, 18.9g protein)";
+  const curd = "Plain Curd (150g = 90 kcal, 5.25g protein)";
+  const chana = "Roasted Chana (100g = 360 kcal, 18g protein)";
+  const whites = "Boiled Egg Whites (4 whites = 68 kcal, 16g protein)";
+  const eggs = "Whole Boiled Eggs (2 eggs = 143 kcal, 13.2g protein)";
+  const chicken = "Boiled Chicken Breast (100g = 150 kcal, 31g protein)";
+
+  switch (dietPreference) {
+    case "vegan":
+      return `${intro}\n- Allowed additions: ${chana}, Soya Chunks (50g dry = 173 kcal, 26g protein), Tofu (100g = 76 kcal, 8g protein). Do NOT suggest whey, paneer, curd, milk, ghee, eggs, chicken, fish, or meat.`;
+    case "vegetarian":
+      return `${intro}\n- Allowed additions: ${whey}, ${paneer}, ${curd}, ${chana}. Do NOT suggest eggs, egg whites, chicken, fish, or meat.`;
+    case "eggetarian":
+      return `${intro}\n- Allowed additions: ${whites}, ${eggs}, ${whey}, ${paneer}, ${curd}. Do NOT suggest chicken, fish, or meat.`;
+    default:
+      return `${intro}\n- Allowed additions: ${chicken}, ${whites}, ${eggs}, ${whey}, ${paneer}, ${curd}.`;
   }
-  return cleaned;
 }
 
 export async function POST(request: NextRequest) {
+  const session = requireUserSession(request);
+  if (session instanceof Response) return session;
+
+  if (!checkRateLimit(`diet:${session.userId}`, 8, 60 * 60 * 1000)) {
+    return rateLimitedResponse();
+  }
+
   try {
-    const body = await request.json();
-    const { email } = body;
+    const body = (await readJsonObject(request)) ?? {};
+    const { email } = session;
 
-    if (!email) {
-      return Response.json({ error: "Email is required to locate user profile." }, { status: 400 });
-    }
-
-    let profile: any = null;
-    let events: any[] = [];
+    let profile: LeanUserProfile | null = null;
+    let events: TimelineLike[] = [];
 
     try {
       await connectDB();
-      profile = await UserProfile.findOne({ email }).lean();
+      profile = await UserProfile.findOne({ email }).lean<LeanUserProfile>();
       if (profile) {
         events = await TimelineEvent.find({ userId: profile._id }).lean();
       }
     } catch (dbErr) {
-      console.warn("⚠️ MongoDB offline during diet generation. Using local fallback file DB.");
-      profile = await getLocalProfile(email);
+      if (process.env.NODE_ENV === "production") throw dbErr;
+      console.warn("MongoDB offline during diet generation. Using local fallback file DB.");
+      profile = (await getLocalProfile(email)) as unknown as LeanUserProfile | null;
       if (profile) {
-        events = await getLocalEvents({ userId: profile._id.toString() });
+        events = await getLocalEvents({ userId: String(profile._id) });
       }
     }
 
@@ -59,7 +83,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. DYNAMICALLY CALCULATE DYNAMIC ADAPTIVE TDEE & CALORIES
-    const tdeeResult = calculateAdaptiveTdee(profile, events);
+    const tdeeResult = calculateAdaptiveTdee(profile, events, session.tz);
     
     let calculatedTdee = profile.tdee || 2400;
     let targetCalories = profile.targetCalories || 2000;
@@ -70,15 +94,7 @@ export async function POST(request: NextRequest) {
       calculatedTdee = tdeeResult.calculatedTdee;
       isAdaptiveActive = true;
       if (!profile.useCustomMacros) {
-        let newTargetCalories = calculatedTdee;
-        if (profile.goal === "lose_fat") {
-          newTargetCalories -= 500;
-        } else if (profile.goal === "build_muscle") {
-          newTargetCalories += 300;
-        } else if (profile.goal === "recomp") {
-          newTargetCalories -= 100;
-        }
-        targetCalories = Math.round(newTargetCalories);
+        targetCalories = goalCalorieTarget(calculatedTdee, profile.goal, profile.gender);
       }
     }
 
@@ -93,8 +109,6 @@ export async function POST(request: NextRequest) {
     }
 
     const mealAllocations = calculateMealMacroAllocation(targetCalories, targetProtein);
-
-    console.log(`🥗 Pre-calculated MPS Meal Allocations for ${email}:`, mealAllocations);
 
     const genAI = getGenAI();
     const model = genAI.getGenerativeModel({ 
@@ -130,11 +144,7 @@ export async function POST(request: NextRequest) {
         * 2 Onion Utapams = 320 kcal, 8g protein
       - If the daily protein total under strict mess constraints is only 50g-70g, that is perfectly fine. DO NOT inflate or hallucinate the protein of mess food to meet the ${targetProtein}g target!`;
     } else {
-      additionsGuideline = `Since mess food is typically low in protein, you MUST suggest specific additions/supplements in the "additions" field to hit the daily target of ${targetProtein}g protein.
-Guidelines for additions based on ICMR-NIN IFCT 2017 benchmarks and preference ("${dietPreference}"):
-- veg / vegetarian: Add ONLY vegetarian items. Allowed additions: Whey protein powder (1 scoop 32g = 120 kcal, 24g protein), Fresh Paneer (100g = 305 kcal, 18.9g protein), Plain Curd (150g = 90 kcal, 5.25g protein), Roasted Chana (100g = 360 kcal, 18g protein). Do NOT suggest eggs, egg whites, chicken, fish, or meat.
-- eggitarian: Allowed additions: Boiled Egg Whites (4 whites = 68 kcal, 16g protein), Whole Boiled Eggs (2 eggs = 143 kcal, 13.2g protein), Whey protein powder, Paneer, Curd. Do NOT suggest chicken, fish, or meat.
-- non_veg / non_vegetarian / none: Allowed additions: Boiled Chicken Breast (100g = 150 kcal, 31g protein), Boiled Egg Whites, Whole Boiled Eggs, Whey protein powder, Paneer, Curd.`;
+      additionsGuideline = additionsForPreference(dietPreference, targetProtein);
     }
 
     const prompt = `You are an elite sports dietitian and bodybuilding nutrition coach. Your goal is to design a highly personalized week-long diet plan (Monday to Sunday) mapping out meal timings, mess food choices, necessary additions, and carbohydrate-fat distribution, optimized for the user's specific biometrics and schedule.
@@ -146,6 +156,9 @@ User Context:
 - Calorie Source: ${isAdaptiveActive ? `Empirically determined Adaptive TDEE: ${calculatedTdee} kcal.` : "Static biometrics calculation."}
 - Schedule: College classes are ${collegeSchedule}. Sleep target is ${sleepTarget} hours.
 - Diet preference: ${dietPreference}.
+- Food allergies (HARD CONSTRAINT, never include these or dishes containing them, even if the mess serves them): ${profile.foodAllergies?.length ? profile.foodAllergies.join(", ") : "None"}.
+- Medical conditions (adapt food choices accordingly): ${profile.medicalConditions?.length ? profile.medicalConditions.join(", ") : "None"}.
+- Other preferences from the user: ${profile.customDietPreferences || "None"}.
 - Strict Mess/Budget Mode: ${strictMessOnly ? "ACTIVE (Strictly Mess Items Only, NO additions)" : "INACTIVE (Allows additions/whey/eggs)"}
 
 Pre-Calculated Target Allocations per Meal:
@@ -179,8 +192,6 @@ Return a JSON object matching this exact structure:
 
 Return ONLY valid JSON.`;
 
-    console.log(`🥗 Generating custom sports-diet plan for ${email} using Gemini...`);
-    
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
@@ -188,7 +199,10 @@ Return ONLY valid JSON.`;
     const parsed = JSON.parse(sanitized);
 
     // Programmatic Math Audit to eliminate LLM arithmetic hallucinations
-    const rawPlan = parsed.dietPlan || parsed;
+    const rawPlan: DietPlan = parsed.dietPlan || parsed;
+    if (!isCompleteDietPlan(rawPlan)) {
+      return Response.json({ error: "The AI returned an incomplete plan. Please try again." }, { status: 502 });
+    }
     const auditedPlan = auditAndFixDietPlanMath(rawPlan);
 
     const dietPlanData = {
@@ -197,7 +211,7 @@ Return ONLY valid JSON.`;
     };
 
     // Save generated diet plan to user profile
-    let savedProfile: any = null;
+    let savedProfile: unknown = null;
     try {
       await connectDB();
       savedProfile = await UserProfile.findOneAndUpdate(
@@ -206,7 +220,7 @@ Return ONLY valid JSON.`;
         { new: true }
       );
     } catch (dbErr) {
-      console.warn("⚠️ MongoDB offline during saving diet plan. Saving to local fallback.");
+      if (process.env.NODE_ENV === "production") throw dbErr;
       const currentLocal = await getLocalProfile(email);
       if (currentLocal) {
         currentLocal.dietPlan = dietPlanData;
@@ -215,8 +229,8 @@ Return ONLY valid JSON.`;
     }
 
     return Response.json({ success: true, dietPlan: dietPlanData.generatedPlan, savedProfile });
-  } catch (err: any) {
+  } catch (err) {
     console.error("AI Diet Plan Generation error:", err);
-    return Response.json({ error: err.message || "Failed to generate AI Diet Plan" }, { status: 500 });
+    return Response.json({ error: "Failed to generate AI Diet Plan" }, { status: 500 });
   }
 }

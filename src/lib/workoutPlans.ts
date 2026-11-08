@@ -132,15 +132,63 @@ export function getWeekSchedule(gymFrequency: number): { day: number; name: stri
   }
 }
 
+const SUPPORTED_FREQUENCIES = [3, 4, 5, 6];
+
+export interface PreviousSet {
+  weight?: number;
+  reps?: number;
+  completed?: boolean;
+}
+
+export interface ProgressionResult {
+  previousWeight: number;
+  suggestedWeight: number;
+}
+
+/**
+ * Double progression: add weight only after every working set at the top
+ * weight reached the top of the rep range. Returns null when the sets hold no
+ * usable data, so the caller can look further back in history.
+ */
+export function calculateProgression(
+  sets: PreviousSet[],
+  targetReps: string,
+  exerciseId: string = ""
+): ProgressionResult | null {
+  const completed = sets.filter((set) => set.completed);
+  const working = completed.length > 0 ? completed : sets;
+  const previousWeight = Math.max(0, ...working.map((set) => set.weight || 0));
+  if (previousWeight <= 0) return null;
+
+  const topSets = working.filter((set) => set.weight === previousWeight);
+  const lowestReps = Math.min(...topSets.map((set) => set.reps || 0));
+  const repNumbers = targetReps.match(/\d+/g);
+  const topOfRange = repNumbers ? parseInt(repNumbers[Math.min(1, repNumbers.length - 1)], 10) : NaN;
+
+  const increment = /dumbbell|db|lateral/.test(exerciseId) ? 2 : 2.5;
+  const earnedIncrease = !Number.isNaN(topOfRange) && lowestReps >= topOfRange;
+
+  return { previousWeight, suggestedWeight: earnedIncrease ? previousWeight + increment : previousWeight };
+}
+
 /**
  * Generates today's workout plan based on user specs and the day of week.
  */
 export function getTodaysWorkout(
-  profile?: { gymFrequency?: number; gymExperience?: string; goal?: string },
+  profile?: {
+    gymFrequency?: number;
+    gymExperience?: string;
+    goal?: string;
+    customWorkoutPlan?: Record<string, unknown>;
+  },
   dayOfWeek?: number
 ): WorkoutPlan {
-  const frequency = profile?.gymFrequency ?? 4;
+  // Only the supported splits have exercise programs; anything else gets the default.
+  const frequency = SUPPORTED_FREQUENCIES.includes(profile?.gymFrequency as number) ? (profile?.gymFrequency as number) : 4;
   const targetDay = dayOfWeek !== undefined ? dayOfWeek : new Date().getDay();
+
+  const customPlan = profile?.customWorkoutPlan?.[targetDay];
+  if (customPlan) return customPlan as WorkoutPlan;
 
   // Find if today is scheduled as a workout
   const schedule = getWeekSchedule(frequency);

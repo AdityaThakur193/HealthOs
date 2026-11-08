@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchIngredient, computeFuzzySimilarity, hasStructuralConflict, TIER1_SEED_MAP, resolveCulinaryPortion } from "../lib/ifctMatcher";
+import { matchIngredient, hasStructuralConflict, TIER1_SEED_MAP, resolveCulinaryPortion } from "../lib/ifctMatcher";
 import { calculateFoodMacros, IFCT_DATABASE } from "../lib/ifctData";
 
 describe("IFCT 3-Tier Matcher Engine (src/lib/ifctMatcher.ts)", () => {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { IUserProfile } from "@/lib/db/models";
+import type { IUserProfile } from "@/lib/db/models";
+import { clearClientSession } from "@/components/SessionWatcher";
 
 export function useAuthGuard() {
   const router = useRouter();
@@ -39,10 +40,13 @@ export function useAuthGuard() {
 
       // Background Revalidation: Fetch fresh profile silently without blocking UI
       try {
-        const res = await fetch(
-          `/api/profile?email=${encodeURIComponent(storedEmail)}&t=${Date.now()}`,
-          { cache: "no-store" }
-        );
+        const res = await fetch(`/api/profile?t=${Date.now()}`, { cache: "no-store" });
+
+        if (res.status === 401) {
+          clearClientSession();
+          router.push("/login");
+          return;
+        }
 
         if (!res.ok) {
           if (!cachedProfile) router.push("/onboarding");

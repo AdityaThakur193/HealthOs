@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import type { TimelineEntry } from "@/lib/timelineUtils";
 import GlassCard from "@/components/GlassCard";
 import MealResultCard from "@/components/MealResultCard";
 import CustomPopup from "@/components/CustomPopup";
-import { Camera, Edit3, AlertTriangle, Play, CheckCircle } from "lucide-react";
+import { Camera, Edit3, AlertTriangle } from "lucide-react";
 import { compressImage } from "@/lib/imageUtils";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
-import { motion, AnimatePresence } from "framer-motion";
-import { calculateFoodMacros, CAMPUS_PRESETS, type CampusPreset } from "@/lib/ifctData";
+import { motion } from "framer-motion";
+import { calculateFoodMacros, CAMPUS_PRESETS } from "@/lib/ifctData";
 
 interface FoodItem {
   name: string;
@@ -38,7 +39,7 @@ export default function MealCapture() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [foods, setFoods] = useState<FoodItem[]>([]);
   const [confidence, setConfidence] = useState(0.9);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<TimelineEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isMock, setIsMock] = useState(false);
@@ -62,7 +63,8 @@ export default function MealCapture() {
           return;
         }
 
-        const profileRes = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
+        const profileRes = await fetch("/api/profile");
+        if (!profileRes.ok) return;
         const profileData = await profileRes.json();
         if (profileData.notInitialized) {
           router.push(`/onboarding?email=${encodeURIComponent(email)}`);
@@ -72,12 +74,12 @@ export default function MealCapture() {
         const userId = profileData.profile._id;
         localStorage.setItem("healthos_userId", userId);
 
-        const res = await fetch(`/api/timeline?userId=${userId}&type=meal`);
+        const res = await fetch("/api/timeline?type=meal");
         if (res.ok) {
           const data = await res.json();
           const todayStr = new Date().toDateString();
           const todayEvents = (data.events || []).filter(
-            (event: any) => new Date(event.timestamp).toDateString() === todayStr
+            (event: TimelineEntry) => new Date(event.timestamp).toDateString() === todayStr
           );
           setHistory(todayEvents);
         }
@@ -189,9 +191,6 @@ export default function MealCapture() {
       return;
     }
 
-    const userId = localStorage.getItem("healthos_userId");
-    if (!userId) return;
-
     const totalCalories = foods.reduce((sum, f) => sum + (f.estimatedCalories || 0), 0);
     const totalProteinG = Math.round(foods.reduce((sum, f) => sum + (f.proteinG || 0), 0) * 10) / 10;
     const totalCarbsG = Math.round(foods.reduce((sum, f) => sum + (f.carbsG || 0), 0) * 10) / 10;
@@ -202,7 +201,6 @@ export default function MealCapture() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId,
           type: "meal",
           payload: {
             foods,
@@ -210,7 +208,6 @@ export default function MealCapture() {
             totalProteinG,
             totalCarbsG,
             totalFatG,
-            imagePreview,
             isMock,
           },
           source: isMock ? "mock" : "ai_vision",
@@ -224,15 +221,14 @@ export default function MealCapture() {
         const errText = await res.text().catch(() => "Unknown error");
         showCustomAlert("Save Failed", `We could not save the meal: ${errText || "Please try again."}`, "error");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      showCustomAlert("Save Failed", err.message || "An unexpected error occurred. Please try again.", "error");
+      showCustomAlert("Save Failed", err instanceof Error ? err.message : "An unexpected error occurred. Please try again.", "error");
     }
   };
 
   const handleSaveManualMeal = async () => {
-    const userId = localStorage.getItem("healthos_userId");
-    if (!userId || !manualName.trim()) return;
+    if (!manualName.trim()) return;
 
     setLoadingHistory(true);
     try {
@@ -240,22 +236,21 @@ export default function MealCapture() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId,
           type: "meal",
           payload: {
             name: manualName.trim(),
-            totalCalories: parseInt(manualCal) || 0,
-            totalProteinG: parseInt(manualProt) || 0,
-            totalCarbsG: parseInt(manualCarbs) || 0,
-            totalFatG: parseInt(manualFats) || 0,
+            totalCalories: parseFloat(manualCal) || 0,
+            totalProteinG: parseFloat(manualProt) || 0,
+            totalCarbsG: parseFloat(manualCarbs) || 0,
+            totalFatG: parseFloat(manualFats) || 0,
             foods: [
               {
                 name: manualName.trim(),
                 portionSize: "medium",
-                estimatedCalories: parseInt(manualCal) || 0,
-                proteinG: parseInt(manualProt) || 0,
-                carbsG: parseInt(manualCarbs) || 0,
-                fatG: parseInt(manualFats) || 0,
+                estimatedCalories: parseFloat(manualCal) || 0,
+                proteinG: parseFloat(manualProt) || 0,
+                carbsG: parseFloat(manualCarbs) || 0,
+                fatG: parseFloat(manualFats) || 0,
               },
             ],
           },
@@ -272,17 +267,19 @@ export default function MealCapture() {
         setManualFats("");
         
         // Reload today's log history
-        const histRes = await fetch(`/api/timeline?userId=${userId}&type=meal`);
+        const histRes = await fetch("/api/timeline?type=meal");
         if (histRes.ok) {
           const histData = await histRes.json();
           const todayStr = new Date().toDateString();
           const todayEvents = (histData.events || []).filter(
-            (event: any) => new Date(event.timestamp).toDateString() === todayStr
+            (event: TimelineEntry) => new Date(event.timestamp).toDateString() === todayStr
           );
           setHistory(todayEvents);
         }
         
         setTimeout(() => setShowSuccess(false), 2000);
+      } else {
+        showCustomAlert("Save Failed", "We could not save this meal. Please check the values and try again.", "error");
       }
     } catch (err) {
       console.error("Failed to save manual meal:", err);
@@ -497,7 +494,7 @@ export default function MealCapture() {
 
           {/* Today's Meals History */}
           <div className="space-y-3">
-            <h3 className="text-xs font-extrabold text-zinc-400 tracking-tight">Today's Logs</h3>
+            <h3 className="text-xs font-extrabold text-zinc-400 tracking-tight">Today&apos;s Logs</h3>
             {loadingHistory ? (
               <div className="shimmer h-16 w-full rounded-xl" />
             ) : history.length === 0 ? (
@@ -515,7 +512,7 @@ export default function MealCapture() {
                     <div className="text-right">
                       <span className="text-xs font-bold text-brand-400">{h.payload.totalCalories} kcal</span>
                       <p className="text-[9px] text-zinc-500 mt-0.5 font-mono">
-                        P: {h.payload.totalProteinG || 0}g | C: {h.payload.totalCarbsG || h.payload.foods?.reduce((s: number, f: any) => s + (Number(f.carbsG) || 0), 0) || 0}g | F: {h.payload.totalFatG || h.payload.foods?.reduce((s: number, f: any) => s + (Number(f.fatG) || 0), 0) || 0}g
+                        P: {h.payload.totalProteinG || 0}g | C: {h.payload.totalCarbsG || h.payload.foods?.reduce((s, f) => s + (Number(f.carbsG) || 0), 0) || 0}g | F: {h.payload.totalFatG || h.payload.foods?.reduce((s, f) => s + (Number(f.fatG) || 0), 0) || 0}g
                       </p>
                     </div>
                   </GlassCard>

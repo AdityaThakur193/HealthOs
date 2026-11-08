@@ -22,7 +22,7 @@ function OnboardingContent() {
   const [age, setAge] = useState(21);
   const [heightCm, setHeightCm] = useState(175);
   const [weightKg, setWeightKg] = useState(70);
-  const [targetWeightKg, setTargetWeightKg] = useState(65);
+  const [manualTargetWeightKg, setTargetWeightKg] = useState(65);
   const [goal, setGoal] = useState<"lose_fat" | "build_muscle" | "maintain" | "recomp" | "general_health">("lose_fat");
   const [activityLevel, setActivityLevel] = useState<"sedentary" | "light" | "moderate" | "active" | "very_active">("moderate");
   const [gymExperience, setGymExperience] = useState<"beginner" | "intermediate" | "advanced">("beginner");
@@ -47,13 +47,11 @@ function OnboardingContent() {
   const [customProtein, setCustomProtein] = useState("");
   const [useCustomMacros, setUseCustomMacros] = useState(false);
 
-  // Auto-calculate suggested ideal target weight when height changes (guilt-free, effort-reducing)
-  useEffect(() => {
-    if (!hasManuallyAdjustedTarget && heightCm > 100) {
-      const ideal = Math.round(22 * (heightCm / 100) * (heightCm / 100));
-      setTargetWeightKg(ideal);
-    }
-  }, [heightCm, hasManuallyAdjustedTarget]);
+  // Suggest an ideal target weight from height until the user picks their own.
+  const targetWeightKg =
+    !hasManuallyAdjustedTarget && heightCm > 100
+      ? Math.round(22 * (heightCm / 100) * (heightCm / 100))
+      : manualTargetWeightKg;
 
   // Load existing profile if any
   useEffect(() => {
@@ -62,7 +60,7 @@ function OnboardingContent() {
       if (!targetEmail) return;
 
       try {
-        const res = await fetch(`/api/profile?email=${encodeURIComponent(targetEmail)}`);
+        const res = await fetch("/api/profile");
         const data = await res.json();
         if (data.profile) {
           const p = data.profile;
@@ -91,8 +89,8 @@ function OnboardingContent() {
           setCustomCalories(p.customCalories ? String(p.customCalories) : "");
           setCustomProtein(p.customProtein ? String(p.customProtein) : "");
           setUseCustomMacros(p.useCustomMacros || false);
-        } else if (emailParam) {
-          setEmail(emailParam);
+        } else {
+          setEmail(targetEmail);
         }
       } catch (err) {
         console.error("Failed to load profile", err);
@@ -150,7 +148,6 @@ function OnboardingContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          email,
           gender,
           age,
           heightCm,
@@ -243,7 +240,7 @@ function OnboardingContent() {
       <div className="flex items-center justify-between py-4">
         <div>
           <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">Health OS Setup</span>
-          <h1 className="text-xl font-bold text-white mt-0.5">Let's build your model</h1>
+          <h1 className="text-xl font-bold text-white mt-0.5">Let&apos;s build your model</h1>
         </div>
         <StepIndicator total={totalSteps} current={step} />
       </div>
@@ -277,8 +274,8 @@ function OnboardingContent() {
                   type="email"
                   placeholder="email@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-glass"
+                  readOnly
+                  className="input-glass opacity-70"
                 />
               </div>
               <div>
@@ -470,7 +467,7 @@ function OnboardingContent() {
               ].map((opt) => (
                 <div
                   key={opt.value}
-                  onClick={() => setGoal(opt.value as any)}
+                  onClick={() => setGoal(opt.value as typeof goal)}
                   className={`p-4 border text-left transition-all rounded-tl-2xl rounded-br-2xl cursor-pointer ${
                     goal === opt.value
                       ? "border-[#8ba893] bg-[#8ba893]/5 glow-green"
@@ -505,7 +502,7 @@ function OnboardingContent() {
                     { value: "very_active", label: "Athlete/Hard Labor", emoji: "🏋️" },
                   ]}
                   value={activityLevel}
-                  onChange={(v) => setActivityLevel(v as any)}
+                  onChange={(v) => setActivityLevel(v as typeof activityLevel)}
                 />
               </div>
 
@@ -518,7 +515,7 @@ function OnboardingContent() {
                     { value: "advanced", label: "Advanced (3+ yrs)", emoji: "🦅" },
                   ]}
                   value={gymExperience}
-                  onChange={(v) => setGymExperience(v as any)}
+                  onChange={(v) => setGymExperience(v as typeof gymExperience)}
                 />
               </div>
 
@@ -558,7 +555,7 @@ function OnboardingContent() {
                     { value: "vegan", label: "Vegan", emoji: "🥦" },
                   ]}
                   value={dietPreference}
-                  onChange={(v) => setDietPreference(v as any)}
+                  onChange={(v) => setDietPreference(v as typeof dietPreference)}
                 />
               </div>
 
