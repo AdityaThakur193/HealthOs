@@ -144,6 +144,7 @@ export default function ReminderSettings() {
 
       {status === "on" && (
         <>
+          <p className="text-[11px] text-zinc-400">Tap a meal to switch its reminder on or off.</p>
           <div className="grid grid-cols-2 gap-2">
             {MEAL_NAMES.map((meal) => (
               <button
@@ -155,7 +156,7 @@ export default function ReminderSettings() {
                   meals.includes(meal) ? "bg-brand-500/20 text-white border-brand-500/50" : "bg-white/5 text-zinc-500 border-white/10"
                 }`}
               >
-                {meal}
+                {meal} · {meals.includes(meal) ? "On" : "Off"}
               </button>
             ))}
           </div>
