@@ -4,7 +4,7 @@ import { isValidEmail, isValidEventId, isValidObjectId, normalizeEmail } from ".
 describe("Security Audit & Input Hardening", () => {
   describe("Email Validation", () => {
     it("should accept valid email addresses", () => {
-      expect(isValidEmail("adityath2305@gmail.com")).toBe(true);
+      expect(isValidEmail("first.last@example.com")).toBe(true);
       expect(isValidEmail("user.name+tag@gitam.in")).toBe(true);
     });
 
@@ -19,15 +19,15 @@ describe("Security Audit & Input Hardening", () => {
 
   describe("MongoDB ObjectId Validation", () => {
     it("should accept valid 24-character hex ObjectIds", () => {
-      expect(isValidObjectId("6a4c73d185dcfe8a2843fb2f")).toBe(true);
+      expect(isValidObjectId("507f1f77bcf86cd79943901f")).toBe(true);
       expect(isValidObjectId("507f1f77bcf86cd799439011")).toBe(true);
     });
 
     it("should reject invalid or malicious ObjectId attempts", () => {
       expect(isValidObjectId("")).toBe(false);
       expect(isValidObjectId("12345")).toBe(false);
-      expect(isValidObjectId("6a4c73d185dcfe8a2843fb2g")).toBe(false); // invalid hex 'g'
-      expect(isValidObjectId("6a4c73d185dcfe8a2843fb2f; DROP TABLE users;")).toBe(false);
+      expect(isValidObjectId("507f1f77bcf86cd79943901g")).toBe(false); // invalid hex 'g'
+      expect(isValidObjectId("507f1f77bcf86cd79943901f; DROP TABLE users;")).toBe(false);
     });
   });
 

@@ -36,6 +36,8 @@ GEMINI_API_KEY=your_gemini_api_key_here
 GROQ_API_KEY=your_groq_api_key_here
 ```
 
+You don't need `AUTH_SECRET` or `RESEND_API_KEY` for local development. To sign in, enter any email and copy the 6-digit code printed in the server console.
+
 ### 4. Run Development Server
 ```bash
 npm run dev
@@ -78,16 +80,19 @@ We strictly enforce **Conventional Commits** to keep the project history clean a
 
 ## 🧪 Testing & Verification Requirements
 
-Before submitting a Pull Request, you **MUST** ensure that all tests pass and that there are no TypeScript or build errors:
+Before submitting a Pull Request, you **MUST** ensure that all tests pass and that there are no lint, TypeScript, or build errors:
 
 ```bash
-# 1. Run Type Check
+# 1. Run ESLint
+npm run lint
+
+# 2. Run Type Check
 npm run type-check
 
-# 2. Run Automated Vitest Test Suite
+# 3. Run Automated Vitest Test Suite
 npm test
 
-# 3. Verify Production Build
+# 4. Verify Production Build
 npm run build
 ```
 

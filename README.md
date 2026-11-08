@@ -8,7 +8,7 @@
 [![Next.js 16](https://img.shields.io/badge/Next.js-16.4.5-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript 5](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vitest Passed](https://img.shields.io/badge/Vitest-212%20Tests%20Passed-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
-[![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas%20v8.0-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Mongoose%208-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v3.4-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
@@ -69,7 +69,7 @@ graph TD
   1. **Visual Contract**: AI vision detects dish names and unit counts without guessing raw calories.
   2. **IFCT 2017 Database**: Post-processes dish detections against official **ICMR-NIN IFCT 2017** benchmarks (Rotis, Thin Mess Dal, Rice, Curd, Paneer, Whey, Eggs).
   3. **Interactive Quantity Sliders**: Replaces vague `Small/Medium/Large` buttons with real-time `-` / `+` portion controls (`1 Katori`, `2 Pieces`, `1 Scoop`).
-  4. **Self-Learning Memory**: Adapts to individual hostel mess portion sizes over time.
+  4. **Zero-Hallucination Policy**: A food that isn't in the database gets 0 macros and is flagged, so the user can enter the values instead of trusting a guess.
 
 ### 3. Grounded AI Diet Generator with MPS Leucine Protein Spacing
 - **Engine Solution** (`src/lib/dietEngine.ts` & `/api/diet/generate`):
@@ -92,15 +92,15 @@ graph TD
 - **Engine Solution** (`src/lib/habitEngine.ts` & `/api/habits`):
   - Tracks daily health habits (hydration, sleep targets, prayer/meditation, physical activity).
   - Calculates active streaks (🔥) and completion percentages using EWMA exponential habit scoring.
-  - Fully integrated with Coach AI so users can check off habits via natural voice/text commands.
+  - Fully integrated with Coach AI so users can check off habits via natural-language chat.
 
 ---
 
 ## 📦 Quickstart & Setup
 
 ### Prerequisites
-- **Node.js**: v18.0.0 or higher
-- **npm**: v9.0.0 or higher
+- **Node.js**: v20.9.0 or higher
+- **npm**: v10.0.0 or higher
 - **MongoDB**: Atlas instance or local MongoDB server
 
 ### 1. Clone & Install
@@ -160,7 +160,7 @@ HealthOs/
 │   │   └── ci.yml                # GitHub Actions CI Workflow (Lint, Type-Check, Test, Build)
 │   ├── PULL_REQUEST_TEMPLATE.md  # Standard Pull Request Submission Template
 │   └── ISSUE_TEMPLATE/           # Bug Report & Feature Request Issue Templates
-├── public/                       # Static Assets & PWA Service Worker (sw.js)
+├── public/                       # Static Assets & PWA Manifest
 ├── src/
 │   ├── app/                      # Next.js 16 App Router Pages & REST API Routes
 │   │   ├── api/                  # Serverless API Endpoints (/vision, /diet, /timeline, /habits, etc.)
@@ -199,6 +199,14 @@ Health OS maintains an automated **Vitest** suite of 212 tests across 17 files. 
 ```bash
 npm test
 ```
+
+---
+
+## 🚧 Known Limitations
+
+- **Offline logging** is not implemented yet. The app can be installed to the home screen, but it needs a connection to log data, and `public/sw.js` is not registered.
+- **AI rate limits** are counted per server instance, so on serverless hosts they are approximate.
+- **Sessions** last 30 days and cannot be revoked individually. Rotating `AUTH_SECRET` ends all of them.
 
 ---
 

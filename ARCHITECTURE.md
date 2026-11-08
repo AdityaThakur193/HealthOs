@@ -14,7 +14,6 @@ graph TD
         MealUI["AI Vision Meal Capture (/meal)"]
         WorkoutUI["Progressive Gym HUD (/workout)"]
         ReviewUI["Weekly Review (/review)"]
-        SW["Service Worker (sw.js)"]
     end
 
     subgraph API ["Serverless API Layer (Node.js / Edge)"]
@@ -36,7 +35,7 @@ graph TD
     subgraph Data ["Data Storage & Persistence"]
         MongoCache["Global Mongoose Connection Pool (mongodb.ts)"]
         MongoAtlas[("MongoDB Atlas Cloud DB")]
-        LocalFallback[("Local JSON Fallback DB (local_db.json)")]
+        LocalFallback[("Local JSON Dev DB (local_db.json)")]
     end
 
     Client -->|HTTP Requests| API
@@ -47,7 +46,7 @@ graph TD
     TimelineRoute --> MongoCache
     ProfileRoute --> MongoCache
     MongoCache -->|Primary| MongoAtlas
-    MongoCache -.->|Offline Fallback| LocalFallback
+    MongoCache -.->|Development Fallback| LocalFallback
 ```
 
 ---
@@ -167,7 +166,7 @@ Key Compound Indexes:
 
 ---
 
-## 🔌 Serverless Connection Pooling & Offline Resilience
+## 🔌 Serverless Connection Pooling & Development Fallback
 
 Health OS uses a **dual-layer database connection manager** (`src/lib/mongodb.ts` & `src/lib/db/fallback.ts`):
 1. **Primary Layer**: `connectDB()` attaches the Mongoose connection promise to `global._mongooseCache` to prevent connection pool exhaustion across serverless cold starts.
