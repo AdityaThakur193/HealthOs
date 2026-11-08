@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { MealDayStatus } from "./mealWindows";
 
 /**
  * Gemini AI Service Client
@@ -268,7 +269,9 @@ export interface CoachContext {
     foodAllergies?: string[];
     medicalConditions?: string[];
     dietPreference?: string;
+    strictMessOnly?: boolean;
   };
+  mealTiming?: MealDayStatus | null;
   today: {
     caloriesConsumed: number;
     proteinConsumed: number;
@@ -330,6 +333,8 @@ Generate a daily coaching recommendation as JSON:
 
 Rules:
 - Encouraging Workout Reminders: If today.workoutCompleted is false and today.scheduledWorkoutName is not "Rest Day", include a friendly, encouraging nudge in your primaryInsight or actionItems to do their scheduled "${context.today.scheduledWorkoutName || "workout"}" today. Remind them how this session helps them progress towards their goal, keeping the tone completely positive, zero guilt. If today.workoutCompleted is true, praise their dedication.
+- MESS TIMING (hard rule): mealTiming gives the current local time and each meal's state. Only suggest eating at a meal whose state is "open" or "upcoming", and say when it opens or closes. Never tell the user to eat at a "closed" meal, because the mess will not serve it. todayMessMenu only contains meals that are still available.
+- If mealTiming.messClosedForToday is true, the mess is finished for the day. Do not suggest mess food. If targets are short, suggest only something the user could already have in their room (not if profile.strictMessOnly is true), or reassure them and point to tomorrow's breakfast.
 - Never guilt the user for missing workouts or eating badly.
 - Respect profile.dietPreference and never suggest anything in profile.foodAllergies. Take profile.medicalConditions into account.
 - If todayMessMenu is present, actively reference its items in your nutritional feedback.

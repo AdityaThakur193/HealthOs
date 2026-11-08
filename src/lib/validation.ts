@@ -1,3 +1,5 @@
+import { isValidMealWindow, MEAL_NAMES } from "./mealWindows";
+
 /**
  * Shared input validation for API routes.
  */
@@ -32,6 +34,15 @@ const GENDERS = ["male", "female", "other"];
 const DIET_PREFERENCES = ["none", "vegetarian", "vegan", "eggetarian", "non_veg"];
 
 type JsonObject = Record<string, unknown>;
+
+/** Mess hours must give a valid start and end for every meal in both schedules. */
+export function isValidMessTimings(value: unknown): boolean {
+  const timings = value as Record<string, Record<string, unknown>> | null;
+  if (!timings || typeof timings !== "object") return false;
+  return ["regular", "holiday"].every((kind) =>
+    MEAL_NAMES.every((meal) => isValidMealWindow(timings[kind]?.[meal]))
+  );
+}
 
 /** Parses a JSON object body; returns null for malformed or non-object bodies. */
 export async function readJsonObject(request: Request): Promise<JsonObject | null> {

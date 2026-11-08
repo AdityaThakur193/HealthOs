@@ -1,10 +1,9 @@
 import { NextRequest } from "next/server";
 import { sanitizeJsonOutput } from "@/lib/gemini";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import connectDB from "@/lib/mongodb";
-import { LeanUserProfile, UserProfile } from "@/lib/db/models";
-import { getLocalProfileById } from "@/lib/db/fallback";
 import { getWeekSchedule } from "@/lib/workoutPlans";
+import { buildCoachContext } from "@/lib/coachContext";
+import { CoachSnapshot, loadCoachSnapshot } from "@/lib/coachData";
 import { normalizeCoachReply } from "@/lib/coachRules";
 import { requireUserSession } from "@/lib/auth/session";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
@@ -29,16 +28,6 @@ function getGenAI(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(apiKey);
 }
 
-async function loadProfile(userId: string): Promise<LeanUserProfile | null> {
-  try {
-    await connectDB();
-    return await UserProfile.findById(userId).lean<LeanUserProfile>();
-  } catch (error) {
-    if (process.env.NODE_ENV === "production") throw error;
-    return (await getLocalProfileById(userId)) as unknown as LeanUserProfile | null;
-  }
-}
-
 function formatHistory(history: unknown): string {
   if (!Array.isArray(history)) return "";
   return (history as ChatTurn[])
@@ -48,10 +37,18 @@ function formatHistory(history: unknown): string {
     .join("\n");
 }
 
-function buildSystemPrompt(profile: LeanUserProfile, tz?: string): string {
+function remainingPlanMeals(meals: { name: string }[] | undefined, closed: string[]) {
+  return (meals || []).filter((meal) => !closed.some((name) => meal.name.toLowerCase().includes(name)));
+}
+
+function buildSystemPrompt(snapshot: CoachSnapshot, tz?: string): string {
+  const { profile, habits } = snapshot;
+  const context = buildCoachContext({ ...snapshot, tz });
   const todayName = DAYS[weekdayIndex(new Date(), tz)];
+  const closedMeals = (context.mealTiming?.meals || [])
+    .filter((meal) => meal.state === "closed")
+    .map((meal) => meal.meal.replace(/s$/, ""));
   const dietPlan = profile.dietPlan?.generatedPlan as Record<string, { meals?: { name: string; messItems?: string }[] }> | undefined;
-  const messMenu = profile.messMenu?.parsedMenu as Record<string, unknown> | undefined;
   const gymFrequency = profile.gymFrequency || 4;
 
   const weeklySummary = dietPlan
@@ -76,9 +73,14 @@ User Profile:
 - Diet preference: ${profile.dietPreference || "none"} | Food allergies (NEVER suggest these): ${allergies} | Medical conditions: ${conditions}
 - Schedule: ${profile.collegeSchedule || "Not specified"} | Strict Mess Mode: ${profile.strictMessOnly ? "ACTIVE" : "INACTIVE"}
 - Gym: ${gymFrequency} days/week (${profile.gymExperience}) | Split: ${JSON.stringify(getWeekSchedule(gymFrequency))}
-- Today (${todayName}): Mess: ${messMenu?.[todayName] ? JSON.stringify(messMenu[todayName]) : "N/A"} | Plan: ${dietPlan?.[todayName] ? JSON.stringify(dietPlan[todayName]) : "N/A"}
+- Today (${todayName}): Remaining plan: ${dietPlan?.[todayName] ? JSON.stringify(remainingPlanMeals(dietPlan[todayName].meals, closedMeals)) : "N/A"}
 - Full Weekly Diet Overview:
 ${weeklySummary || "No diet plan generated yet"}
+
+LIVE STATUS (calculated by the app, use these numbers and do not recalculate):
+${JSON.stringify({ ...context, habits })}
+
+MESS TIMING RULE: mealTiming has the current local time and each meal's state. Only suggest eating at a meal whose state is "open" or "upcoming". Never tell the user to eat at a "closed" meal, because the mess will not serve it. If messClosedForToday is true, suggest only what they could already have in their room (not in Strict Mess Mode), or reassure them and point to tomorrow's breakfast.
 
 ════════════════════════════════════════════
 FULL DATA CONTROL — ACTIONS YOU CAN TAKE
@@ -220,12 +222,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const profile = await loadProfile(session.userId);
-    if (!profile) {
+    const snapshot = await loadCoachSnapshot(session.userId, session.tz);
+    if (!snapshot) {
       return Response.json({ error: "User profile not found." }, { status: 404 });
     }
 
-    const prompt = `${buildSystemPrompt(profile, session.tz)}\n\nChat History:\n${formatHistory(history)}\n\nUser: ${message}\n\nCoach:`;
+    const prompt = `${buildSystemPrompt(snapshot, session.tz)}\n\nChat History:\n${formatHistory(history)}\n\nUser: ${message}\n\nCoach:`;
     const responseText = await generateReply(prompt);
     return Response.json(normalizeCoachReply(JSON.parse(sanitizeJsonOutput(responseText))));
   } catch (error) {

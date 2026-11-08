@@ -11,6 +11,7 @@ import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 import type { TimelineEntry } from "@/lib/timelineUtils";
 import type { DietMeal, DietPlan } from "@/lib/dietEngine";
+import { DEFAULT_MESS_TIMINGS, MEAL_NAMES, MessTimings, resolveMessTimings } from "@/lib/mealWindows";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -122,7 +123,9 @@ export default function ProfilePage() {
   const [events, setEvents] = useState<TimelineEntry[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [eventTitle, setEventTitle] = useState("");
-  const [eventType, setEventType] = useState<"exam" | "travel" | "sick">("exam");
+  const [messTimings, setMessTimings] = useState<MessTimings>(DEFAULT_MESS_TIMINGS);
+  const [savingHours, setSavingHours] = useState(false);
+  const [eventType, setEventType] = useState<"exam" | "travel" | "sick" | "holiday">("exam");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [savingEvent, setSavingEvent] = useState(false);
@@ -132,6 +135,7 @@ export default function ProfilePage() {
     // Copies the loaded profile into the editable form fields.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(false);
+    setMessTimings(resolveMessTimings(profile.messTimings));
 
     if (profile.messMenu) {
       setRawMenuInput(profile.messMenu.rawText || "");
@@ -511,6 +515,49 @@ export default function ProfilePage() {
       showCustomAlert("Connection Error", "Error saving mess menu.", "error");
     } finally {
       setSavingMenu(false);
+    }
+  };
+
+  const updateMealHour = (kind: keyof MessTimings, meal: (typeof MEAL_NAMES)[number], edge: "start" | "end", value: string) => {
+    setMessTimings((current) => ({
+      ...current,
+      [kind]: { ...current[kind], [meal]: { ...current[kind][meal], [edge]: value } },
+    }));
+  };
+
+  const handleSaveMessHours = async () => {
+    if (!profile) return;
+
+    setSavingHours(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: profile.name,
+          age: profile.age,
+          gender: profile.gender,
+          heightCm: profile.heightCm,
+          weightKg: profile.weightKg,
+          goal: profile.goal,
+          activityLevel: profile.activityLevel,
+          gymExperience: profile.gymExperience,
+          messTimings,
+        }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setProfile(data.profile);
+        showCustomAlert("Saved", "Your coach will now plan around these mess hours.", "success");
+      } else {
+        showCustomAlert("Save Failed", data.error || "Could not save mess hours.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showCustomAlert("Connection Error", "Error saving mess hours.", "error");
+    } finally {
+      setSavingHours(false);
     }
   };
 
@@ -997,6 +1044,7 @@ export default function ProfilePage() {
                   <option value="exam">📝 Exams Prep Period (Steps target $\rightarrow$ 5,000)</option>
                   <option value="travel">✈️ Travel / Vacation (Steps target $\rightarrow$ 6,000)</option>
                   <option value="sick">🤒 Illness / Sick Days (Steps target $\rightarrow$ 3,000)</option>
+                  <option value="holiday">🎉 Holiday (uses Sunday mess hours)</option>
                 </select>
               </div>
 
@@ -1046,7 +1094,7 @@ export default function ProfilePage() {
                   const payload = ev.payload;
                   const startStr = new Date(payload.startDate as string).toLocaleDateString([], { month: "short", day: "numeric" });
                   const endStr = new Date(payload.endDate as string).toLocaleDateString([], { month: "short", day: "numeric" });
-                  const emoji = payload.event_type === "exam" ? "📝" : payload.event_type === "travel" ? "✈️" : "🤒";
+                  const emoji = payload.event_type === "holiday" ? "🎉" : payload.event_type === "exam" ? "📝" : payload.event_type === "travel" ? "✈️" : "🤒";
 
                   return (
                     <GlassCard key={ev._id || i} className="p-4 flex items-center justify-between">
@@ -1081,6 +1129,45 @@ export default function ProfilePage() {
       {/* Tab 3: Hostel Mess Menu Parser */}
       {activeTab === "mess" && (
         <div className="space-y-5 animate-in-delay-1">
+          {/* Mess Hours Card */}
+          <GlassCard className="p-5 space-y-4 border border-white/10">
+            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-white/5 pb-2">Mess Hours</h3>
+            <p className="text-[10px] text-zinc-500 leading-relaxed">
+              Your coach only suggests meals that are still open. For a one-off holiday, add it in the Schedule tab.
+            </p>
+
+            {(["regular", "holiday"] as const).map((kind) => (
+              <div key={kind} className="space-y-2">
+                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+                  {kind === "regular" ? "Monday to Saturday" : "Sundays & Holidays"}
+                </p>
+                {MEAL_NAMES.map((meal) => (
+                  <div key={meal} className="grid grid-cols-[72px_1fr_1fr] gap-2 items-center">
+                    <span className="text-xs text-zinc-300 capitalize">{meal}</span>
+                    {(["start", "end"] as const).map((edge) => (
+                      <input
+                        key={edge}
+                        type="time"
+                        aria-label={`${kind} ${meal} ${edge === "start" ? "opens" : "closes"}`}
+                        value={messTimings[kind][meal][edge]}
+                        onChange={(e) => updateMealHour(kind, meal, edge, e.target.value)}
+                        className="input-glass text-xs h-10 px-2 bg-zinc-950 text-white border border-white/10 rounded-xl w-full"
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            <button
+              onClick={handleSaveMessHours}
+              disabled={savingHours}
+              className="w-full py-3 rounded-xl bg-[#8ba893] hover:bg-[#8ba893]/90 text-[#0c0f0d] text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Save className="w-3.5 h-3.5" /> {savingHours ? "Saving..." : "Save Mess Hours"}
+            </button>
+          </GlassCard>
+
           {/* Paste Menu Card */}
           <GlassCard className="p-5 space-y-4 border border-white/10 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#8ba893]/5 blur-[50px] rounded-full -z-10" />
