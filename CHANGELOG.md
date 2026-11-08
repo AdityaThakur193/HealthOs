@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- The reminder job now reports why it skipped or failed, and can send a test notification on demand.
 - Mess-aware coaching. Both coaches now know the time, mess hours, Sunday and holiday timings, and which meals are logged, and they no longer suggest a meal that has closed. Mess hours can be edited in Settings.
 - The home coach reuses its message until something relevant changes, which reduces AI calls.
 - The chat coach can now see today's logs, habits, adaptive TDEE and exam or sick mode.

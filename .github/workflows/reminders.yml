@@ -6,6 +6,11 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+    inputs:
+      send_test:
+        description: Send a test notification to every device now
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -19,5 +24,8 @@ jobs:
         env:
           APP_URL: ${{ vars.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SEND_TEST: ${{ inputs.send_test }}
         run: |
-          curl --fail --silent --show-error --max-time 60 -X POST -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/reminders"
+          query=""
+          if [ "$SEND_TEST" = "true" ]; then query="?test=1"; fi
+          curl --fail --silent --show-error --max-time 60 -X POST -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/reminders$query"
