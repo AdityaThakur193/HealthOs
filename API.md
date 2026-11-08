@@ -174,7 +174,7 @@ Send `mealText` instead of an image to analyze a description. The response has `
 { "strictMessOnly": false }
 ```
 
-Requires a parsed mess menu on the profile. Respects diet preference, allergies, and medical conditions, then re-sums every meal in code. Returns `{ "success": true, "dietPlan": {}, "savedProfile": {} }`, or `502` if the model returns an incomplete week.
+Requires a parsed mess menu on the profile. Code chooses realistic portions and takes nutrition from IFCT 2017, with AI estimates only for dishes IFCT doesn't cover. Send `{ "swap": { "day": "monday", "meal": "Lunch" } }` to try different additions for one meal. Returns `{ "success": true, "dietPlan": {}, "savedProfile": {} }`.
 
 ---
 

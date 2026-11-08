@@ -71,11 +71,12 @@ graph TD
   3. **Interactive Quantity Sliders**: Replaces vague `Small/Medium/Large` buttons with real-time `-` / `+` portion controls (`1 Katori`, `2 Pieces`, `1 Scoop`).
   4. **Zero-Hallucination Policy**: A food that isn't in the database gets 0 macros and is flagged, so the user can enter the values instead of trusting a guess.
 
-### 3. Grounded AI Diet Generator with MPS Leucine Protein Spacing
-- **Engine Solution** (`src/lib/dietEngine.ts` & `/api/diet/generate`):
-  - Pre-calculates 4-meal Muscle Protein Synthesis (MPS) leucine protein distribution (25% Breakfast / 30% Lunch / 15% Evening Snack / 30% Dinner).
-  - Calculates exact required additions (Whey Protein, Egg Whites, Boiled Eggs, Paneer, Curd, Chicken Breast) based on user preference (`veg`, `eggetarian`, `non_veg`).
-  - Executes `auditAndFixDietPlanMath` to re-sum meal items in TypeScript and override any LLM arithmetic hallucinations with deterministic ICMR-NIN IFCT 2017 validation.
+### 3. Mess-Based Diet Planner with Realistic Portions
+- **Engine Solution** (`src/lib/dietPlanner.ts` & `/api/diet/generate`):
+  - Splits the weekly mess menu into individual foods and takes nutrition from **ICMR-NIN IFCT 2017**. AI estimates are used only for dishes IFCT doesn't cover, and are labelled as estimated.
+  - Code chooses every portion within limits a person would really eat, across a 25% / 30% / 15% / 30% meal split.
+  - Adds protein sources (`vegetarian`, `vegan`, `eggetarian`, `non_veg`) only when the mess falls short, and respects allergies and strict mess mode.
+  - States plainly when the mess can't reach a target on a given day.
 
 ### 4. Evidence-Based Gym Engine & Progressive Overload
 - **Engine Solution** (`src/lib/workoutPlans.ts`):
