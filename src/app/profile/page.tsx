@@ -125,6 +125,7 @@ export default function ProfilePage() {
   const [eventTitle, setEventTitle] = useState("");
   const [messTimings, setMessTimings] = useState<MessTimings>(DEFAULT_MESS_TIMINGS);
   const [savingHours, setSavingHours] = useState(false);
+  const [swappingMeal, setSwappingMeal] = useState<string | null>(null);
   const [eventType, setEventType] = useState<"exam" | "travel" | "sick" | "holiday">("exam");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -561,6 +562,28 @@ export default function ProfilePage() {
     }
   };
 
+  const handleSwapMeal = async (mealName: string) => {
+    setSwappingMeal(mealName);
+    try {
+      const res = await fetch("/api/diet/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ strictMessOnly, swap: { day: dietActiveDay, meal: mealName } }),
+      });
+      const data = await res.json();
+      if (res.ok && data.dietPlan) {
+        setDietPlan(data.dietPlan);
+      } else {
+        showCustomAlert("Swap Failed", data.error || "Could not change this meal.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showCustomAlert("Connection Error", "Error changing this meal.", "error");
+    } finally {
+      setSwappingMeal(null);
+    }
+  };
+
   const handleGenerateDietPlan = async () => {
     setGeneratingDiet(true);
     try {
@@ -574,7 +597,7 @@ export default function ProfilePage() {
         const data = await res.json();
         if (data.dietPlan) {
           setDietPlan(data.dietPlan);
-          showCustomAlert("Success! 🎉", "AI custom diet plan generated successfully!", "success");
+          showCustomAlert("Plan Ready", "Your diet plan has been built from your mess menu.", "success");
         } else {
           showCustomAlert("Configuration Needed", "Could not generate diet plan. Please check if your mess menu is uploaded.", "warning");
         }
@@ -971,7 +994,7 @@ export default function ProfilePage() {
                 <textarea
                   value={customDietPreferences}
                   onChange={(e) => setCustomDietPreferences(e.target.value)}
-                  placeholder="Enter custom guidelines (e.g. 'No Soya chunks', 'Limit chapatis to 2 per day', 'Only suggest curd or milk instead of eggs'). The AI Diet Planner reads these rules and adapts all future generations accordingly."
+                  placeholder="Add your own rules, e.g. 'No soya chunks, limit chapatis to 2 per day'. The planner follows 'no' and 'limit ... to' rules the next time you rebuild your plan."
                   rows={3}
                   className="input-glass text-xs py-2.5 px-3.5 resize-none h-20"
                 />
@@ -1357,15 +1380,15 @@ export default function ProfilePage() {
 
                 <div className="text-zinc-400 text-xs leading-relaxed space-y-2 bg-white/2 p-3.5 rounded-xl border border-white/5">
                   <p className="font-semibold text-white flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-[#8ba893]" /> Sports-Science Diet Calibration
+                    <Sparkles className="w-4 h-4 text-[#8ba893]" /> Built From Your Mess Menu
                   </p>
                   <p className="text-[10px] text-zinc-500 leading-normal">
                     This engine designs a tailored diet chart combining your biometric stats, target macros, and college schedule with what is actually served in your hostel.
                   </p>
                   <ul className="text-[9px] text-zinc-500 list-disc pl-4 space-y-0.5">
-                    <li>Protein spaced into 4-5 meals (~{Math.round((profile?.targetProteinG || 150) / 4.5)}g per sitting) to optimize protein synthesis.</li>
-                    <li>Complex carbohydrates positioned pre-workout to maximize muscle glycogen.</li>
-                    <li>Low-fat windows around training to accelerate digestion and performance.</li>
+                    <li>Portions stay realistic, so you won&apos;t be told to eat 9 rotis to hit a number.</li>
+                    <li>Nutrition comes from IFCT 2017. Anything else is marked as estimated.</li>
+                    <li>If the mess can&apos;t reach your target on a given day, the plan says so.</li>
                   </ul>
                 </div>
 
@@ -1380,7 +1403,7 @@ export default function ProfilePage() {
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4" /> {dietPlan ? "Regenerate AI Diet Plan" : "Generate Custom AI Diet Plan"}
+                      <Sparkles className="w-4 h-4" /> {dietPlan ? "Rebuild Diet Plan" : "Build My Diet Plan"}
                     </>
                   )}
                 </button>
@@ -1423,9 +1446,9 @@ export default function ProfilePage() {
                       const calPercent = Math.min(100, Math.round((plannedCal / targetCal) * 100));
                       const protPercent = Math.min(100, Math.round((plannedProt / targetProt) * 100));
                       
-                      const calMatch = Math.abs(plannedCal - targetCal) <= 50;
-                      const protMatch = Math.abs(plannedProt - targetProt) <= 5;
-                      const isPerfectFit = calMatch && protMatch;
+                      const onTarget = Math.abs(plannedCal - targetCal) <= 150 && targetProt - plannedProt <= 10;
+                      const proteinShort = Math.max(0, Math.round(targetProt - plannedProt));
+                      const dayNote = dietPlan[dietActiveDay].dailySummary?.note;
 
                       return (
                         <GlassCard className="p-4 border border-[#8ba893]/20 bg-[#8ba893]/5 space-y-3">
@@ -1434,11 +1457,11 @@ export default function ProfilePage() {
                               Daily Planned Totals
                             </h4>
                             <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
-                              isPerfectFit 
+                              onTarget
                                 ? "bg-green-500/10 text-green-400 border border-green-500/20" 
                                 : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
                             }`}>
-                              {isPerfectFit ? "🎯 Perfect Fit" : "⚠️ Needs Recalibration"}
+                              {onTarget ? "On Target" : proteinShort > 10 ? `${proteinShort}g Protein Short` : "Close To Target"}
                             </span>
                           </div>
 
@@ -1475,6 +1498,7 @@ export default function ProfilePage() {
                               </div>
                             </div>
                           </div>
+                          {dayNote && <p className="text-[10px] text-zinc-400 leading-relaxed">{dayNote}</p>}
                         </GlassCard>
                       );
                     })()
@@ -1524,6 +1548,16 @@ export default function ProfilePage() {
                               {renderFoodList(meal.additions || "", true)}
                             </div>
                           </div>
+
+                          {meal.additions && meal.additions.startsWith("•") && (
+                            <button
+                              onClick={() => handleSwapMeal(meal.name || "")}
+                              disabled={swappingMeal === meal.name}
+                              className="self-start text-[10px] font-semibold text-[#8ba893] hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              {swappingMeal === meal.name ? "Swapping..." : "Try different additions"}
+                            </button>
+                          )}
 
                           {/* Coach Timing Reason */}
                           {meal.timingReason && (

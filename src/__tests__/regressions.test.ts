@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dayKey, shiftDayKey, startOfDay, startOfDayKey, weekdayIndex } from "../lib/dateUtils";
 import { calculateAdaptiveTdee, calculateHealthTargets, goalCalorieTarget, HealthTargetInput, TimelineLike } from "../lib/tdee";
-import { auditAndFixDietPlanMath, getRecommendedAdditions, isCompleteDietPlan } from "../lib/dietEngine";
+import { auditAndFixDietPlanMath, getRecommendedAdditions } from "../lib/dietEngine";
 import { calculateProgression, getTodaysWorkout } from "../lib/workoutPlans";
 import { calculateCurrentStreak, formatDateKey } from "../lib/habitEngine";
 import { calculateLoggingStreak } from "../lib/timelineUtils";
@@ -142,10 +142,6 @@ describe("Diet plan math audit", () => {
 
   it("handles nested parentheses", () => {
     expect(audit("• Dal (1 Katori (150g) - 5.2g P, 105 kcal)").calories).toBe(105);
-  });
-
-  it("detects an incomplete week", () => {
-    expect(isCompleteDietPlan({ monday: { meals: [{}] } })).toBe(false);
   });
 
   it("never suggests animal products to vegans", () => {

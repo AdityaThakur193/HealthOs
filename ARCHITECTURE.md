@@ -100,26 +100,21 @@ sequenceDiagram
 
 ---
 
-### Diagram 4: Grounded AI Diet Allocation & Math Audit Pipeline
+### Diagram 4: Mess-Based Diet Planner
 ```mermaid
 flowchart LR
-    subgraph Allocator ["1. Pre-Calculation Math"]
-        DailyTarget["Daily Targets (e.g. 2200 kcal, 150g P)"] --> MPSAlloc["MPS Leucine Allocation (25% B / 30% L / 15% S / 30% D)"]
-        MPSAlloc --> AdditionsCalc["Calculate Required Additions (Whey, Eggs, Paneer)"]
-    end
-
-    subgraph Prompt ["2. Grounded LLM Contract"]
-        AdditionsCalc --> GeminiPrompt["Inject Exact Macro Parentheses Contract into Gemini"]
-        GeminiPrompt --> GeneratePlan["Gemini Generates Natural Meal Rationale & Timing"]
-    end
-
-    subgraph Audit ["3. Programmatic Math Audit"]
-        GeneratePlan --> ParseJSON["Parse Response JSON"]
-        ParseJSON --> AuditMath["auditAndFixDietPlanMath() (Re-sum item macros in TypeScript)"]
-        AuditMath --> FixHallucinations["Override LLM Arithmetic Errors (0% Error Rate)"]
-    end
-
-    FixHallucinations --> SaveDB[("Save Verified Diet Plan to User Profile")]
+    Menu["Parsed Mess Menu"] --> Split["Split Into Individual Foods"]
+    Split --> Filter["Remove Foods That Break Diet or Allergy Rules"]
+    Filter --> Lookup{"Food in IFCT 2017?"}
+    Lookup -- Yes --> Portions["Fit Portions Within Realistic Limits"]
+    Lookup -- No --> Estimate["AI Estimate, Labelled and Saved"]
+    Estimate --> Portions
+    Targets["Daily Targets Split Across 4 Meals"] --> Portions
+    Portions --> Gap{"Protein Short?"}
+    Gap -- "Yes, Additions Allowed" --> Additions["Add Allowed Protein Sources"]
+    Additions --> Trim["Trim Portions to Fit Calories"]
+    Gap -- No --> Save[("Save Plan to User Profile")]
+    Trim --> Save
 ```
 
 ---

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mess-aware coaching. Both coaches now know the time, mess hours, Sunday and holiday timings, and which meals are logged, and they no longer suggest a meal that has closed. Mess hours can be edited in Settings.
 - The home coach reuses its message until something relevant changes, which reduces AI calls.
 - The chat coach can now see today's logs, habits, adaptive TDEE and exam or sick mode.
+- Rebuilt diet planner. Code now chooses realistic portions from what the mess serves, using IFCT 2017 data, and says when a target can't be reached. AI only estimates dishes IFCT doesn't cover, and those are labelled.
 
 ### Security
 - Added signed HTTP-only session cookies. API routes now take identity from the session and scope every read and write to the signed-in user. Previously any client could read or change another user's data by supplying their ID or email.

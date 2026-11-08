@@ -13,21 +13,22 @@ export interface DietMeal {
   proteinG?: number;
   calories?: number;
   timingReason?: string;
+  variant?: number;
 }
 
 export type DietPlan = Record<
   string,
-  { meals: DietMeal[]; dailySummary?: { totalCalories: number; totalProteinG: number } }
+  {
+    meals: DietMeal[];
+    dailySummary?: {
+      totalCalories: number;
+      totalProteinG: number;
+      messProteinG?: number;
+      proteinGap?: number;
+      note?: string;
+    };
+  }
 >;
-
-const WEEK_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-
-/** True when every day of the week has at least one meal. */
-export function isCompleteDietPlan(plan: unknown): plan is DietPlan {
-  if (!plan || typeof plan !== "object") return false;
-  const days = plan as DietPlan;
-  return WEEK_DAYS.every((day) => Array.isArray(days[day]?.meals) && days[day].meals.length > 0);
-}
 
 export interface MealTarget {
   name: string;

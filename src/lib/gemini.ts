@@ -399,3 +399,78 @@ export async function generateDailyCoach(context: CoachContext): Promise<CoachRe
 
   throw new Error("No configured API key found for coaching recommendations.");
 }
+
+/* ─────────────────────────────────────────────
+ * Diet planner: estimates for foods IFCT lacks
+ * ───────────────────────────────────────────── */
+
+export interface MessFoodEstimate {
+  unit: string;
+  grams: number;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+function buildEstimatePrompt(names: string[]): string {
+  return `You are estimating nutrition for dishes served in Indian college hostel messes, which are lighter on oil and protein than restaurant food.
+
+For each dish below give ONE normal serving. Use "piece" for countable foods, otherwise "katori", "plate", "cup" or "serving".
+
+Dishes: ${JSON.stringify(names)}
+
+Return ONLY JSON in this shape, using the dish names exactly as given, in lowercase:
+{ "foods": { "dish name": { "unit": "katori", "grams": 150, "calories": 120, "proteinG": 3, "carbsG": 15, "fatG": 5 } } }`;
+}
+
+/** Drops anything outside what a single serving could plausibly be. */
+function validEstimates(raw: unknown): Record<string, MessFoodEstimate> {
+  const foods = (raw as { foods?: Record<string, MessFoodEstimate> })?.foods ?? {};
+  return Object.fromEntries(
+    Object.entries(foods).filter(([, food]) => {
+      const values = [food?.grams, food?.calories, food?.proteinG, food?.carbsG, food?.fatG];
+      return (
+        typeof food?.unit === "string" &&
+        values.every((value) => typeof value === "number" && value >= 0) &&
+        food.grams <= 500 &&
+        food.calories <= 900 &&
+        food.proteinG <= 60
+      );
+    })
+  );
+}
+
+export async function estimateMessFoods(names: string[]): Promise<Record<string, MessFoodEstimate>> {
+  const prompt = buildEstimatePrompt(names);
+  const geminiKey = process.env.GEMINI_API_KEY;
+
+  if (geminiKey && geminiKey !== "your_gemini_api_key_here") {
+    try {
+      const result = await getCoachModel().generateContent(prompt);
+      return validEstimates(JSON.parse(sanitizeJsonOutput(result.response.text())));
+    } catch (geminiError) {
+      console.warn("Gemini food estimates failed, trying Groq:", geminiError);
+    }
+  }
+
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey || groqKey === "your_groq_api_key_here") {
+    throw new Error("No AI provider is available for food estimates.");
+  }
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "openai/gpt-oss-20b",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    }),
+  });
+  if (!res.ok) throw new Error(`Groq food estimates failed (${res.status})`);
+
+  const data = await res.json();
+  return validEstimates(JSON.parse(sanitizeJsonOutput(data.choices[0]?.message?.content ?? "{}")));
+}
