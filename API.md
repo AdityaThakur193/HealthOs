@@ -101,7 +101,7 @@ Returns `200 { "success": true }`. Returns `429` if a code was sent in the last 
 }
 ```
 
-Omitted optional fields keep their stored values. Calculated calorie targets never go below 1,200 kcal (1,500 kcal for men) unless the user sets custom macros.
+Omitted optional fields keep their stored values. `messTimings` sets the mess hours, with `regular` and `holiday` schedules (`holiday` also applies on Sundays). Calculated calorie targets never go below 1,200 kcal (1,500 kcal for men) unless the user sets custom macros.
 
 `DELETE` permanently removes the profile, timeline, habits, and AI memory, and clears the session.
 

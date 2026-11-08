@@ -5,7 +5,7 @@ import { getLocalProfile, saveLocalProfile, deleteLocalEvents, deleteLocalProfil
 import { calculateAdaptiveTdee, calculateHealthTargets, goalCalorieTarget, ActivityLevel, Gender, Goal } from "@/lib/tdee";
 import { calculateLoggingStreak } from "@/lib/timelineUtils";
 import { clearSessionCookieHeader, createSessionToken, requireSession, Session, sessionCookieHeader } from "@/lib/auth/session";
-import { invalidBodyResponse, readJsonObject, validateProfileChoices, validateProfileMetrics } from "@/lib/validation";
+import { invalidBodyResponse, isValidMessTimings, readJsonObject, validateProfileChoices, validateProfileMetrics } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -134,11 +134,13 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: metrics.errors[0] }, { status: 400 });
   }
 
-  const neckCm = toNumber(body.neckCm);
-  const waistCm = toNumber(body.waistCm);
-  const hipCm = toNumber(body.hipCm);
-  const customCalories = toNumber(body.customCalories);
-  const customProtein = toNumber(body.customProtein);
+  // Screens that save only some settings must not disturb the rest.
+  const storedOr = (key: string) => toNumber(body[key]) ?? (existing?.[key] as number | undefined);
+  const neckCm = storedOr("neckCm");
+  const waistCm = storedOr("waistCm");
+  const hipCm = storedOr("hipCm");
+  const customCalories = storedOr("customCalories");
+  const customProtein = storedOr("customProtein");
   const useCustomMacros = pick<boolean>("useCustomMacros", false);
   const gymFrequency = toNumber(body.gymFrequency) ?? (existing?.gymFrequency as number | undefined) ?? 4;
 
@@ -193,6 +195,12 @@ export async function POST(request: NextRequest) {
     ...targets,
   };
 
+  if (body.messTimings !== undefined) {
+    if (!isValidMessTimings(body.messTimings)) {
+      return Response.json({ error: "Each meal needs an opening time before its closing time." }, { status: 400 });
+    }
+    profileData.messTimings = body.messTimings;
+  }
   if (body.messMenu !== undefined) profileData.messMenu = body.messMenu;
   if (body.dietPlan !== undefined) profileData.dietPlan = body.dietPlan;
 

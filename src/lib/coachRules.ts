@@ -1,5 +1,6 @@
 import { EVENT_STEP_TARGETS } from "./constants";
 import { auditAndFixDietPlanMath, DietPlan } from "./dietEngine";
+import { formatMealTime } from "./mealWindows";
 import type { CoachContext, CoachRecommendation } from "./gemini";
 
 interface CoachRulesProfile {
@@ -21,6 +22,34 @@ function proteinSources(dietPreference?: string): string {
     default:
       return "egg whites, chicken breast, or whey";
   }
+}
+
+function titleCase(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/** Protein advice limited to meals the user can still get. */
+function proteinAction(proteinRemaining: number, context: CoachContext, profile: CoachRulesProfile): string {
+  const timing = context.mealTiming;
+  const sources = proteinSources(profile.dietPreference);
+
+  if (!timing) {
+    return `Need ${proteinRemaining}g more protein. Consider having ${sources} to hit your target.`;
+  }
+
+  const target = timing.meals.find((meal) => meal.meal === (timing.currentMeal ?? timing.nextMeal));
+  if (target) {
+    const when =
+      target.state === "open"
+        ? `${titleCase(target.meal)} is open until ${formatMealTime(target.end)}`
+        : `${titleCase(target.meal)} opens at ${formatMealTime(target.start)}`;
+    return `Need ${proteinRemaining}g more protein. ${when}, so pick its highest-protein items${context.profile.strictMessOnly ? "" : ` or add ${sources}`}.`;
+  }
+
+  if (context.profile.strictMessOnly) {
+    return `The mess is closed for today, so the last ${proteinRemaining}g of protein can wait. Start strong at breakfast tomorrow.`;
+  }
+  return `The mess is closed for today. If you have ${sources} in your room, that helps with the ${proteinRemaining}g left. If not, no stress: start strong at breakfast tomorrow.`;
 }
 
 /**
@@ -54,7 +83,7 @@ export function buildRuleBasedCoach(context: CoachContext, profile: CoachRulesPr
       status = "needs_attention";
       primaryInsight = `Sleep was short last night (${today.sleepHours}h). Your CNS recovery will be reduced today.`;
       actionItems.push("Reduce today's lifting volume by 15-20% and avoid heavy single-rep PRs.");
-    } else if (proteinRemaining > 50 && today.caloriesConsumed > context.profile.targetCalories * 0.7) {
+    } else if (proteinRemaining > 50 && today.caloriesConsumed > context.profile.targetCalories * 0.7 && !context.mealTiming?.messClosedForToday) {
       status = "needs_attention";
       primaryInsight = "Calorie intake is high but protein is lagging. Prioritize lean protein sources next.";
     } else if (today.workoutCompleted && proteinRemaining <= 10) {
@@ -72,7 +101,7 @@ export function buildRuleBasedCoach(context: CoachContext, profile: CoachRulesPr
 
     actionItems.push(
       proteinRemaining > 0
-        ? `Need ${proteinRemaining}g more protein. Consider having ${proteinSources(profile.dietPreference)} to hit your target.`
+        ? proteinAction(proteinRemaining, context, profile)
         : "Protein target met for the day! Excellent job fueling your muscles."
     );
   }

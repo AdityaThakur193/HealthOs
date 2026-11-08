@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import type { MessTimings } from "../mealWindows";
 
 /* ─────────────────────────────────────────────
  * User Profile Schema
@@ -50,6 +51,7 @@ export interface IUserProfile extends Document {
   useCustomMacros?: boolean;
   /** Optional per-user plan, keyed by day of week (0 = Sunday). */
   customWorkoutPlan?: Record<string, unknown>;
+  messTimings?: MessTimings;
   messMenu?: {
     rawText?: string;
     parsedMenu?: {
@@ -146,6 +148,7 @@ const UserProfileSchema = new Schema<IUserProfile>(
     customProtein: Number,
     useCustomMacros: { type: Boolean, default: false },
     customWorkoutPlan: Schema.Types.Mixed,
+    messTimings: Schema.Types.Mixed,
     messMenu: {
       rawText: String,
       parsedMenu: {

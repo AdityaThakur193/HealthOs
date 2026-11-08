@@ -39,7 +39,7 @@ export interface TimelinePayload {
   }[];
   // Notes and calendar events
   title?: string;
-  event_type?: "exam" | "travel" | "sick";
+  event_type?: "exam" | "travel" | "sick" | "holiday";
   startDate?: string;
   endDate?: string;
   // Habits

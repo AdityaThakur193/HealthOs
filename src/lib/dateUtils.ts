@@ -62,6 +62,18 @@ function timeZoneOffsetMs(instant: Date, tz?: string): number {
   return asUtc - Math.floor(instant.getTime() / 1000) * 1000;
 }
 
+/** Minutes since midnight for an instant in the given timezone. */
+export function minutesIntoDay(date: Date = new Date(), tz?: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    hour: "numeric",
+    minute: "numeric",
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return get("hour") * 60 + get("minute");
+}
+
 /** The instant at which the calendar day `key` starts in the given timezone. */
 export function startOfDayKey(key: string, tz?: string): Date {
   const [y, m, d] = key.split("-").map(Number);

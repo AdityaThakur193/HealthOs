@@ -159,7 +159,8 @@ export default function Dashboard() {
         const notes = events.filter((e) => e.type === "note");
         const todayDate = new Date();
         const foundActiveEvent = notes.find((n) => {
-          if (!n.payload || !n.payload.startDate || !n.payload.endDate) return false;
+          // A holiday only changes mess hours; it doesn't scale targets down.
+          if (!n.payload || !n.payload.startDate || !n.payload.endDate || n.payload.event_type === "holiday") return false;
           const start = new Date(n.payload.startDate);
           const end = new Date(n.payload.endDate);
           start.setHours(0, 0, 0, 0);
