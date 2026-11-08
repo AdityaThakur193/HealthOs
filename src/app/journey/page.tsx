@@ -9,6 +9,7 @@ import { fetchAllTimelineEvents, getGroupedEvents, TimelineEntry, TimelinePayloa
 import { clearClientSession } from "@/components/SessionWatcher";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { compareNutritionWeeks, NutritionPeriod, weightTrendSeries } from "@/lib/progressInsights";
 
 interface WeightPoint {
   date: string;
@@ -25,6 +26,7 @@ export default function Journey() {
   const [weeklyWorkouts, setWeeklyWorkouts] = useState(0);
   const [avgSleepHours, setAvgSleepHours] = useState(0);
   const [weightDelta, setWeightDelta] = useState<number | null>(null);
+  const [nutritionWeeks, setNutritionWeeks] = useState<{ recent: NutritionPeriod; previous: NutritionPeriod } | null>(null);
   const [allEvents, setAllEvents] = useState<TimelineEntry[]>([]);
 
   // UI state
@@ -73,10 +75,11 @@ export default function Journey() {
         setWeightHistory(weightPoints);
 
         if (weightPoints.length >= 2) {
-          const first = weightPoints[0].weight;
-          const last = weightPoints[weightPoints.length - 1].weight;
-          setWeightDelta(Math.round((last - first) * 10) / 10);
+          const trend = weightTrendSeries(weightPoints.map((point) => point.weight));
+          setWeightDelta(Math.round((trend[trend.length - 1] - trend[0]) * 10) / 10);
         }
+
+        setNutritionWeeks(compareNutritionWeeks(events));
 
         // Process weekly stats
         const sevenDaysAgo = new Date();
@@ -341,7 +344,10 @@ export default function Journey() {
       return { x, y, label: pt.weight, date: pt.date };
     });
 
-    const dPath = points.map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+    const trend = weightTrendSeries(weights);
+    const dPath = trend
+      .map((value, idx) => `${idx === 0 ? "M" : "L"} ${points[idx].x} ${chartHeight - padding - ((value - minW) / weightRange) * (chartHeight - padding * 2)}`)
+      .join(" ");
 
     return (
       <div className="space-y-4">
@@ -376,10 +382,10 @@ export default function Journey() {
                 <circle
                   cx={p.x}
                   cy={p.y}
-                  r={3.5}
+                  r={2.5}
                   fill="#0c0f0d"
-                  stroke="#06b6d4"
-                  strokeWidth={2}
+                  stroke="#52525b"
+                  strokeWidth={1.5}
                 />
                 {/* Value Label */}
                 {(idx === 0 || idx === points.length - 1 || points.length <= 5) && (
@@ -410,6 +416,41 @@ export default function Journey() {
             ))}
           </svg>
         </div>
+        <p className="text-[10px] text-zinc-500 px-1">The line is your smoothed trend. Dots are individual weigh-ins, which move around with water and food.</p>
+      </div>
+    );
+  };
+
+  const renderNutritionTrend = () => {
+    if (!nutritionWeeks) return null;
+    const { recent, previous } = nutritionWeeks;
+    if (recent.daysLogged === 0) {
+      return <p className="text-xs text-zinc-500">Log meals for a few days to see your nutrition trend.</p>;
+    }
+
+    const rows = [
+      { label: "Calories", value: recent.avgCalories, before: previous.avgCalories, target: profile?.targetCalories, unit: " kcal" },
+      { label: "Protein", value: recent.avgProteinG, before: previous.avgProteinG, target: profile?.targetProteinG, unit: "g" },
+    ];
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between text-[11px] text-zinc-400 font-bold">
+          <span>Daily Average, Last 7 Days</span>
+          <span className="text-zinc-500 font-normal">{recent.daysLogged} days logged</span>
+        </div>
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-baseline justify-between text-xs">
+            <span className="text-zinc-400">{row.label}</span>
+            <span className="text-white font-bold">
+              {row.value}{row.unit}
+              {row.target ? <span className="text-zinc-500 font-normal"> of {row.target}{row.unit}</span> : null}
+              {previous.daysLogged > 0 && (
+                <span className="text-zinc-500 font-normal"> · {row.value - row.before >= 0 ? "+" : ""}{row.value - row.before} vs week before</span>
+              )}
+            </span>
+          </div>
+        ))}
       </div>
     );
   };
@@ -434,6 +475,10 @@ export default function Journey() {
       <GlassCard className="p-5 animate-in-delay-1 border border-white/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-[50px] rounded-full -z-10" />
         {renderWeightChart()}
+      </GlassCard>
+
+      <GlassCard className="p-5 animate-in-delay-1 border border-white/10">
+        {renderNutritionTrend()}
       </GlassCard>
 
       {/* Weekly Review Launcher wrapper */}

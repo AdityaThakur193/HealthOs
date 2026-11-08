@@ -156,6 +156,60 @@ export function calculateCurrentStreak(
   };
 }
 
+function weekStart(key: string): string {
+  return shiftDayKey(key, -((weekdayOfKey(key) + 6) % 7));
+}
+
+/** Consecutive weeks (Monday to Sunday) that reached the weekly goal. */
+export function calculateWeeklyStreak(
+  logs: HabitLogEntry[],
+  weeklyTarget: number,
+  targetValue: number = 1,
+  tz?: string
+): { currentStreak: number; bestStreak: number } {
+  const perWeek = new Map<string, number>();
+  logs
+    .filter((log) => log.completed || (log.value && log.value >= targetValue))
+    .forEach((log) => perWeek.set(weekStart(log.date), (perWeek.get(weekStart(log.date)) ?? 0) + 1));
+
+  const reached = (week: string) => (perWeek.get(week) ?? 0) >= weeklyTarget;
+
+  // The current week still has time, so it only counts once the goal is met.
+  const thisWeek = weekStart(dayKey(new Date(), tz));
+  let cursor = reached(thisWeek) ? thisWeek : shiftDayKey(thisWeek, -7);
+  let currentStreak = 0;
+  while (reached(cursor)) {
+    currentStreak++;
+    cursor = shiftDayKey(cursor, -7);
+  }
+
+  let bestStreak = 0;
+  for (const week of perWeek.keys()) {
+    if (!reached(week) || reached(shiftDayKey(week, -7))) continue;
+    let length = 0;
+    for (let run = week; reached(run); run = shiftDayKey(run, 7)) length++;
+    bestStreak = Math.max(bestStreak, length);
+  }
+
+  return { currentStreak, bestStreak };
+}
+
+export function isHydrationHabit(habit: { habitId?: string; id?: string; title?: string; unit?: string }): boolean {
+  const id = habit.habitId || habit.id;
+  return id === "habit_hydration" || (/water|hydrat/i.test(habit.title ?? "") && /^(l|litres?|liters?)$/i.test(habit.unit ?? ""));
+}
+
+/** Counts water already logged, so hydration never has to be entered twice. */
+export function mergeWaterIntoHydration(logs: HabitLogEntry[], waterByDay: Map<string, number>, targetValue: number): HabitLogEntry[] {
+  const merged = new Map(logs.map((log) => [log.date, log]));
+  for (const [date, litres] of waterByDay) {
+    const existing = merged.get(date);
+    const value = Math.round(Math.max(existing?.value ?? 0, litres) * 100) / 100;
+    merged.set(date, { date, value, completed: Boolean(existing?.completed) || value >= targetValue });
+  }
+  return [...merged.values()];
+}
+
 /**
  * Generates 30-day heatmap grid array
  */

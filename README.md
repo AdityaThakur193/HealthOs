@@ -168,6 +168,7 @@ HealthOs/
 │   │   ├── meal/                 # AI Vision Meal Capture Page
 │   │   ├── workout/              # Progressive Overload Workout HUD Page
 │   │   ├── habits/               # Habit Tracker & Streak Dashboard Page
+│   │   ├── diet/                 # Mess-Based Diet Plan Page
 │   │   ├── review/               # Sunday Weekly Review Page
 │   │   └── page.tsx              # Main Glassmorphic Dashboard HUD
 │   ├── components/               # Reusable Glassmorphic UI Components

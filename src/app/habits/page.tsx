@@ -56,6 +56,7 @@ export default function HabitsPage() {
     targetValue: 1,
     unit: "",
     frequency: "daily" as "daily" | "weekdays" | "weekly_count",
+    weeklyTargetCount: 3,
     colorTag: "#34d399",
     icon: "Sparkles",
     notes: "",
@@ -173,6 +174,7 @@ export default function HabitsPage() {
       targetValue: Number(formData.targetValue) || 1,
       unit: formData.unit.trim(),
       frequency: formData.frequency,
+      weeklyTargetCount: Number(formData.weeklyTargetCount) || 3,
       colorTag: formData.colorTag,
       icon: formData.icon,
       notes: formData.notes.trim(),
@@ -227,6 +229,7 @@ export default function HabitsPage() {
       targetValue: h.targetValue,
       unit: h.unit || "",
       frequency: h.frequency,
+      weeklyTargetCount: h.weeklyTargetCount || 3,
       colorTag: h.colorTag,
       icon: h.icon,
       notes: h.notes || "",
@@ -243,6 +246,7 @@ export default function HabitsPage() {
       targetValue: 1,
       unit: "",
       frequency: "daily",
+      weeklyTargetCount: 3,
       colorTag: "#34d399",
       icon: "Sparkles",
       notes: "",
@@ -474,7 +478,7 @@ export default function HabitsPage() {
                   <div className="flex items-center gap-3 text-xs">
                     <div className="flex items-center gap-1 text-amber-400 font-bold">
                       <Flame className="w-4 h-4 fill-amber-400/20" />
-                      <span>{habit.currentStreak}d streak</span>
+                      <span>{habit.currentStreak}{habit.frequency === "weekly_count" ? "w" : "d"} streak</span>
                     </div>
                     <div className="flex items-center gap-1 text-[#8ba893] font-bold">
                       <TrendingUp className="w-3.5 h-3.5" />
@@ -617,8 +621,22 @@ export default function HabitsPage() {
                       className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#8ba893]"
                     >
                       <option value="daily">Everyday</option>
+                      <option value="weekly_count">A few times a week</option>
                       <option value="weekdays">Mon - Fri Only</option>
                     </select>
+                    {formData.frequency === "weekly_count" && (
+                      <label className="block text-zinc-400 mt-2">
+                        Times per week
+                        <input
+                          type="number"
+                          min={1}
+                          max={7}
+                          value={formData.weeklyTargetCount}
+                          onChange={(e) => setFormData({ ...formData, weeklyTargetCount: Math.min(7, Math.max(1, Number(e.target.value) || 1)) })}
+                          className="w-full mt-1 bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white"
+                        />
+                      </label>
+                    )}
                   </div>
                 </div>
 

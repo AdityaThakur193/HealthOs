@@ -188,3 +188,36 @@ export function pointsAtClosedMeal(texts: string[], status: MealDayStatus): bool
     .flatMap((text) => text.split(/(?<=[.!?])\s+/))
     .some((sentence) => closedPattern.test(sentence) && !pastOrFuture.test(sentence));
 }
+
+export interface NextMealPrompt {
+  title: string;
+  detail?: string;
+  action?: string;
+}
+
+function mealTitle(meal: string): string {
+  return meal.charAt(0).toUpperCase() + meal.slice(1);
+}
+
+/** The one thing about food worth saying right now. */
+export function nextMealPrompt(status: MealDayStatus, menu?: Partial<Record<MealName, string>> | null): NextMealPrompt {
+  const open = status.meals.find((meal) => meal.state === "open");
+  const upcoming = status.meals.find((meal) => meal.state === "upcoming");
+  const missed = status.meals.filter((meal) => meal.state === "closed" && !meal.logged).pop();
+
+  if (open && !open.logged) {
+    return { title: `${mealTitle(open.meal)} is open until ${formatMealTime(open.end)}`, detail: menu?.[open.meal], action: `Log ${mealTitle(open.meal)}` };
+  }
+
+  const earlier = missed ? { action: `Log ${mealTitle(missed.meal)}` } : {};
+
+  if (upcoming) {
+    return {
+      title: `${mealTitle(upcoming.meal)} opens at ${formatMealTime(upcoming.start)}`,
+      detail: menu?.[upcoming.meal],
+      ...earlier,
+    };
+  }
+
+  return { title: "The mess is closed for today", detail: "Tomorrow starts fresh at breakfast.", ...earlier };
+}

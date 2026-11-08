@@ -4,6 +4,9 @@ import { Habit, HabitLog, TimelineEvent, UserProfile } from "@/lib/db/models";
 import {
   calculateHabitStrength,
   calculateCurrentStreak,
+  calculateWeeklyStreak,
+  isHydrationHabit,
+  mergeWaterIntoHydration,
   get30DayHeatmap,
   getStarterHabits,
   HabitDefinition,
@@ -11,7 +14,7 @@ import {
   HabitLogEntry,
 } from "@/lib/habitEngine";
 import { requireSession, Session } from "@/lib/auth/session";
-import { dayKey } from "@/lib/dateUtils";
+import { dayKey, startOfDay } from "@/lib/dateUtils";
 import { invalidBodyResponse, isValidDateKey, readJsonObject } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +89,10 @@ async function seedStarterHabits(userId: mongoose.Types.ObjectId) {
 function withStats(habit: HabitLike, logs: HabitLogEntry[], todayKey: string, tz?: string): HabitWithStats {
   const targetValue = habit.targetValue || 1;
   const frequency = habit.frequency || "daily";
-  const { currentStreak, bestStreak } = calculateCurrentStreak(logs, frequency, targetValue, tz);
+  const { currentStreak, bestStreak } =
+    frequency === "weekly_count"
+      ? calculateWeeklyStreak(logs, habit.weeklyTargetCount || 7, targetValue, tz)
+      : calculateCurrentStreak(logs, frequency, targetValue, tz);
   const todayLog = logs.find((log) => log.date === todayKey);
 
   return {
@@ -124,6 +130,7 @@ export async function GET(request: Request) {
 
     let habits: HabitLike[];
     let logs: HabitLogLike[];
+    const waterByDay = new Map<string, number>();
 
     if (userId) {
       const hasHabits = await Habit.exists({ userId });
@@ -132,6 +139,15 @@ export async function GET(request: Request) {
         Habit.find({ userId, status: "active" }).sort({ sortOrder: 1 }).lean() as unknown as Promise<HabitLike[]>,
         HabitLog.find({ userId }).lean() as unknown as Promise<HabitLogLike[]>,
       ]);
+
+      const water = await TimelineEvent.find({ userId, type: "water", timestamp: { $gte: startOfDay(session.tz, 90) } })
+        .select("timestamp payload.amountL payload.amountMl")
+        .lean();
+      for (const event of water) {
+        const key = dayKey(event.timestamp, session.tz);
+        const litres = Number(event.payload?.amountL) || Number(event.payload?.amountMl) / 1000 || 0;
+        waterByDay.set(key, (waterByDay.get(key) ?? 0) + litres);
+      }
     } else {
       const store = memoryFor(session.email);
       habits = store.habits.filter((habit) => habit.status === "active");
@@ -146,9 +162,11 @@ export async function GET(request: Request) {
     });
 
     const todayKey = dayKey(new Date(), session.tz);
-    const habitsWithStats = habits.map((habit) =>
-      withStats(habit, logsByHabit.get((habit.habitId || habit.id) as string) || [], todayKey, session.tz)
-    );
+    const habitsWithStats = habits.map((habit) => {
+      const entries = logsByHabit.get((habit.habitId || habit.id) as string) || [];
+      const merged = isHydrationHabit(habit) ? mergeWaterIntoHydration(entries, waterByDay, habit.targetValue || 1) : entries;
+      return withStats(habit, merged, todayKey, session.tz);
+    });
 
     const totalHabits = habitsWithStats.length;
     const completedTodayCount = habitsWithStats.filter((habit) => habit.completedToday).length;
@@ -163,7 +181,9 @@ export async function GET(request: Request) {
         avgHabitStrength: totalHabits > 0
           ? Math.round(habitsWithStats.reduce((total, habit) => total + habit.habitStrength, 0) / totalHabits)
           : 0,
-        bestStreakOverall: habitsWithStats.reduce((max, habit) => Math.max(max, habit.currentStreak), 0),
+        bestStreakOverall: habitsWithStats
+          .filter((habit) => habit.frequency !== "weekly_count")
+          .reduce((max, habit) => Math.max(max, habit.currentStreak), 0),
       },
     });
   } catch (error) {

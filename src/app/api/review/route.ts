@@ -5,6 +5,7 @@ import { getLocalProfileById, getLocalEvents } from "@/lib/db/fallback";
 import { requireUserSession } from "@/lib/auth/session";
 import { TimelineLike } from "@/lib/tdee";
 import { dayKey, startOfDay } from "@/lib/dateUtils";
+import { getCurrentWeek } from "@/lib/workoutPlans";
 
 export const dynamic = "force-dynamic";
 
@@ -239,7 +240,7 @@ export async function GET(request: NextRequest) {
         targetCalories: profile.targetCalories,
         targetProteinG: profile.targetProteinG,
         goal: profile.goal,
-        gymFrequency: profile.gymFrequency || 4,
+        gymFrequency: Object.values(getCurrentWeek(profile as Parameters<typeof getCurrentWeek>[0])).filter((day) => day.exercises.length > 0).length,
       },
     };
 

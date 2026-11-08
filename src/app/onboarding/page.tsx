@@ -3,6 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
+import MessHoursEditor from "@/components/MessHoursEditor";
+import { calculateHealthTargets, estimateBodyFatPct, HealthTargetInput } from "@/lib/tdee";
+import { DEFAULT_MESS_TIMINGS, MessTimings, resolveMessTimings } from "@/lib/mealWindows";
 import ChipSelect from "@/components/ChipSelect";
 import StepIndicator from "@/components/StepIndicator";
 import { Flame, Dumbbell, Zap, Scale, Heart, AlertCircle } from "lucide-react";
@@ -29,6 +32,7 @@ function OnboardingContent() {
   const [gymFrequency, setGymFrequency] = useState(4); // days/week
   
   const [gymAccess, setGymAccess] = useState("college_gym"); // college_gym, commercial, home
+  const [messTimings, setMessTimings] = useState<MessTimings>(DEFAULT_MESS_TIMINGS);
   const [messAccess, setMessAccess] = useState("hostel_mess"); // hostel_mess, home_cooked, tiffin, dining_out
   
   const [dietPreference, setDietPreference] = useState<"none" | "vegetarian" | "vegan" | "eggetarian" | "non_veg">("none");
@@ -78,6 +82,7 @@ function OnboardingContent() {
           setGymFrequency(p.gymFrequency || 4);
           setGymAccess(p.gymAccess || "college_gym");
           setMessAccess(p.messAccess || "hostel_mess");
+          setMessTimings(resolveMessTimings(p.messTimings));
           setDietPreference(p.dietPreference || "none");
           setFoodAllergies(p.foodAllergies || []);
           setMedicalConditions(p.medicalConditions || []);
@@ -159,6 +164,7 @@ function OnboardingContent() {
           gymFrequency,
           gymAccess,
           messAccess,
+          messTimings,
           dietPreference,
           foodAllergies,
           medicalConditions,
@@ -190,49 +196,31 @@ function OnboardingContent() {
     }
   };
 
-  // Helper calculations for review step (using Katch-McArdle if body fat measurements are provided)
-  const getBodyFatForBmr = () => {
-    const neck = parseFloat(neckCm);
-    const waist = parseFloat(waistCm);
-    const height = heightCm;
-    if (isNaN(neck) || isNaN(waist) || height <= 0 || waist <= neck) return null;
-    
-    if (gender === "male") {
-      const waistIn = waist / 2.54;
-      const neckIn = neck / 2.54;
-      const heightIn = height / 2.54;
-      if (waistIn <= neckIn) return null;
-      return 86.010 * Math.log10(waistIn - neckIn) - 70.041 * Math.log10(heightIn) + 36.76;
-    } else {
-      const hip = parseFloat(hipCm);
-      if (isNaN(hip)) return null;
-      const waistIn = waist / 2.54;
-      const hipIn = hip / 2.54;
-      const neckIn = neck / 2.54;
-      const heightIn = height / 2.54;
-      if ((waistIn + hipIn) <= neckIn) return null;
-      return 163.205 * Math.log10(waistIn + hipIn - neckIn) - 97.684 * Math.log10(heightIn) - 78.387;
-    }
+  // The same calculation the server saves, so this preview can't disagree with it.
+  const targetInput: HealthTargetInput = {
+    age,
+    gender,
+    heightCm,
+    weightKg,
+    targetWeightKg,
+    neckCm: parseFloat(neckCm) || undefined,
+    waistCm: parseFloat(waistCm) || undefined,
+    hipCm: parseFloat(hipCm) || undefined,
+    goal,
+    activityLevel,
+    useCustomMacros,
+    customCalories: parseInt(customCalories) || undefined,
+    customProtein: parseInt(customProtein) || undefined,
   };
-
-  const bfPct = getBodyFatForBmr();
-  const calculatedBmr = bfPct !== null && bfPct > 0
-    ? 370 + 21.6 * (weightKg * (1 - bfPct / 100))
-    : 10 * weightKg + 6.25 * heightCm - 5 * age + (gender === "male" ? 5 : gender === "female" ? -161 : -80);
-
-  const multipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
-  const calculatedTdee = Math.round(calculatedBmr * multipliers[activityLevel]);
-  
-  const standardCalGoal = Math.round(goal === "lose_fat" ? calculatedTdee - 500 : goal === "build_muscle" ? calculatedTdee + 300 : goal === "recomp" ? calculatedTdee - 100 : calculatedTdee);
-  const calGoal = useCustomMacros && customCalories ? parseInt(customCalories) : standardCalGoal;
-  
-  // Calculate reference weight based on body composition (BMI rules)
-  const heightM = heightCm / 100;
-  const bmi = weightKg / (heightM * heightM);
-  const referenceWeight = bmi > 25 ? (targetWeightKg || Math.round(22 * heightM * heightM)) : weightKg;
-  
-  const standardProteinGoal = Math.round(referenceWeight * (goal === "lose_fat" ? 2.2 : goal === "build_muscle" ? 1.8 : goal === "recomp" ? 2.3 : 2.0));
-  const proteinGoal = useCustomMacros && customProtein ? parseInt(customProtein) : standardProteinGoal;
+  const targets = calculateHealthTargets(targetInput);
+  const standardTargets = calculateHealthTargets({ ...targetInput, useCustomMacros: false });
+  const standardCalGoal = standardTargets.targetCalories;
+  const standardProteinGoal = standardTargets.targetProteinG;
+  const estimatedBodyFat = estimateBodyFatPct(targetInput);
+  const bfPct = estimatedBodyFat === null ? null : Math.round(estimatedBodyFat * 10) / 10;
+  const calculatedTdee = targets.tdee;
+  const calGoal = targets.targetCalories;
+  const proteinGoal = targets.targetProteinG;
 
   return (
     <div className="page-container flex flex-col justify-between min-h-dvh pb-10">
@@ -573,6 +561,13 @@ function OnboardingContent() {
                 />
               </div>
 
+              {messAccess === "hostel_mess" && (
+                <div className="space-y-3">
+                  <label className="text-xs text-zinc-500 font-semibold block">Mess Hours</label>
+                  <MessHoursEditor value={messTimings} onChange={setMessTimings} />
+                </div>
+              )}
+
               <div>
                 <label className="text-xs text-zinc-500 font-semibold mb-2 block">Workout Location (Gym Access)</label>
                 <ChipSelect
@@ -744,6 +739,12 @@ function OnboardingContent() {
                 <p className="text-xs text-zinc-400 mt-0.5">protein / day</p>
               </GlassCard>
             </div>
+
+            {age < 18 && (
+              <p className="text-[11px] text-amber-300 leading-relaxed">
+                Because you&apos;re under 18 and still growing, your calories are set to maintenance. Please talk to a doctor or dietitian before trying to lose or gain weight.
+              </p>
+            )}
 
             <GlassCard className="p-4 space-y-2.5">
               <div className="flex justify-between text-xs">

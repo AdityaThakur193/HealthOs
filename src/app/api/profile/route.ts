@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     if (tdeeResult.status === "adaptive" && tdeeResult.calculatedTdee !== profile.tdee) {
       profileDoc.tdee = tdeeResult.calculatedTdee;
       if (!profileDoc.useCustomMacros) {
-        profileDoc.targetCalories = goalCalorieTarget(tdeeResult.calculatedTdee, profileDoc.goal, profileDoc.gender);
+        profileDoc.targetCalories = goalCalorieTarget(tdeeResult.calculatedTdee, profileDoc.goal, profileDoc.gender, profileDoc.age);
       }
       await profileDoc.save();
       profile.tdee = profileDoc.tdee;

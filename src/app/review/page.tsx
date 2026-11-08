@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import ReviewCard from "@/components/ReviewCard";
 import GlassCard from "@/components/GlassCard";
+import { buildNextWeekActions } from "@/lib/progressInsights";
 import { Scale, Utensils, Zap, Moon, Lightbulb, BarChart2, ArrowDown, ArrowUp } from "lucide-react";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 
@@ -51,7 +52,6 @@ interface WeeklyReview {
 
 function generateCoachSummary(review: WeeklyReview): {
   mainText: string;
-  adjustment: string;
 } {
   const sentences: string[] = [];
   const { weight, nutrition, training, recovery, profile } = review;
@@ -112,32 +112,11 @@ function generateCoachSummary(review: WeeklyReview): {
     );
   }
 
-  // Generate adjustment recommendation
-  let adjustment = "Stay consistent with the current plan.";
-  if (
-    weight.deltaKg !== null &&
-    weight.deltaKg < -1.0 &&
-    profile.goal === "lose_fat"
-  ) {
-    adjustment =
-      "Weight is dropping a bit fast — keep calories stable to preserve strength.";
-  } else if (
-    training.sessionsCompleted >= profile.gymFrequency &&
-    training.totalVolumeKg > 0
-  ) {
-    adjustment =
-      "Try adding 2.5 kg to your main compound lifts next week for progressive overload.";
-  } else if (nutrition.calorieAdherence < 60 && nutrition.daysLogged > 0) {
-    adjustment =
-      "Focus on hitting your calorie target more consistently — meal prep could help.";
-  }
-
   return {
     mainText:
       sentences.length > 0
         ? sentences.slice(0, 3).join(" ")
         : `Keep going, ${profile.name}! Log more data for a detailed weekly insight.`,
-    adjustment,
   };
 }
 
@@ -585,13 +564,18 @@ export default function WeeklyReview() {
                     &ldquo;{coachSummary.mainText}&rdquo;
                   </p>
                 </div>
-                <GlassCard className="p-3.5 border border-white/5 text-center">
+                <GlassCard className="p-3.5 border border-white/5 space-y-2">
                   <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono block">
                     Next Week&apos;s Focus
                   </span>
-                  <p className="font-bold text-[#c87a53] text-xs mt-1.5 leading-snug">
-                    {coachSummary.adjustment}
-                  </p>
+                  <ol className="space-y-2">
+                    {buildNextWeekActions(review).map((action, index) => (
+                      <li key={action} className="flex gap-2 text-xs text-zinc-200 leading-snug">
+                        <span className="font-bold text-[#c87a53]">{index + 1}.</span>
+                        <span>{action}</span>
+                      </li>
+                    ))}
+                  </ol>
                 </GlassCard>
               </div>
             </ReviewCard>
