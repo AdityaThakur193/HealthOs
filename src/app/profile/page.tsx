@@ -6,6 +6,7 @@ import {
   User, Calendar, Soup, Sparkles, Upload, AlertTriangle, Clock, Save, Loader2
 } from "lucide-react";
 import CustomPopup from "@/components/CustomPopup";
+import ReminderSettings from "@/components/ReminderSettings";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 
@@ -717,6 +718,7 @@ export default function ProfilePage() {
       {/* Tab 1: Biometric Specs Form */}
       {activeTab === "specs" && (
         <>
+          <ReminderSettings />
           <form onSubmit={handleUpdateProfile} className="space-y-4 animate-in-delay-1">
           <GlassCard className="p-5 space-y-4 border border-white/10 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/5 blur-[50px] rounded-full -z-10" />

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mess-aware coaching. Both coaches now know the time, mess hours, Sunday and holiday timings, and which meals are logged, and they no longer suggest a meal that has closed. Mess hours can be edited in Settings.
 - The home coach reuses its message until something relevant changes, which reduces AI calls.
 - The chat coach can now see today's logs, habits, adaptive TDEE and exam or sick mode.
+- Meal reminders. A notification in the last hour before a meal closes, only if it hasn't been logged. Each meal can be turned on or off.
 - Tap-to-log from today's mess menu. Pick what you took and adjust the amounts. Your last amount is only a starting point, and nothing is saved until you confirm.
 - Rebuilt diet planner. Code now chooses realistic portions from what the mess serves, using IFCT 2017 data, and says when a target can't be reached. AI only estimates dishes IFCT doesn't cover, and those are labelled.
 

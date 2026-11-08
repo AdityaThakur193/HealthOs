@@ -52,6 +52,7 @@ export interface IUserProfile extends Document {
   /** Optional per-user plan, keyed by day of week (0 = Sunday). */
   customWorkoutPlan?: Record<string, unknown>;
   messTimings?: MessTimings;
+  reminderMeals?: string[];
   messMenu?: {
     rawText?: string;
     parsedMenu?: {
@@ -149,6 +150,7 @@ const UserProfileSchema = new Schema<IUserProfile>(
     useCustomMacros: { type: Boolean, default: false },
     customWorkoutPlan: Schema.Types.Mixed,
     messTimings: Schema.Types.Mixed,
+    reminderMeals: { type: [String], default: undefined },
     messMenu: {
       rawText: String,
       parsedMenu: {
@@ -387,6 +389,30 @@ const OtpChallengeSchema = new Schema<IOtpChallenge>({
 OtpChallengeSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0 });
 
 /* ─────────────────────────────────────────────
+ * Devices that receive meal reminders
+ * ───────────────────────────────────────────── */
+
+export interface IPushDevice extends Document {
+  userId: mongoose.Types.ObjectId;
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  tz?: string;
+}
+
+const PushDeviceSchema = new Schema<IPushDevice>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "UserProfile", required: true, index: true },
+    endpoint: { type: String, required: true, unique: true },
+    keys: {
+      p256dh: { type: String, required: true },
+      auth: { type: String, required: true },
+    },
+    tz: String,
+  },
+  { timestamps: true }
+);
+
+/* ─────────────────────────────────────────────
  * Plain-object shapes returned by .lean()
  * ───────────────────────────────────────────── */
 
@@ -396,6 +422,10 @@ export type LeanTimelineEvent = Omit<ITimelineEvent, keyof Document> & { _id: mo
 /* ─────────────────────────────────────────────
  * Model Exports
  * ───────────────────────────────────────────── */
+
+export const PushDevice: Model<IPushDevice> =
+  mongoose.models.PushDevice ||
+  mongoose.model<IPushDevice>("PushDevice", PushDeviceSchema);
 
 export const OtpChallenge: Model<IOtpChallenge> =
   mongoose.models.OtpChallenge ||

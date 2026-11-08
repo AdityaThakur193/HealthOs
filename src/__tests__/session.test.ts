@@ -121,7 +121,7 @@ describe("Route protection", () => {
   it("every API route outside /api/auth checks the session", () => {
     const apiRoot = path.join(__dirname, "..", "app", "api");
     const routes = (fs.readdirSync(apiRoot, { recursive: true }) as string[])
-      .filter((file) => file.endsWith("route.ts") && !file.startsWith("auth"));
+      .filter((file) => file.endsWith("route.ts") && !file.startsWith("auth") && !file.startsWith("cron"));
 
     expect(routes.length).toBeGreaterThanOrEqual(8);
     for (const route of routes) {

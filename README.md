@@ -205,7 +205,7 @@ npm test
 
 ## 🚧 Known Limitations
 
-- **Offline logging** is not implemented yet. The app can be installed to the home screen, but it needs a connection to log data, and `public/sw.js` is not registered.
+- **Offline logging** is not implemented yet. The app can be installed to the home screen, but it needs a connection to log data.
 - **AI rate limits** are counted per server instance, so on serverless hosts they are approximate.
 - **Sessions** last 30 days and cannot be revoked individually. Rotating `AUTH_SECRET` ends all of them.
 
