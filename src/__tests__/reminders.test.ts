@@ -6,7 +6,7 @@ import webpush from "web-push";
 import { createSessionToken, SESSION_COOKIE } from "../lib/auth/session";
 import { PushDevice } from "../lib/db/models";
 import { buildMealDayStatus, DEFAULT_MESS_TIMINGS } from "../lib/mealWindows";
-import { buildReminderMessage, findDueReminder, isAllowedPushEndpoint, resolveReminderMeals } from "../lib/reminders";
+import { buildReminderMessage, checkReminder, findDueReminder, isAllowedPushEndpoint, resolveReminderMeals } from "../lib/reminders";
 import { POST as cronPOST } from "../app/api/cron/reminders/route";
 import { GET as remindersGET, POST as remindersPOST } from "../app/api/reminders/route";
 import { DELETE as profileDELETE, POST as profilePOST } from "../app/api/profile/route";
@@ -51,6 +51,14 @@ describe("Which reminder is due", () => {
     expect(resolveReminderMeals([])).toEqual([]);
   });
 
+  it("names the reason for staying quiet", () => {
+    expect(checkReminder(status("12:30"), [...ALL], [])).toEqual({ skip: "not_last_hour" });
+    expect(checkReminder(status("15:00"), [...ALL], [])).toEqual({ skip: "no_open_meal" });
+    expect(checkReminder(status("13:15"), ["dinner"], [])).toEqual({ skip: "meal_turned_off" });
+    expect(checkReminder(status("13:15"), [...ALL], ["lunch"])).toEqual({ skip: "already_sent" });
+    expect(checkReminder(status("13:15", [{ timestamp: monday("12:45") }]), [...ALL], [])).toEqual({ skip: "already_logged" });
+  });
+
   it("writes a short, guilt-free message", () => {
     const message = buildReminderMessage(status("13:15"), "lunch", "Rajma, Roti");
     expect(message.title).toBe("Lunch closes at 2:00 PM");
@@ -88,7 +96,7 @@ describe("Reminder routes", () => {
     return cookieFor(String((await res.json()).profile._id), mail);
   }
 
-  const runCron = (auth = "Bearer test-cron") => cronPOST(new Request("http://localhost/api/cron/reminders", { method: "POST", headers: { authorization: auth } }));
+  const runCron = (auth = "Bearer test-cron", query = "") => cronPOST(new Request(`http://localhost/api/cron/reminders${query}`, { method: "POST", headers: { authorization: auth } }));
 
   const subscribe = (cookie: string, body: object = { action: "subscribe", subscription, tz: TZ }) => remindersPOST(post("/api/reminders", cookie, body));
 
@@ -192,6 +200,45 @@ describe("Reminder routes", () => {
 
     expect(send).toHaveBeenCalledTimes(2);
     expect(await PushDevice.countDocuments()).toBe(1);
+  });
+
+  it("reports why a push service refused, without the device address", async () => {
+    await subscribe(await createUser());
+    send.mockRejectedValue(Object.assign(new Error("refused"), { statusCode: 403, body: "bad credentials" }));
+
+    const result = await (await runCron()).json();
+
+    expect(result.sent).toBe(0);
+    expect(result.failed).toEqual([{ service: "fcm.googleapis.com", status: 403, detail: "bad credentials" }]);
+    expect(JSON.stringify(result)).not.toContain("abc");
+  });
+
+  it("reports why nothing was due", async () => {
+    await subscribe(await createUser());
+    vi.setSystemTime(monday("12:30"));
+
+    const result = await (await runCron()).json();
+
+    expect(result.skipped).toEqual({ not_last_hour: 1 });
+    expect(result.localTimes).toEqual(["12:30"]);
+  });
+
+  it("sends a test whatever the time, without using up the meal's reminder", async () => {
+    await subscribe(await createUser());
+    vi.setSystemTime(monday("15:00"));
+
+    const result = await (await runCron("Bearer test-cron", "?test=1")).json();
+    expect(result.sent).toBe(1);
+    expect(JSON.parse(send.mock.calls[0][1] as string).title).toBe("Health OS test");
+
+    vi.setSystemTime(monday("13:15"));
+    await runCron();
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it("still needs the secret to send a test", async () => {
+    expect((await runCron("Bearer wrong", "?test=1")).status).toBe(401);
+    expect(send).not.toHaveBeenCalled();
   });
 
   it("moves a shared device to whoever signed in last", async () => {

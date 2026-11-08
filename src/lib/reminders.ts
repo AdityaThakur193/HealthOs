@@ -25,12 +25,26 @@ function title(meal: string): string {
   return meal.charAt(0).toUpperCase() + meal.slice(1);
 }
 
-export function findDueReminder(status: MealDayStatus, wanted: MealName[], alreadySent: string[]): MealName | null {
+export type ReminderSkipReason = "no_open_meal" | "already_logged" | "meal_turned_off" | "already_sent" | "not_last_hour";
+
+export function checkReminder(
+  status: MealDayStatus,
+  wanted: MealName[],
+  alreadySent: string[]
+): { meal: MealName } | { skip: ReminderSkipReason } {
   const current = status.meals.find((meal) => meal.state === "open");
-  if (!current || current.logged || !wanted.includes(current.meal) || alreadySent.includes(current.meal)) return null;
+  if (!current) return { skip: "no_open_meal" };
+  if (current.logged) return { skip: "already_logged" };
+  if (!wanted.includes(current.meal)) return { skip: "meal_turned_off" };
+  if (alreadySent.includes(current.meal)) return { skip: "already_sent" };
 
   const minutesLeft = minutesFromTime(current.end) - minutesFromTime(status.localClock);
-  return minutesLeft <= REMIND_MINUTES_BEFORE_CLOSE ? current.meal : null;
+  return minutesLeft <= REMIND_MINUTES_BEFORE_CLOSE ? { meal: current.meal } : { skip: "not_last_hour" };
+}
+
+export function findDueReminder(status: MealDayStatus, wanted: MealName[], alreadySent: string[]): MealName | null {
+  const result = checkReminder(status, wanted, alreadySent);
+  return "meal" in result ? result.meal : null;
 }
 
 export function buildReminderMessage(status: MealDayStatus, meal: MealName, menu: string | undefined) {
