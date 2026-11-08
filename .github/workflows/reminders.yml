@@ -1,0 +1,22 @@
+name: Meal Reminders
+
+# Checks every 15 minutes which users are due a reminder. GitHub may run this
+# a few minutes late, so reminders start an hour before a meal closes.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  send:
+    name: Send Due Reminders
+    if: ${{ vars.APP_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the reminder endpoint
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: curl --fail --silent --show-error --max-time 60 -X POST -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/reminders"

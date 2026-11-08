@@ -31,6 +31,8 @@ Routes that need a finished profile return `403` with `{ "notInitialized": true 
 | `/api/coach` | `POST` | Generate today's coaching insight for the dashboard |
 | `/api/coach/chat` | `POST` | Conversational coach that returns a reply and an optional action |
 | `/api/review` | `GET` | Calculate the review for the last seven calendar days |
+| `/api/reminders` | `GET`, `POST` | Read reminder settings; subscribe a device, unsubscribe, or choose meals |
+| `/api/cron/reminders` | `POST` | Scheduled job that sends due reminders. Requires `Authorization: Bearer <CRON_SECRET>` instead of a session |
 
 ---
 

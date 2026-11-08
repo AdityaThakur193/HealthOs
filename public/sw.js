@@ -27,11 +27,46 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  if (new URL(event.request.url).pathname.startsWith("/api/")) return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
 
   event.respondWith(
     fetch(event.request).catch(async () => {
       return (await caches.match(event.request)) || Response.error();
+    })
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let message = { title: "Health OS", body: "Time to log your meal.", url: "/meal" };
+  try {
+    message = { ...message, ...event.data.json() };
+  } catch {
+    // Keep the default message if the data can't be read.
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(message.title, {
+      body: message.body,
+      icon: "/logo-192.png",
+      badge: "/logo-192.png",
+      data: { url: message.url },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((client) => "focus" in client);
+      if (open) {
+        open.navigate(target);
+        return open.focus();
+      }
+      return self.clients.openWindow(target);
     })
   );
 });

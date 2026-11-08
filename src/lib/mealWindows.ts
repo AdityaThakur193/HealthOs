@@ -48,10 +48,12 @@ export function resolveMessTimings(saved?: { regular?: Partial<MealSchedule>; ho
   };
 }
 
-function toMinutes(time: string): number {
+export function minutesFromTime(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
 }
+
+const toMinutes = minutesFromTime;
 
 /** "19:30" becomes "7:30 PM". */
 export function formatMealTime(time: string): string {
@@ -86,6 +88,8 @@ export interface MealStatus {
 
 export interface MealDayStatus {
   localTime: string;
+  /** The same time as 24-hour HH:MM, for calculations. */
+  localClock: string;
   dayType: "regular" | "sunday_or_holiday";
   meals: MealStatus[];
   currentMeal: MealName | null;
@@ -159,8 +163,11 @@ export function buildMealDayStatus(options: {
   const currentMeal = meals.find((status) => status.state === "open")?.meal ?? null;
   const nextMeal = meals.find((status) => status.state === "upcoming")?.meal ?? null;
 
+  const localClock = `${String(Math.floor(current / 60)).padStart(2, "0")}:${String(current % 60).padStart(2, "0")}`;
+
   return {
-    localTime: formatMealTime(`${String(Math.floor(current / 60)).padStart(2, "0")}:${String(current % 60).padStart(2, "0")}`),
+    localTime: formatMealTime(localClock),
+    localClock,
     dayType: special ? "sunday_or_holiday" : "regular",
     meals,
     currentMeal,

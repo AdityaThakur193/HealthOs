@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import connectDB from "@/lib/mongodb";
-import { AIMemory, Habit, HabitLog, OtpChallenge, TimelineEvent, UserProfile } from "@/lib/db/models";
+import { AIMemory, Habit, HabitLog, OtpChallenge, PushDevice, TimelineEvent, UserProfile } from "@/lib/db/models";
 import { getLocalProfile, saveLocalProfile, deleteLocalEvents, deleteLocalProfile } from "@/lib/db/fallback";
 import { calculateAdaptiveTdee, calculateHealthTargets, goalCalorieTarget, ActivityLevel, Gender, Goal } from "@/lib/tdee";
 import { calculateLoggingStreak } from "@/lib/timelineUtils";
@@ -244,6 +244,7 @@ export async function DELETE(request: NextRequest) {
         Habit.deleteMany({ userId }),
         HabitLog.deleteMany({ userId }),
         AIMemory.deleteMany({ userId }),
+        PushDevice.deleteMany({ userId }),
       ]);
       await UserProfile.deleteOne({ _id: userId });
     }
