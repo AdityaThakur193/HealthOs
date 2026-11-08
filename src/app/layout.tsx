@@ -3,6 +3,7 @@ import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import CoachChatFAB from "@/components/CoachChatFAB";
 import SplashWrapper from "@/components/SplashWrapper";
+import SessionWatcher from "@/components/SessionWatcher";
 
 import type { Viewport } from "next";
 
@@ -37,6 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full scroll-smooth antialiased dark">
       <body className="min-h-full flex flex-col bg-[#0c0f0d] text-white">
+        <SessionWatcher />
         {/* Main layout container with maximum width to simulate a mobile app layout on desktop */}
         <SplashWrapper>
           <div className="flex-1 w-full max-w-lg mx-auto relative flex flex-col min-h-dvh">

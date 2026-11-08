@@ -54,7 +54,7 @@ describe("Grounded AI Diet Allocation Engine", () => {
     // Math audit should override hallucinated 999/9999 with 6.4 + 24 = 30.4g P, 170 + 120 = 290 kcal
     expect(auditedMeal.proteinG).toBe(30.4);
     expect(auditedMeal.calories).toBe(290);
-    expect(audited.monday.dailySummary.totalCalories).toBe(290);
-    expect(audited.monday.dailySummary.totalProteinG).toBe(30.4);
+    expect(audited.monday.dailySummary?.totalCalories).toBe(290);
+    expect(audited.monday.dailySummary?.totalProteinG).toBe(30.4);
   });
 });

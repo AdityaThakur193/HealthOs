@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import ReviewCard from "@/components/ReviewCard";
 import GlassCard from "@/components/GlassCard";
-import { Scale, Utensils, Zap, Moon, Lightbulb, BarChart2, Calendar, ArrowDown, ArrowUp } from "lucide-react";
+import { Scale, Utensils, Zap, Moon, Lightbulb, BarChart2, ArrowDown, ArrowUp } from "lucide-react";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 /* ─────────────────────────────────────────────
@@ -173,10 +173,8 @@ export default function WeeklyReview() {
 
   const loadReview = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
-    setError(null);
     try {
-      const reviewRes = await fetch(`/api/review?userId=${userId}`);
+      const reviewRes = await fetch("/api/review");
       if (!reviewRes.ok) {
         const errData = await reviewRes.json().catch(() => ({}));
         setError(errData.error ?? "Failed to load review");
@@ -185,6 +183,7 @@ export default function WeeklyReview() {
 
       const reviewData = await reviewRes.json();
       setReview(reviewData.review);
+      setError(null);
     } catch (err) {
       console.error("Failed to load weekly review:", err);
       setError("Something went wrong loading your review.");
@@ -195,6 +194,8 @@ export default function WeeklyReview() {
 
   useEffect(() => {
     if (userId) {
+      // Async data load: state only changes after the response arrives.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadReview();
     }
   }, [userId, loadReview]);
@@ -346,7 +347,7 @@ export default function WeeklyReview() {
               </p>
             </div>
             <div className="p-4 bg-white/2 border border-white/5 rounded-2xl text-xs text-zinc-400 leading-relaxed">
-              We tracked your weight, workouts, sleep, and mess intake to structure your body's metabolic report.
+              We tracked your weight, workouts, sleep, and mess intake to structure your body&apos;s metabolic report.
             </div>
             <div className="text-[9px] text-[#c87a53] font-bold uppercase tracking-widest font-mono animate-bounce pt-4">
               Tap right side of screen to start →
@@ -586,7 +587,7 @@ export default function WeeklyReview() {
                 </div>
                 <GlassCard className="p-3.5 border border-white/5 text-center">
                   <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono block">
-                    Next Week's Focus
+                    Next Week&apos;s Focus
                   </span>
                   <p className="font-bold text-[#c87a53] text-xs mt-1.5 leading-snug">
                     {coachSummary.adjustment}

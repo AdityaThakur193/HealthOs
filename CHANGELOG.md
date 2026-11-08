@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Security
+- Added signed HTTP-only session cookies. API routes now take identity from the session and scope every read and write to the signed-in user. Previously any client could read or change another user's data by supplying their ID or email.
+- Login codes are now single-use, limited to 5 guesses, rate limited, and generated with a secure random source. The client no longer receives a value derived from the code, and the hardcoded fallback signing secret is gone.
+- Added size limits and per-user rate limits on AI routes, security headers, and generic error messages in place of internal error text.
+- Coach chat now loads the profile from the database instead of trusting one sent by the client, and only accepts known actions.
+
+### Fixed
+- Habit check-ins failed with a 500 after saving because `habit` was missing from the timeline schema. Toggling a habit now keeps exactly one timeline event per day.
+- Deleting a habit did nothing because the server had no `delete` action.
+- Server-side "today", streaks, and weekly windows used UTC instead of the user's timezone, which was wrong for Indian users until 05:30 each morning.
+- Diet plans now respect allergies, medical conditions, and vegan diets, and calculated calorie targets have a safety floor.
+- Diet math audit misread "100g Paneer" as protein and "71.5 kcal" as 5 kcal.
+- Adaptive TDEE counted repeat same-day weigh-ins as separate days, included today's unfinished log, and ignored activity level when clamping.
+- Progressive overload raised weight when only one set reached the top of the range, and could not find history on 6-day splits.
+- Weekly review covered eight days instead of seven.
+- Journey and data export were limited to the latest 50 events.
+- Exam and sick mode could not be turned off. Steps and water edits left stale values behind.
+- Account deletion left habits and AI memory behind.
+
+### Added
+- Sign out, integration tests against an in-memory MongoDB, React component tests, and ESLint in CI.
+
+### Changed
+- Production now requires `AUTH_SECRET` and `RESEND_API_KEY`.
+
 ## [1.0.0] - 2026-07-25
 
 ### Added
@@ -31,9 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports 3-day, 4-day, 5-day, and 6-day training splits.
   - Double progression model calculating automatic weight increases (+2.5kg / +2.0kg) upon hitting target rep ranges.
   - Curated YouTube exercise video timestamp links embedded directly into exercise cards.
-- **Zomato/Swiggy Style PWA Web Push Notification System (`src/lib/notifications.ts` & `sw.js`)**:
-  - Auto-registers Service Worker with immediate lifecycle activation (`skipWaiting` and `clients.claim`).
-  - Sends local background push notifications for meal logging reminders, workout alerts, and water intake check-ins.
 - **Automated Vitest Test Suite (`src/__tests__/`)**:
   - 30 unit and security tests covering TDEE regression math, workout split progression, IFCT portion math, diet engine audit logic, API boundary validation, and security sanitization.
 - **GitHub Actions CI/CD Pipeline (`.github/workflows/ci.yml`)**:

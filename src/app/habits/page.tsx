@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import GlassCard from "@/components/GlassCard";
 import BottomNav from "@/components/BottomNav";
 import CoachInsight from "@/components/CoachInsight";
@@ -16,17 +16,8 @@ import {
   RotateCcw,
   Trash2,
   Edit3,
-  Calendar,
   X,
-  Target,
-  Award,
   Layers,
-  Code,
-  Soup,
-  BookOpen,
-  Dumbbell,
-  Heart,
-  Zap,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -40,17 +31,6 @@ const COLOR_PALETTE = [
   { name: "Rose", value: "#f43f5e" },
   { name: "Indigo", value: "#818cf8" },
   { name: "Teal", value: "#2dd4bf" },
-];
-
-const ICON_OPTIONS = [
-  { name: "Sparkles", icon: Sparkles },
-  { name: "Code", icon: Code },
-  { name: "Soup", icon: Soup },
-  { name: "BookOpen", icon: BookOpen },
-  { name: "Dumbbell", icon: Dumbbell },
-  { name: "Heart", icon: Heart },
-  { name: "Zap", icon: Zap },
-  { name: "Target", icon: Target },
 ];
 
 export default function HabitsPage() {
@@ -81,11 +61,10 @@ export default function HabitsPage() {
     notes: "",
   });
 
-  const fetchHabits = async () => {
+  const fetchHabits = useCallback(async () => {
     if (!email) return;
     try {
-      setLoading(true);
-      const res = await fetch(`/api/habits?email=${encodeURIComponent(email)}`);
+      const res = await fetch("/api/habits");
       const data = await res.json();
       if (data.success) {
         setHabits(data.habits || []);
@@ -96,16 +75,18 @@ export default function HabitsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [email]);
 
   useEffect(() => {
     if (!authLoading) {
+      // Async data load: state only changes after the response arrives.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchHabits();
     }
     const handleUpdate = () => fetchHabits();
     window.addEventListener("habitsUpdated", handleUpdate);
     return () => window.removeEventListener("habitsUpdated", handleUpdate);
-  }, [authLoading, email]);
+  }, [authLoading, fetchHabits]);
 
   const handleToggleHabit = async (habit: HabitWithStats) => {
     const nextCompleted = !habit.completedToday;
@@ -132,7 +113,6 @@ export default function HabitsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "checkin",
-          email,
           checkin: {
             habitId: habit.id,
             completed: nextCompleted,
@@ -167,7 +147,6 @@ export default function HabitsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "checkin",
-          email,
           checkin: {
             habitId: habit.id,
             completed: isDone,
@@ -205,7 +184,6 @@ export default function HabitsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "save",
-          email,
           habit: payload,
         }),
       });
@@ -226,7 +204,6 @@ export default function HabitsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "delete",
-          email,
           habitId,
         }),
       });
@@ -279,7 +256,6 @@ export default function HabitsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "reset",
-          email: email || "user@example.com",
         }),
       });
       if (res.ok) {
@@ -637,7 +613,7 @@ export default function HabitsPage() {
                     <label className="block text-zinc-400 font-bold mb-1">Frequency</label>
                     <select
                       value={formData.frequency}
-                      onChange={(e) => setFormData({ ...formData, frequency: e.target.value as any })}
+                      onChange={(e) => setFormData({ ...formData, frequency: e.target.value as typeof formData.frequency })}
                       className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#8ba893]"
                     >
                       <option value="daily">Everyday</option>
@@ -652,7 +628,7 @@ export default function HabitsPage() {
                     <label className="block text-zinc-400 font-bold mb-1">Target Type</label>
                     <select
                       value={formData.targetType}
-                      onChange={(e) => setFormData({ ...formData, targetType: e.target.value as any })}
+                      onChange={(e) => setFormData({ ...formData, targetType: e.target.value as typeof formData.targetType })}
                       className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#8ba893]"
                     >
                       <option value="boolean">Yes / No</option>

@@ -1,9 +1,27 @@
 import { NextRequest } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { sanitizeJsonOutput } from "@/lib/gemini";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import connectDB from "@/lib/mongodb";
+import { LeanUserProfile, UserProfile } from "@/lib/db/models";
+import { getLocalProfileById } from "@/lib/db/fallback";
 import { getWeekSchedule } from "@/lib/workoutPlans";
+import { normalizeCoachReply } from "@/lib/coachRules";
+import { requireUserSession } from "@/lib/auth/session";
+import { checkRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
+import { weekdayIndex } from "@/lib/dateUtils";
+import { invalidBodyResponse, MAX_CHAT_MESSAGE_CHARS, readJsonObject } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
+
+const HOUR_MS = 60 * 60 * 1000;
+const CHAT_MESSAGES_PER_HOUR = 60;
+
+const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+
+interface ChatTurn {
+  role?: unknown;
+  content?: unknown;
+}
 
 function getGenAI(): GoogleGenerativeAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -11,60 +29,56 @@ function getGenAI(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(apiKey);
 }
 
-export async function POST(request: NextRequest) {
+async function loadProfile(userId: string): Promise<LeanUserProfile | null> {
   try {
-    const body = await request.json();
-    const { email, message, history, profile } = body;
+    await connectDB();
+    return await UserProfile.findById(userId).lean<LeanUserProfile>();
+  } catch (error) {
+    if (process.env.NODE_ENV === "production") throw error;
+    return (await getLocalProfileById(userId)) as unknown as LeanUserProfile | null;
+  }
+}
 
-    if (!email || !message) {
-      return Response.json({ error: "Email and message are required." }, { status: 400 });
-    }
+function formatHistory(history: unknown): string {
+  if (!Array.isArray(history)) return "";
+  return (history as ChatTurn[])
+    .slice(-6)
+    .filter((turn) => typeof turn?.content === "string")
+    .map((turn) => `${turn.role === "user" ? "User" : "Coach"}: ${(turn.content as string).slice(0, MAX_CHAT_MESSAGE_CHARS)}`)
+    .join("\n");
+}
 
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+function buildSystemPrompt(profile: LeanUserProfile, tz?: string): string {
+  const todayName = DAYS[weekdayIndex(new Date(), tz)];
+  const dietPlan = profile.dietPlan?.generatedPlan as Record<string, { meals?: { name: string; messItems?: string }[] }> | undefined;
+  const messMenu = profile.messMenu?.parsedMenu as Record<string, unknown> | undefined;
+  const gymFrequency = profile.gymFrequency || 4;
 
-    const name = profile?.name || "User";
-    const age = profile?.age || 22;
-    const height = profile?.heightCm || 175;
-    const weight = profile?.weightKg || 75;
-    const targetCalories = profile?.targetCalories || 2000;
-    const targetProtein = profile?.targetProteinG || 150;
-    const collegeSchedule = profile?.collegeSchedule || "8 AM - 4 PM";
-    const goal = profile?.goal || "recomp";
-    const strictMessOnly = profile?.strictMessOnly || false;
-    const activeDietPlan = profile?.dietPlan?.generatedPlan || null;
-    const activeMessMenu = profile?.messMenu?.parsedMenu || null;
-    const gymFrequency = profile?.gymFrequency || 4;
-    const gymExperience = profile?.gymExperience || "intermediate";
-    const workoutSchedule = getWeekSchedule(gymFrequency);
+  const weeklySummary = dietPlan
+    ? Object.keys(dietPlan)
+        .map((day) => {
+          const meals = (dietPlan[day]?.meals || [])
+            .map((meal) => `${meal.name}: ${(meal.messItems || "").split("\n")[0].replace("• ", "")}`)
+            .join(" | ");
+          return `${day.toUpperCase()}: ${meals}`;
+        })
+        .join("\n")
+    : "";
 
-    const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-    const todayName = days[new Date().getDay()];
-    
-    // Extract today's plan & mess menu
-    const todayDiet = activeDietPlan ? activeDietPlan[todayName] : null;
-    const todayMess = activeMessMenu ? activeMessMenu[todayName] : null;
+  const allergies = profile.foodAllergies?.length ? profile.foodAllergies.join(", ") : "None";
+  const conditions = profile.medicalConditions?.length ? profile.medicalConditions.join(", ") : "None";
 
-    // Create ultra-compact weekly summary
-    let weeklySummaryStr = "";
-    if (activeDietPlan) {
-      weeklySummaryStr = Object.keys(activeDietPlan).map(day => {
-        const d = activeDietPlan[day];
-        const mealsSummary = (d?.meals || []).map((m: any) => m.name + ": " + (m.messItems || "").split("\n")[0].replace("• ", "")).join(" | ");
-        return `${day.toUpperCase()}: ${mealsSummary}`;
-      }).join("\n");
-    }
-
-    const systemPrompt = `You are the Health OS Personal AI Coach — a fully autonomous health data agent with COMPLETE control over the user's health app. You can read and write all health data: meals, steps, water, sleep, weight, and workout logs. You are not just a conversational assistant — you are an ACTION-FIRST agent. Whenever the user mentions any health data, you MUST capture it and write it to the database immediately.
+  return `You are the Health OS Personal AI Coach — a fully autonomous health data agent with COMPLETE control over the user's health app. You can read and write all health data: meals, steps, water, sleep, weight, and workout logs. You are not just a conversational assistant — you are an ACTION-FIRST agent. Whenever the user mentions any health data, you MUST capture it and write it to the database immediately.
 
 User Profile:
-- Name: ${name} | Age: ${age} | Height: ${height}cm | Weight: ${weight}kg
-- Goal: "${goal}" | Daily Targets: ${targetCalories} kcal, ${targetProtein}g protein
-- Schedule: ${collegeSchedule} | Strict Mess Mode: ${strictMessOnly ? "ACTIVE" : "INACTIVE"}
-- Gym: ${gymFrequency} days/week (${gymExperience}) | Split: ${JSON.stringify(workoutSchedule)}
-- Today (${todayName}): Mess: ${todayMess ? JSON.stringify(todayMess) : "N/A"} | Plan: ${todayDiet ? JSON.stringify(todayDiet) : "N/A"}
+- Name: ${profile.name} | Age: ${profile.age} | Height: ${profile.heightCm}cm | Weight: ${profile.weightKg}kg
+- Goal: "${profile.goal}" | Daily Targets: ${profile.targetCalories} kcal, ${profile.targetProteinG}g protein
+- Diet preference: ${profile.dietPreference || "none"} | Food allergies (NEVER suggest these): ${allergies} | Medical conditions: ${conditions}
+- Schedule: ${profile.collegeSchedule || "Not specified"} | Strict Mess Mode: ${profile.strictMessOnly ? "ACTIVE" : "INACTIVE"}
+- Gym: ${gymFrequency} days/week (${profile.gymExperience}) | Split: ${JSON.stringify(getWeekSchedule(gymFrequency))}
+- Today (${todayName}): Mess: ${messMenu?.[todayName] ? JSON.stringify(messMenu[todayName]) : "N/A"} | Plan: ${dietPlan?.[todayName] ? JSON.stringify(dietPlan[todayName]) : "N/A"}
 - Full Weekly Diet Overview:
-${weeklySummaryStr || "Standard 2200 kcal High Protein Mess Plan"}
+${weeklySummary || "No diet plan generated yet"}
 
 ════════════════════════════════════════════
 FULL DATA CONTROL — ACTIONS YOU CAN TAKE
@@ -154,57 +168,68 @@ RESPONSE FORMAT — RETURN ONLY VALID JSON
 }
 
 CRITICAL: Return ONLY the JSON object. No text before or after. No markdown wrapping.`;
+}
 
-    const recentHistory = (history || []).slice(-6);
-    const formattedHistory = recentHistory.map((msg: any) => {
-      return `${msg.role === "user" ? "User" : "Coach"}: ${msg.content}`;
-    }).join("\n");
-
-    const fullPrompt = `${systemPrompt}\n\nChat History:\n${formattedHistory}\n\nUser: ${message}\n\nCoach:`;
-
+async function generateReply(prompt: string): Promise<string> {
+  try {
+    const model = getGenAI().getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: { responseMimeType: "application/json" },
+    });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (geminiError) {
     const groqApiKey = process.env.GROQ_API_KEY;
-    let responseText = "";
+    if (!groqApiKey || groqApiKey === "your_groq_api_key_here") throw geminiError;
 
-    try {
-      console.log(`💬 Chatbot processing message from ${email} using Gemini...`);
-      const result = await model.generateContent(fullPrompt);
-      responseText = result.response.text();
-    } catch (geminiError) {
-      console.warn("⚠️ Gemini chatbot request failed, attempting Groq fallback:", geminiError);
+    console.warn("Gemini chat failed, trying Groq:", geminiError);
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${groqApiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-oss-20b",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Groq fallback failed (${response.status}): ${await response.text()}`);
+    }
+    const data = await response.json();
+    return data.choices[0]?.message?.content || "";
+  }
+}
 
-      if (groqApiKey && groqApiKey !== "your_groq_api_key_here") {
-        const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${groqApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "openai/gpt-oss-20b",
-            messages: [{ role: "user", content: fullPrompt }],
-            response_format: { type: "json_object" },
-            temperature: 0.7,
-          }),
-        });
+export async function POST(request: NextRequest) {
+  const session = requireUserSession(request);
+  if (session instanceof Response) return session;
 
-        if (groqRes.ok) {
-          const groqData = await groqRes.json();
-          responseText = groqData.choices[0]?.message?.content || "";
-          console.log("✅ Successfully fell back to Groq for chatbot response.");
-        } else {
-          const errText = await groqRes.text();
-          throw new Error(`Groq fallback failed (${groqRes.status}): ${errText}`);
-        }
-      } else {
-        throw geminiError;
-      }
+  const body = await readJsonObject(request);
+  if (!body) return invalidBodyResponse();
+
+  const { message, history } = body;
+  if (typeof message !== "string" || !message.trim()) {
+    return Response.json({ error: "A message is required." }, { status: 400 });
+  }
+  if (message.length > MAX_CHAT_MESSAGE_CHARS) {
+    return Response.json({ error: "That message is too long." }, { status: 400 });
+  }
+  if (!checkRateLimit(`chat:${session.userId}`, CHAT_MESSAGES_PER_HOUR, HOUR_MS)) {
+    return rateLimitedResponse();
+  }
+
+  try {
+    const profile = await loadProfile(session.userId);
+    if (!profile) {
+      return Response.json({ error: "User profile not found." }, { status: 404 });
     }
 
-    const sanitized = sanitizeJsonOutput(responseText);
-    const parsed = JSON.parse(sanitized);
-    return Response.json(parsed);
-  } catch (err: any) {
-    console.error("AI Coach Chatbot error:", err);
-    return Response.json({ error: err.message || "Failed to process chat message" }, { status: 500 });
+    const prompt = `${buildSystemPrompt(profile, session.tz)}\n\nChat History:\n${formatHistory(history)}\n\nUser: ${message}\n\nCoach:`;
+    const responseText = await generateReply(prompt);
+    return Response.json(normalizeCoachReply(JSON.parse(sanitizeJsonOutput(responseText))));
+  } catch (error) {
+    console.error("AI Coach Chatbot error:", error);
+    return Response.json({ error: "Failed to process chat message" }, { status: 500 });
   }
 }

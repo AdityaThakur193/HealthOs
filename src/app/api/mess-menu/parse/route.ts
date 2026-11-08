@@ -1,5 +1,9 @@
 import { NextRequest } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { sanitizeJsonOutput } from "@/lib/gemini";
+import { requireUserSession } from "@/lib/auth/session";
+import { checkRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
+import { invalidBodyResponse, readJsonObject, validateImageInput, validateMessMenuInput } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -11,23 +15,30 @@ function getGenAI(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(apiKey);
 }
 
-function sanitizeJsonOutput(text: string): string {
-  let cleaned = text.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  }
-  return cleaned;
-}
-
 export async function POST(request: NextRequest) {
+  const session = requireUserSession(request);
+  if (session instanceof Response) return session;
+
+  const body = await readJsonObject(request);
+  if (!body) return invalidBodyResponse();
+  const { text, image, mimeType } = body;
+
+  if (!text && !image) {
+    return Response.json({ error: "Either text or image input is required." }, { status: 400 });
+  }
+  if (text) {
+    const textCheck = validateMessMenuInput(text);
+    if (!textCheck.valid) return Response.json({ error: textCheck.error }, { status: 400 });
+  }
+  if (image) {
+    const imageError = validateImageInput(image, mimeType);
+    if (imageError) return Response.json({ error: imageError }, { status: 400 });
+  }
+  if (!checkRateLimit(`mess-menu:${session.userId}`, 10, 60 * 60 * 1000)) {
+    return rateLimitedResponse();
+  }
+
   try {
-    const body = await request.json();
-    const { text, image, mimeType } = body;
-
-    if (!text && !image) {
-      return Response.json({ error: "Either text or image input is required." }, { status: 400 });
-    }
-
     const genAI = getGenAI();
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -55,19 +66,17 @@ If any meal is not specified or is a rest day, use a brief blank or placeholder 
 
     if (image) {
       // Multimodal vision check
-      const cleanBase64 = image.replace(/^data:image\/\w+;base64,/, "");
+      const cleanBase64 = (image as string).replace(/^data:image\/\w+;base64,/, "");
       const imagePart = {
         inlineData: {
           data: cleanBase64,
-          mimeType: mimeType || "image/jpeg",
+          mimeType: (mimeType as string) || "image/jpeg",
         },
       };
-      console.log("📸 Calling Gemini Vision to parse mess menu image...");
       const result = await model.generateContent([prompt, imagePart]);
       responseText = result.response.text();
     } else {
       // Text block analysis
-      console.log("📝 Calling Gemini Text to parse mess menu text...");
       const fullPrompt = `${prompt}\n\nUnstructured Menu Text:\n${text}`;
       const result = await model.generateContent(fullPrompt);
       responseText = result.response.text();
@@ -77,8 +86,8 @@ If any meal is not specified or is a rest day, use a brief blank or placeholder 
     const parsed = JSON.parse(sanitized);
 
     return Response.json(parsed);
-  } catch (err: any) {
+  } catch (err) {
     console.error("Mess menu parsing error:", err);
-    return Response.json({ error: err.message || "Failed to parse mess menu" }, { status: 500 });
+    return Response.json({ error: "Failed to parse mess menu" }, { status: 500 });
   }
 }

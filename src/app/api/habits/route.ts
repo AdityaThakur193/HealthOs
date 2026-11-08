@@ -1,326 +1,340 @@
-import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import connectToDatabase from "@/lib/mongodb";
-import { UserProfile, Habit, HabitLog, TimelineEvent } from "@/lib/db/models";
+import { Habit, HabitLog, TimelineEvent, UserProfile } from "@/lib/db/models";
 import {
   calculateHabitStrength,
   calculateCurrentStreak,
   get30DayHeatmap,
-  formatDateKey,
   getStarterHabits,
+  HabitDefinition,
   HabitWithStats,
   HabitLogEntry,
 } from "@/lib/habitEngine";
-import mongoose from "mongoose";
+import { requireSession, Session } from "@/lib/auth/session";
+import { dayKey } from "@/lib/dateUtils";
+import { invalidBodyResponse, isValidDateKey, readJsonObject } from "@/lib/validation";
 
-// In-memory fallback if MongoDB Atlas is unavailable
-let memoryHabits: any[] = [];
-let memoryHabitLogs: any[] = [];
+export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+type HabitLike = Partial<HabitDefinition> & { habitId?: string };
+type HabitLogLike = HabitLogEntry & { habitId: string };
+
+/** Per-user store for development without MongoDB. Never used in production. */
+const memoryByUser = new Map<string, { habits: HabitLike[]; logs: HabitLogLike[] }>();
+
+function memoryFor(email: string) {
+  let store = memoryByUser.get(email);
+  if (!store) {
+    store = { habits: getStarterHabits(email), logs: [] };
+    memoryByUser.set(email, store);
+  }
+  return store;
+}
+
+function serverError(context: string, error: unknown): Response {
+  console.error(`${context}:`, error);
+  return Response.json({ success: false, error: "Something went wrong saving your habits." }, { status: 500 });
+}
+
+/** Resolves the signed-in user's database id, or null when running on the memory store. */
+async function resolveUser(session: Session): Promise<mongoose.Types.ObjectId | null | Response> {
   try {
-    const { searchParams } = new URL(req.url);
-    const email = searchParams.get("email");
-
-    if (!email) {
-      return NextResponse.json({ error: "email query parameter is required" }, { status: 400 });
+    await connectToDatabase();
+    const user = await UserProfile.findOne({ email: session.email }).select("_id").lean();
+    if (!user) {
+      return Response.json({ success: false, error: "Profile not set up yet.", notInitialized: true }, { status: 403 });
     }
-
-    let dbConnected = false;
-    let userIdStr = "default_user";
-
-    try {
-      await connectToDatabase();
-      const user = await UserProfile.findOne({ email });
-      if (user) {
-        userIdStr = user._id.toString();
-      }
-      dbConnected = true;
-    } catch {
-      console.warn("MongoDB connection unavailable for /api/habits, using memory fallback.");
+    return user._id as mongoose.Types.ObjectId;
+  } catch (error) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("Habits could not reach MongoDB:", error);
+      return Response.json({ success: false, error: "Database offline. Please try again later." }, { status: 503 });
     }
+    return null;
+  }
+}
 
-    let habitsRaw: any[] = [];
-    let logsRaw: any[] = [];
+async function seedStarterHabits(userId: mongoose.Types.ObjectId) {
+  // Upserts make concurrent first loads safe against the unique index.
+  await Habit.bulkWrite(
+    getStarterHabits(String(userId)).map((starter) => ({
+      updateOne: {
+        filter: { userId, habitId: starter.id },
+        update: {
+          $setOnInsert: {
+            userId,
+            habitId: starter.id,
+            title: starter.title,
+            category: starter.category,
+            targetType: starter.targetType,
+            targetValue: starter.targetValue,
+            unit: starter.unit,
+            frequency: starter.frequency,
+            colorTag: starter.colorTag,
+            icon: starter.icon,
+            status: starter.status,
+            notes: starter.notes,
+            sortOrder: starter.sortOrder,
+          },
+        },
+        upsert: true,
+      },
+    }))
+  );
+}
 
-    if (dbConnected && userIdStr !== "default_user") {
-      const userObjectId = new mongoose.Types.ObjectId(userIdStr);
-      habitsRaw = await Habit.find({ userId: userObjectId, status: "active" }).sort({ sortOrder: 1 });
-      
-      // If user has no habits defined yet, seed starter habits
-      if (habitsRaw.length === 0) {
-        const starter = getStarterHabits(userIdStr);
-        for (const s of starter) {
-          await Habit.create({
-            userId: userObjectId,
-            habitId: s.id,
-            title: s.title,
-            category: s.category,
-            targetType: s.targetType,
-            targetValue: s.targetValue,
-            unit: s.unit,
-            frequency: s.frequency,
-            colorTag: s.colorTag,
-            icon: s.icon,
-            status: s.status,
-            notes: s.notes,
-            sortOrder: s.sortOrder,
-          });
-        }
-        habitsRaw = await Habit.find({ userId: userObjectId, status: "active" }).sort({ sortOrder: 1 });
-      }
+function withStats(habit: HabitLike, logs: HabitLogEntry[], todayKey: string, tz?: string): HabitWithStats {
+  const targetValue = habit.targetValue || 1;
+  const frequency = habit.frequency || "daily";
+  const { currentStreak, bestStreak } = calculateCurrentStreak(logs, frequency, targetValue, tz);
+  const todayLog = logs.find((log) => log.date === todayKey);
 
-      logsRaw = await HabitLog.find({ userId: userObjectId });
+  return {
+    id: (habit.habitId || habit.id) as string,
+    userId: String(habit.userId),
+    title: habit.title || "",
+    category: habit.category || "Misc",
+    targetType: habit.targetType || "boolean",
+    targetValue,
+    unit: habit.unit,
+    frequency,
+    weeklyTargetCount: habit.weeklyTargetCount || 7,
+    colorTag: habit.colorTag || "#34d399",
+    icon: habit.icon || "Sparkles",
+    status: habit.status || "active",
+    notes: habit.notes || "",
+    sortOrder: habit.sortOrder || 1,
+    createdAt: habit.createdAt ? new Date(habit.createdAt).toISOString() : new Date().toISOString(),
+    habitStrength: calculateHabitStrength(logs, targetValue, tz),
+    currentStreak,
+    bestStreak,
+    completedToday: Boolean(todayLog?.completed || (todayLog?.value && todayLog.value >= targetValue)),
+    todayValue: todayLog?.value || 0,
+    heatmap30Days: get30DayHeatmap(logs, targetValue, tz),
+  };
+}
+
+export async function GET(request: Request) {
+  const session = requireSession(request);
+  if (session instanceof Response) return session;
+
+  try {
+    const userId = await resolveUser(session);
+    if (userId instanceof Response) return userId;
+
+    let habits: HabitLike[];
+    let logs: HabitLogLike[];
+
+    if (userId) {
+      const hasHabits = await Habit.exists({ userId });
+      if (!hasHabits) await seedStarterHabits(userId);
+      [habits, logs] = await Promise.all([
+        Habit.find({ userId, status: "active" }).sort({ sortOrder: 1 }).lean() as unknown as Promise<HabitLike[]>,
+        HabitLog.find({ userId }).lean() as unknown as Promise<HabitLogLike[]>,
+      ]);
     } else {
-      if (memoryHabits.length === 0) {
-        memoryHabits = getStarterHabits(userIdStr);
-      }
-      habitsRaw = memoryHabits.filter((h) => h.status === "active");
-      logsRaw = memoryHabitLogs;
+      const store = memoryFor(session.email);
+      habits = store.habits.filter((habit) => habit.status === "active");
+      logs = store.logs;
     }
 
-    const todayKey = formatDateKey(new Date());
-
-    // Map logs by habitId
-    const habitLogMap = new Map<string, HabitLogEntry[]>();
-    logsRaw.forEach((l) => {
-      const hId = l.habitId;
-      if (!habitLogMap.has(hId)) habitLogMap.set(hId, []);
-      habitLogMap.get(hId)!.push({
-        date: l.date,
-        completed: Boolean(l.completed),
-        value: l.value || 0,
-      });
+    const logsByHabit = new Map<string, HabitLogEntry[]>();
+    logs.forEach((log) => {
+      const entries = logsByHabit.get(log.habitId) ?? [];
+      entries.push({ date: log.date, completed: Boolean(log.completed), value: log.value || 0 });
+      logsByHabit.set(log.habitId, entries);
     });
 
-    // Compute statistics for each custom habit
-    const habitsWithStats: HabitWithStats[] = habitsRaw.map((h) => {
-      const hId = h.habitId || h.id;
-      const logs = habitLogMap.get(hId) || [];
-      const targetVal = h.targetValue || 1;
-
-      const strength = calculateHabitStrength(logs, targetVal);
-      const { currentStreak, bestStreak } = calculateCurrentStreak(logs, h.frequency || "daily");
-      const heatmap = get30DayHeatmap(logs, targetVal);
-
-      const todayLog = logs.find((l) => l.date === todayKey);
-      const completedToday = Boolean(todayLog?.completed || (todayLog?.value && todayLog.value >= targetVal));
-      const todayValue = todayLog?.value || 0;
-
-      return {
-        id: hId,
-        userId: String(h.userId),
-        title: h.title,
-        category: h.category || "Misc",
-        targetType: h.targetType || "boolean",
-        targetValue: targetVal,
-        unit: h.unit,
-        frequency: h.frequency || "daily",
-        weeklyTargetCount: h.weeklyTargetCount || 7,
-        colorTag: h.colorTag || "#34d399",
-        icon: h.icon || "Sparkles",
-        status: h.status || "active",
-        notes: h.notes || "",
-        sortOrder: h.sortOrder || 1,
-        createdAt: h.createdAt ? new Date(h.createdAt).toISOString() : new Date().toISOString(),
-        habitStrength: strength,
-        currentStreak,
-        bestStreak,
-        completedToday,
-        todayValue,
-        heatmap30Days: heatmap,
-      };
-    });
+    const todayKey = dayKey(new Date(), session.tz);
+    const habitsWithStats = habits.map((habit) =>
+      withStats(habit, logsByHabit.get((habit.habitId || habit.id) as string) || [], todayKey, session.tz)
+    );
 
     const totalHabits = habitsWithStats.length;
-    const completedTodayCount = habitsWithStats.filter((h) => h.completedToday).length;
-    const avgStrength = totalHabits > 0 
-      ? Math.round(habitsWithStats.reduce((acc, h) => acc + h.habitStrength, 0) / totalHabits) 
-      : 0;
-    const bestStreakOverall = habitsWithStats.reduce((max, h) => Math.max(max, h.currentStreak), 0);
+    const completedTodayCount = habitsWithStats.filter((habit) => habit.completedToday).length;
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       habits: habitsWithStats,
       summary: {
         totalHabits,
         completedTodayCount,
         completionRateToday: totalHabits > 0 ? Math.round((completedTodayCount / totalHabits) * 100) : 0,
-        avgHabitStrength: avgStrength,
-        bestStreakOverall,
+        avgHabitStrength: totalHabits > 0
+          ? Math.round(habitsWithStats.reduce((total, habit) => total + habit.habitStrength, 0) / totalHabits)
+          : 0,
+        bestStreakOverall: habitsWithStats.reduce((max, habit) => Math.max(max, habit.currentStreak), 0),
       },
     });
-  } catch (error: any) {
-    console.error("GET /api/habits Error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error) {
+    return serverError("GET /api/habits", error);
   }
 }
 
-export async function POST(req: Request) {
+function habitFields(data: Record<string, unknown>) {
+  return {
+    title: String(data.title).trim(),
+    category: typeof data.category === "string" ? data.category : "Misc",
+    targetType: (data.targetType as HabitDefinition["targetType"]) || "boolean",
+    targetValue: Number(data.targetValue) || 1,
+    unit: typeof data.unit === "string" ? data.unit : "",
+    frequency: (data.frequency as HabitDefinition["frequency"]) || "daily",
+    weeklyTargetCount: Number(data.weeklyTargetCount) || 7,
+    colorTag: typeof data.colorTag === "string" ? data.colorTag : "#34d399",
+    icon: typeof data.icon === "string" ? data.icon : "Sparkles",
+    status: (data.status as HabitDefinition["status"]) || "active",
+    notes: typeof data.notes === "string" ? data.notes : "",
+    sortOrder: Number(data.sortOrder) || 1,
+  };
+}
+
+/** Mirrors a habit check-in on the Health Timeline: one event per habit per day. */
+async function syncHabitTimeline(
+  userId: mongoose.Types.ObjectId,
+  habitId: string,
+  date: string,
+  completed: boolean,
+  value: number
+) {
+  const filter = { userId, type: "habit", "payload.habitId": habitId, "payload.date": date };
+
+  if (!completed) {
+    await TimelineEvent.deleteOne(filter);
+    return;
+  }
+
+  const definition = await Habit.findOne({ userId, habitId }).lean();
+  await TimelineEvent.updateOne(
+    filter,
+    {
+      $set: {
+        payload: {
+          habitId,
+          date,
+          title: definition?.title || habitId,
+          category: definition?.category || "Habit",
+          value,
+          unit: definition?.unit || "",
+        },
+        source: "habit_tracker",
+      },
+      $setOnInsert: { timestamp: new Date() },
+    },
+    { upsert: true }
+  );
+}
+
+export async function POST(request: Request) {
+  const session = requireSession(request);
+  if (session instanceof Response) return session;
+
+  const body = await readJsonObject(request);
+  if (!body) return invalidBodyResponse();
+
   try {
-    const body = await req.json();
-    const { action, email, habit, checkin } = body;
+    const userId = await resolveUser(session);
+    if (userId instanceof Response) return userId;
 
-    if (!email) {
-      return NextResponse.json({ error: "email is required" }, { status: 400 });
-    }
+    const action = body.action;
 
-    let dbConnected = false;
-    let userIdStr = "default_user";
-    let userObjectId: mongoose.Types.ObjectId | null = null;
+    if (action === "checkin") {
+      const checkin = (body.checkin ?? body) as Record<string, unknown>;
+      const habitId = checkin.habitId;
+      const date = checkin.date ?? dayKey(new Date(), session.tz);
 
-    try {
-      await connectToDatabase();
-      const user = await UserProfile.findOne({ email });
-      if (user) {
-        userIdStr = user._id.toString();
-        userObjectId = user._id as mongoose.Types.ObjectId;
-        dbConnected = true;
+      if (typeof habitId !== "string" || !habitId) {
+        return Response.json({ success: false, error: "Missing habitId" }, { status: 400 });
       }
-    } catch {
-      console.warn("MongoDB unavailable for POST /api/habits, using memory fallback.");
-    }
-
-    // ── ACTION 1: CHECKIN / TOGGLE ──────────────────────────────────────────
-    if (action === "checkin" || checkin) {
-      const { habitId, date = formatDateKey(new Date()), value, completed } = checkin || body;
-      
-      if (!habitId) {
-        return NextResponse.json({ success: false, error: "Missing habitId" }, { status: 400 });
+      if (!isValidDateKey(date)) {
+        return Response.json({ success: false, error: "Invalid date" }, { status: 400 });
       }
 
-      let isCompleted = Boolean(completed);
-      let logValue = value !== undefined ? Number(value) : (isCompleted ? 1 : 0);
+      const completed = Boolean(checkin.completed);
+      const value = checkin.value !== undefined ? Number(checkin.value) : completed ? 1 : 0;
+      if (Number.isNaN(value) || value < 0) {
+        return Response.json({ success: false, error: "Invalid value" }, { status: 400 });
+      }
 
-      if (dbConnected && userObjectId) {
-        // Upsert HabitLog
-        await HabitLog.findOneAndUpdate(
-          { userId: userObjectId, habitId, date },
-          { completed: isCompleted, value: logValue },
-          { upsert: true, new: true }
+      if (userId) {
+        await HabitLog.updateOne(
+          { userId, habitId, date },
+          { $set: { completed, value } },
+          { upsert: true }
         );
-
-        // Fetch Habit details for Timeline entry
-        const hDef = await Habit.findOne({ userId: userObjectId, habitId });
-        const habitTitle = hDef ? hDef.title : habitId;
-
-        // Sync with Health Timeline if completed
-        if (isCompleted) {
-          await TimelineEvent.create({
-            userId: userObjectId,
-            type: "habit",
-            source: "habit_tracker",
-            payload: {
-              habitId,
-              title: habitTitle,
-              category: hDef?.category || "Habit",
-              value: logValue,
-              unit: hDef?.unit || "",
-              timestamp: new Date().toISOString(),
-            },
-            timestamp: new Date(),
-          });
-        }
+        await syncHabitTimeline(userId, habitId, date, completed, value);
       } else {
-        const existingIdx = memoryHabitLogs.findIndex((l) => l.habitId === habitId && l.date === date);
-        if (existingIdx >= 0) {
-          memoryHabitLogs[existingIdx] = { habitId, date, completed: isCompleted, value: logValue };
-        } else {
-          memoryHabitLogs.push({ habitId, date, completed: isCompleted, value: logValue });
-        }
+        const { logs } = memoryFor(session.email);
+        const entry = { habitId, date, completed, value };
+        const index = logs.findIndex((log) => log.habitId === habitId && log.date === date);
+        if (index >= 0) logs[index] = entry;
+        else logs.push(entry);
       }
 
-      return NextResponse.json({ success: true, message: "Habit check-in saved" });
+      return Response.json({ success: true, message: "Habit check-in saved" });
     }
 
-    // ── ACTION 2: CREATE / SAVE HABIT ───────────────────────────────────────
-    if (action === "save" || action === "create" || habit) {
-      const hData = habit || body;
-      const hId = hData.id || `habit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-      if (dbConnected && userObjectId) {
-        await Habit.findOneAndUpdate(
-          { userId: userObjectId, habitId: hId },
-          {
-            userId: userObjectId,
-            habitId: hId,
-            title: hData.title,
-            category: hData.category || "Misc",
-            targetType: hData.targetType || "boolean",
-            targetValue: Number(hData.targetValue) || 1,
-            unit: hData.unit || "",
-            frequency: hData.frequency || "daily",
-            colorTag: hData.colorTag || "#34d399",
-            icon: hData.icon || "Sparkles",
-            status: hData.status || "active",
-            notes: hData.notes || "",
-            sortOrder: Number(hData.sortOrder) || 1,
-          },
-          { upsert: true, new: true }
-        );
-      } else {
-        const idx = memoryHabits.findIndex((h) => h.id === hId || h.habitId === hId);
-        const newHabit = {
-          id: hId,
-          habitId: hId,
-          userId: userIdStr,
-          title: hData.title,
-          category: hData.category || "Misc",
-          targetType: hData.targetType || "boolean",
-          targetValue: Number(hData.targetValue) || 1,
-          unit: hData.unit || "",
-          frequency: hData.frequency || "daily",
-          colorTag: hData.colorTag || "#34d399",
-          icon: hData.icon || "Sparkles",
-          status: hData.status || "active",
-          notes: hData.notes || "",
-          sortOrder: Number(hData.sortOrder) || 1,
-          createdAt: new Date().toISOString(),
-        };
-
-        if (idx >= 0) {
-          memoryHabits[idx] = newHabit;
-        } else {
-          memoryHabits.push(newHabit);
-        }
+    if (action === "save" || action === "create") {
+      const data = (body.habit ?? body) as Record<string, unknown>;
+      if (typeof data.title !== "string" || !data.title.trim()) {
+        return Response.json({ success: false, error: "A habit title is required" }, { status: 400 });
       }
 
-      return NextResponse.json({ success: true, habitId: hId, message: "Custom habit saved successfully" });
+      const habitId = typeof data.id === "string" && data.id
+        ? data.id
+        : `habit_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const fields = habitFields(data);
+
+      if (userId) {
+        await Habit.updateOne({ userId, habitId }, { $set: { ...fields, userId, habitId } }, { upsert: true });
+      } else {
+        const { habits } = memoryFor(session.email);
+        const record: HabitLike = { ...fields, id: habitId, habitId, userId: session.email, createdAt: new Date().toISOString() };
+        const index = habits.findIndex((habit) => (habit.habitId || habit.id) === habitId);
+        if (index >= 0) habits[index] = record;
+        else habits.push(record);
+      }
+
+      return Response.json({ success: true, habitId, message: "Custom habit saved successfully" });
     }
 
-    // ── ACTION 4: RESET HABITS DATA ───────────────────────────────────────
+    if (action === "delete") {
+      const habitId = body.habitId;
+      if (typeof habitId !== "string" || !habitId) {
+        return Response.json({ success: false, error: "Missing habitId" }, { status: 400 });
+      }
+
+      if (userId) {
+        await Promise.all([
+          Habit.deleteOne({ userId, habitId }),
+          HabitLog.deleteMany({ userId, habitId }),
+          TimelineEvent.deleteMany({ userId, type: "habit", "payload.habitId": habitId }),
+        ]);
+      } else {
+        const store = memoryFor(session.email);
+        store.habits = store.habits.filter((habit) => (habit.habitId || habit.id) !== habitId);
+        store.logs = store.logs.filter((log) => log.habitId !== habitId);
+      }
+
+      return Response.json({ success: true, message: "Habit deleted" });
+    }
+
     if (action === "reset") {
-      if (dbConnected && userObjectId) {
-        await Habit.deleteMany({ userId: userObjectId });
-        await HabitLog.deleteMany({ userId: userObjectId });
-        const starter = getStarterHabits(userIdStr);
-        for (const s of starter) {
-          await Habit.create({
-            userId: userObjectId,
-            habitId: s.id,
-            title: s.title,
-            category: s.category,
-            targetType: s.targetType,
-            targetValue: s.targetValue,
-            unit: s.unit,
-            frequency: s.frequency,
-            colorTag: s.colorTag,
-            icon: s.icon,
-            status: s.status,
-            notes: s.notes,
-            sortOrder: s.sortOrder,
-          });
-        }
+      if (userId) {
+        await Promise.all([
+          Habit.deleteMany({ userId }),
+          HabitLog.deleteMany({ userId }),
+          TimelineEvent.deleteMany({ userId, type: "habit" }),
+        ]);
+        await seedStarterHabits(userId);
       } else {
-        memoryHabits = getStarterHabits(userIdStr);
-        memoryHabitLogs = [];
+        memoryByUser.delete(session.email);
       }
 
-      return NextResponse.json({ success: true, message: "Habit data successfully reset and re-seeded with 100% health defaults." });
+      return Response.json({ success: true, message: "Habit data reset to the starter habits." });
     }
 
-    return NextResponse.json({ success: false, error: "Invalid action specified" }, { status: 400 });
-  } catch (error: any) {
-    console.error("POST /api/habits Error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return Response.json({ success: false, error: "Invalid action specified" }, { status: 400 });
+  } catch (error) {
+    return serverError("POST /api/habits", error);
   }
 }

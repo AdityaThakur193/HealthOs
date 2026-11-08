@@ -5,6 +5,8 @@
  * so missed days cause graceful score decay rather than catastrophic streak resets.
  */
 
+import { dayKey, shiftDayKey, weekdayOfKey } from "./dateUtils";
+
 export interface HabitLogEntry {
   date: string; // YYYY-MM-DD
   completed: boolean;
@@ -29,23 +31,22 @@ export interface HabitDefinition {
   createdAt: string;
 }
 
+type HeatmapStatus = "completed" | "partial" | "missed" | "none";
+
 export interface HabitWithStats extends HabitDefinition {
   habitStrength: number; // 0 to 100 %
   currentStreak: number; // Days
   bestStreak: number;
   completedToday: boolean;
   todayValue: number;
-  heatmap30Days: Array<{ date: string; status: "completed" | "partial" | "missed" | "none"; val: number }>;
+  heatmap30Days: Array<{ date: string; status: HeatmapStatus; val: number }>;
 }
 
 /**
- * Formats a Date object as YYYY-MM-DD in local timezone
+ * Formats a Date as YYYY-MM-DD in the given timezone (runtime local by default).
  */
-export function formatDateKey(date: Date = new Date()): string {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+export function formatDateKey(date: Date = new Date(), tz?: string): string {
+  return dayKey(date, tz);
 }
 
 /**
@@ -54,27 +55,21 @@ export function formatDateKey(date: Date = new Date()): string {
  * Formula: Strength_t = Strength_{t-1} * (1 - α) + Execution_t * α
  * α = 0.1 (halflife ~ 6.5 days)
  */
-export function calculateHabitStrength(logs: HabitLogEntry[], targetValue: number = 1): number {
+export function calculateHabitStrength(logs: HabitLogEntry[], targetValue: number = 1, tz?: string): number {
   if (!logs || logs.length === 0) return 0;
 
-  const logMap = new Map<string, HabitLogEntry>();
-  logs.forEach((l) => logMap.set(l.date, l));
-
+  const logMap = new Map(logs.map((log) => [log.date, log]));
   const alpha = 0.1;
+  const today = dayKey(new Date(), tz);
   let strength = 0;
 
-  // Process the past 90 days in chronological order
-  const today = new Date();
-  for (let i = 89; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const key = formatDateKey(d);
-    const entry = logMap.get(key);
+  for (let daysAgo = 89; daysAgo >= 0; daysAgo--) {
+    const entry = logMap.get(shiftDayKey(today, -daysAgo));
 
     let execution = 0;
-    if (entry && entry.completed) {
+    if (entry?.completed) {
       execution = 1;
-    } else if (entry && entry.value && entry.value > 0) {
+    } else if (entry?.value && entry.value > 0) {
       execution = Math.min(1, entry.value / Math.max(1, targetValue));
     }
 
@@ -84,125 +79,81 @@ export function calculateHabitStrength(logs: HabitLogEntry[], targetValue: numbe
   return Math.round(Math.min(100, Math.max(0, strength * 100)));
 }
 
-/**
- * Calculates consecutive daily/weekday completion streak count with 1-day Streak Protection Freeze
- */
-export function calculateCurrentStreak(
-  logs: HabitLogEntry[],
-  frequency: "daily" | "weekdays" | "weekly_count" = "daily"
-): { currentStreak: number; bestStreak: number; freezeUsed?: boolean } {
-  if (!logs || logs.length === 0) return { currentStreak: 0, bestStreak: 0, freezeUsed: false };
+type Frequency = HabitDefinition["frequency"];
 
-  const completedDates = new Set<string>();
-  logs.forEach((l) => {
-    if (l.completed || (l.value && l.value > 0)) {
-      completedDates.add(l.date);
-    }
-  });
-
-  const today = new Date();
-  const todayKey = formatDateKey(today);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayKey = formatDateKey(yesterday);
-
-  let checkDate = new Date(today);
-  let freezesAvailable = 1; // 1 Streak Freeze buffer allowed
-  let freezeUsed = false;
-
-  if (!completedDates.has(todayKey) && !completedDates.has(yesterdayKey)) {
-    if (frequency === "weekdays") {
-      const dayOfWeek = today.getDay();
-      if (dayOfWeek === 1) { // Monday
-        const friday = new Date(today);
-        friday.setDate(friday.getDate() - 3);
-        const fridayKey = formatDateKey(friday);
-        if (!completedDates.has(todayKey) && !completedDates.has(fridayKey)) {
-          if (freezesAvailable > 0) {
-            freezesAvailable--;
-            freezeUsed = true;
-            checkDate = friday;
-          } else {
-            return { currentStreak: 0, bestStreak: calculateBestStreak(completedDates), freezeUsed: false };
-          }
-        } else {
-          checkDate = completedDates.has(todayKey) ? today : friday;
-        }
-      } else {
-        if (freezesAvailable > 0) {
-          freezesAvailable--;
-          freezeUsed = true;
-          checkDate = yesterday;
-        } else {
-          return { currentStreak: 0, bestStreak: calculateBestStreak(completedDates), freezeUsed: false };
-        }
-      }
-    } else {
-      if (freezesAvailable > 0) {
-        freezesAvailable--;
-        freezeUsed = true;
-        checkDate = yesterday;
-      } else {
-        return { currentStreak: 0, bestStreak: calculateBestStreak(completedDates), freezeUsed: false };
-      }
-    }
-  } else if (!completedDates.has(todayKey) && completedDates.has(yesterdayKey)) {
-    checkDate = yesterday;
+function previousDay(key: string, frequency: Frequency): string {
+  let previous = shiftDayKey(key, -1);
+  if (frequency === "weekdays") {
+    while ([0, 6].includes(weekdayOfKey(previous))) previous = shiftDayKey(previous, -1);
   }
+  return previous;
+}
 
-  let streak = 0;
-  const curr = new Date(checkDate);
+function calculateBestStreak(completedDates: Set<string>, frequency: Frequency): number {
+  let best = 0;
+  for (const date of completedDates) {
+    // Only walk forward from the first day of each run.
+    const isScheduled = frequency !== "weekdays" || ![0, 6].includes(weekdayOfKey(date));
+    if (!isScheduled || completedDates.has(previousDay(date, frequency))) continue;
 
-  while (true) {
-    const key = formatDateKey(curr);
-    const isWeekend = curr.getDay() === 0 || curr.getDay() === 6;
-
-    if (frequency === "weekdays" && isWeekend) {
-      curr.setDate(curr.getDate() - 1);
-      continue;
+    let length = 1;
+    let cursor = date;
+    for (;;) {
+      let next = shiftDayKey(cursor, 1);
+      if (frequency === "weekdays") {
+        while ([0, 6].includes(weekdayOfKey(next))) next = shiftDayKey(next, 1);
+      }
+      if (!completedDates.has(next)) break;
+      length++;
+      cursor = next;
     }
-
-    if (completedDates.has(key)) {
-      streak++;
-      curr.setDate(curr.getDate() - 1);
-    } else if (freezesAvailable > 0 && streak > 0) {
-      // Consume 1 streak freeze buffer for mid-streak missed day
-      freezesAvailable--;
-      freezeUsed = true;
-      curr.setDate(curr.getDate() - 1);
-    } else {
-      break;
-    }
+    best = Math.max(best, length);
   }
-
-  const bestStreak = Math.max(streak, calculateBestStreak(completedDates));
-  return { currentStreak: streak, bestStreak, freezeUsed };
+  return best;
 }
 
 /**
- * Helper to calculate best historical consecutive streak
+ * Consecutive completion streak with a one-day freeze. Today only counts once
+ * it is done, so an unfinished today never breaks a streak.
  */
-function calculateBestStreak(completedDatesSet: Set<string>): number {
-  if (completedDatesSet.size === 0) return 0;
+export function calculateCurrentStreak(
+  logs: HabitLogEntry[],
+  frequency: Frequency = "daily",
+  targetValue: number = 1,
+  tz?: string
+): { currentStreak: number; bestStreak: number; freezeUsed?: boolean } {
+  if (!logs || logs.length === 0) return { currentStreak: 0, bestStreak: 0, freezeUsed: false };
 
-  const sortedDates = Array.from(completedDatesSet)
-    .map((d) => new Date(d).getTime())
-    .sort((a, b) => a - b);
+  const completedDates = new Set(
+    logs.filter((log) => log.completed || (log.value && log.value >= targetValue)).map((log) => log.date)
+  );
+  if (completedDates.size === 0) return { currentStreak: 0, bestStreak: 0, freezeUsed: false };
 
-  let best = 1;
-  let curr = 1;
+  const earliest = [...completedDates].sort()[0];
+  const today = dayKey(new Date(), tz);
 
-  for (let i = 1; i < sortedDates.length; i++) {
-    const diffDays = Math.round((sortedDates[i] - sortedDates[i - 1]) / (1000 * 3600 * 24));
-    if (diffDays === 1) {
-      curr++;
-      best = Math.max(best, curr);
-    } else if (diffDays > 1) {
-      curr = 1;
+  let cursor = completedDates.has(today) ? today : previousDay(today, frequency);
+  let freezesAvailable = 1;
+  let freezeUsed = false;
+  let streak = 0;
+
+  while (cursor >= earliest) {
+    if (completedDates.has(cursor)) {
+      streak++;
+    } else if (freezesAvailable > 0) {
+      freezesAvailable--;
+      freezeUsed = true;
+    } else {
+      break;
     }
+    cursor = previousDay(cursor, frequency);
   }
 
-  return best;
+  return {
+    currentStreak: streak,
+    bestStreak: Math.max(streak, calculateBestStreak(completedDates, frequency)),
+    freezeUsed: freezeUsed && streak > 0,
+  };
 }
 
 /**
@@ -210,21 +161,18 @@ function calculateBestStreak(completedDatesSet: Set<string>): number {
  */
 export function get30DayHeatmap(
   logs: HabitLogEntry[],
-  targetValue: number = 1
-): Array<{ date: string; status: "completed" | "partial" | "missed" | "none"; val: number }> {
-  const logMap = new Map<string, HabitLogEntry>();
-  if (logs) logs.forEach((l) => logMap.set(l.date, l));
+  targetValue: number = 1,
+  tz?: string
+): Array<{ date: string; status: HeatmapStatus; val: number }> {
+  const logMap = new Map((logs || []).map((log) => [log.date, log]));
+  const today = dayKey(new Date(), tz);
+  const result: Array<{ date: string; status: HeatmapStatus; val: number }> = [];
 
-  const result = [];
-  const today = new Date();
-
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const key = formatDateKey(d);
+  for (let daysAgo = 29; daysAgo >= 0; daysAgo--) {
+    const key = shiftDayKey(today, -daysAgo);
     const entry = logMap.get(key);
 
-    let status: "completed" | "partial" | "missed" | "none" = "none";
+    let status: HeatmapStatus = "none";
     let val = 0;
 
     if (entry) {

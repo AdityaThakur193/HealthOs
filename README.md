@@ -5,9 +5,9 @@
 ### *The World's Most Intelligent Personal Health Operating System*
 
 [![CI Build](https://github.com/AdityaThakur193/HealthOs/actions/workflows/ci.yml/badge.svg)](https://github.com/AdityaThakur193/HealthOs/actions/workflows/ci.yml)
-[![Next.js 16](https://img.shields.io/badge/Next.js-16.2.9-black?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16.4.5-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript 5](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vitest Passed](https://img.shields.io/badge/Vitest-133%20Tests%20Passed-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Vitest Passed](https://img.shields.io/badge/Vitest-212%20Tests%20Passed-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 [![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas%20v8.0-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v3.4-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
@@ -60,7 +60,8 @@ graph TD
 ### 1. 14-Day Adaptive TDEE Expenditure Engine (MacroFactor Paradigm)
 - **Problem**: Static BMR formulas (Harris-Benedict, Mifflin-St Jeor) ignore metabolic adaptation, NEAT variance, and sodium water retention.
 - **Engine Solution** (`src/lib/tdee.ts`): Computes a 14-day rolling window linear regression of daily weight change vs average caloric intake.
-- **Math Integrity**: Features water weight spike clamping (clamping max daily TDEE shift to ±200 kcal/day) and boundary safety limits `[1,200 kcal, 4,500 kcal]`.
+- **Activation**: Starts once the window holds at least 3 weigh-in days and 7 calorie-logged days.
+- **Math Integrity**: Keeps the result within ±200 kcal of the BMR-and-activity baseline to absorb water weight swings, inside safety limits of `[1,200 kcal, 4,500 kcal]`. Today's unfinished log is excluded.
 
 ### 2. 4-Stage Perfect Vision & ICMR-NIN IFCT 2017 Portion Engine
 - **Problem**: Standard LLM vision APIs output text token-by-token and hallucinate macro math (e.g. claiming thin mess dal has 20g protein).
@@ -79,7 +80,7 @@ graph TD
 ### 4. Evidence-Based Gym Engine & Progressive Overload
 - **Engine Solution** (`src/lib/workoutPlans.ts`):
   - Supports 3-day, 4-day, 5-day, and 6-day training splits.
-  - Implements double progression logic: automatically calculates target weight increases (+2.5kg for compound / +2.0kg for isolation) when top rep targets are hit.
+  - Implements double progression logic: suggests a weight increase (+2.5kg, or +2.0kg for dumbbell and lateral work) once every top set reaches the top of the rep range.
   - Curated YouTube exercise video timestamp links embedded directly into exercise cards.
 
 ### 5. Autonomous AI Coach Assistant & Real-Time Data Control
@@ -116,6 +117,12 @@ Create a `.env.local` file in the root directory (refer to `.env.local.example`)
 MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/healthos
 GEMINI_API_KEY=your_gemini_api_key_here
 GROQ_API_KEY=your_groq_api_key_here
+
+# Required in production, at least 32 characters: openssl rand -base64 48
+AUTH_SECRET=
+# Required in production. In development the login code is printed in the server console.
+RESEND_API_KEY=
+EMAIL_FROM=HealthOS <onboarding@resend.dev>
 ```
 
 ### 3. Run Development Server
@@ -129,7 +136,10 @@ Navigate to [http://localhost:3000](http://localhost:3000).
 # Run TypeScript Strict Validation
 npm run type-check
 
-# Run Vitest Test Suite (35 Unit & Security Tests)
+# Run ESLint
+npm run lint
+
+# Run Vitest Test Suite
 npm test
 ```
 
@@ -168,8 +178,9 @@ HealthOs/
 │   │   ├── workoutPlans.ts       # Workout Split & Progressive Overload Engine
 │   │   ├── habitEngine.ts         # Habit Tracker & Streak Analytics Engine
 │   │   ├── gemini.ts             # Gemini 2.5 Flash Vision Integration
+│   │   ├── auth/                 # Signed Sessions & One-Time Login Codes
 │   │   └── mongodb.ts            # Serverless Mongoose Connection Pool Cache
-│   └── __tests__/                # Vitest Test Suites (35 Tests Passed)
+│   └── __tests__/                # Vitest Unit, Integration & Component Tests
 ├── ARCHITECTURE.md               # Technical Deep-Dive & Mermaid Flow Diagrams
 ├── API.md                        # Complete REST API Specifications
 ├── CONTRIBUTING.md               # Developer Contribution & Branch/Commit Standards
@@ -183,27 +194,10 @@ HealthOs/
 
 ## 🧪 Automated Testing & Quality Audit
 
-Health OS maintains an automated **Vitest** test suite covering 133 unit, integration, and security edge cases:
+Health OS maintains an automated **Vitest** suite of 212 tests across 17 files. It covers the calculation engines, input validation, sessions, and login UI. Integration tests run the real API route handlers against an in-memory MongoDB to verify that users cannot reach each other's data.
 
-```
- RUN  v4.1.10 D:/HealthApp
-
- ✓ src/__tests__/security.test.ts (8 tests)
- ✓ src/__tests__/apiValidation.test.ts (4 tests)
- ✓ src/__tests__/tdee.test.ts (6 tests)
- ✓ src/__tests__/workoutPlans.test.ts (4 tests)
- ✓ src/__tests__/habitEngine.test.ts (5 tests)
- ✓ src/__tests__/ifctData.test.ts (4 tests)
- ✓ src/__tests__/dietEngine.test.ts (4 tests)
- ✓ src/__tests__/visionMockFlag.test.ts (14 tests)
- ✓ src/__tests__/timelineSync.test.ts (24 tests)
- ✓ src/__tests__/mealDecomposition.test.ts (7 tests)
- ✓ src/__tests__/ifctMatcher.test.ts (35 tests)
- ✓ src/__tests__/ifct542Dataset.test.ts (10 tests)
- ✓ src/__tests__/authMiddleware.test.ts (8 tests)
-
- Test Files  13 passed (13)
-      Tests  133 passed (133)
+```bash
+npm test
 ```
 
 ---

@@ -48,6 +48,8 @@ export interface IUserProfile extends Document {
   customCalories?: number;
   customProtein?: number;
   useCustomMacros?: boolean;
+  /** Optional per-user plan, keyed by day of week (0 = Sunday). */
+  customWorkoutPlan?: Record<string, unknown>;
   messMenu?: {
     rawText?: string;
     parsedMenu?: {
@@ -81,7 +83,7 @@ export interface IUserProfile extends Document {
 const UserProfileSchema = new Schema<IUserProfile>(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     avatarUrl: String,
 
     age: { type: Number, required: true },
@@ -143,6 +145,7 @@ const UserProfileSchema = new Schema<IUserProfile>(
     customCalories: Number,
     customProtein: Number,
     useCustomMacros: { type: Boolean, default: false },
+    customWorkoutPlan: Schema.Types.Mixed,
     messMenu: {
       rawText: String,
       parsedMenu: {
@@ -190,7 +193,8 @@ export type TimelineEventType =
   | "photo"
   | "measurement"
   | "note"
-  | "water";
+  | "water"
+  | "habit";
 
 export interface ITimelineEvent extends Document {
   userId: mongoose.Types.ObjectId;
@@ -198,7 +202,7 @@ export interface ITimelineEvent extends Document {
   timestamp: Date;
   payload: Record<string, unknown>;
   tags: string[];
-  source: "manual" | "ai_vision" | "wearable" | "import";
+  source: "manual" | "ai_vision" | "wearable" | "import" | "chatbot" | "habit_tracker";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -223,6 +227,7 @@ const TimelineEventSchema = new Schema<ITimelineEvent>(
         "measurement",
         "note",
         "water",
+        "habit",
       ],
       required: true,
     },
@@ -231,7 +236,7 @@ const TimelineEventSchema = new Schema<ITimelineEvent>(
     tags: { type: [String], default: [] },
     source: {
       type: String,
-      enum: ["manual", "ai_vision", "wearable", "import", "chatbot"],
+      enum: ["manual", "ai_vision", "wearable", "import", "chatbot", "habit_tracker"],
       default: "manual",
     },
   },
@@ -347,8 +352,51 @@ const HabitLogSchema = new Schema<IHabitLogModel>(
 HabitLogSchema.index({ userId: 1, habitId: 1, date: 1 }, { unique: true });
 
 /* ─────────────────────────────────────────────
+ * Login Code Challenges
+ *
+ * Server-side state that makes a code single-use
+ * and limits guesses. Removed automatically once
+ * purgeAt passes.
+ * ───────────────────────────────────────────── */
+
+export interface IOtpChallenge extends Document {
+  email: string;
+  codeHash: string | null;
+  expiresAt: Date;
+  attempts: number;
+  lastSentAt: Date;
+  windowStart: Date;
+  sendCount: number;
+  purgeAt: Date;
+}
+
+const OtpChallengeSchema = new Schema<IOtpChallenge>({
+  email: { type: String, required: true, unique: true },
+  codeHash: { type: String, default: null },
+  expiresAt: { type: Date, required: true },
+  attempts: { type: Number, default: 0 },
+  lastSentAt: { type: Date, required: true },
+  windowStart: { type: Date, required: true },
+  sendCount: { type: Number, default: 1 },
+  purgeAt: { type: Date, required: true },
+});
+
+OtpChallengeSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0 });
+
+/* ─────────────────────────────────────────────
+ * Plain-object shapes returned by .lean()
+ * ───────────────────────────────────────────── */
+
+export type LeanUserProfile = Omit<IUserProfile, keyof Document> & { _id: mongoose.Types.ObjectId };
+export type LeanTimelineEvent = Omit<ITimelineEvent, keyof Document> & { _id: mongoose.Types.ObjectId };
+
+/* ─────────────────────────────────────────────
  * Model Exports
  * ───────────────────────────────────────────── */
+
+export const OtpChallenge: Model<IOtpChallenge> =
+  mongoose.models.OtpChallenge ||
+  mongoose.model<IOtpChallenge>("OtpChallenge", OtpChallengeSchema);
 
 export const UserProfile: Model<IUserProfile> =
   mongoose.models.UserProfile ||

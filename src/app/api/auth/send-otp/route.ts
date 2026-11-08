@@ -1,50 +1,74 @@
-import { NextResponse } from "next/server";
-import { generateRandomOtp, generateOtpHash } from "@/lib/auth/otp";
 import { Resend } from "resend";
+import { generateRandomOtp, createOtpChallenge, cancelOtpChallenge } from "@/lib/auth/otp";
+import { normalizeEmail, readJsonObject, invalidBodyResponse } from "@/lib/validation";
+import { checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rateLimit";
 
-// Initialize Resend (with a fallback to prevent build-time crashes if env var is missing during Vercel build)
-const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy_key_for_build");
+const HOUR_MS = 60 * 60 * 1000;
 
-export async function POST(req: Request) {
+async function deliverOtp(email: string, otp: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("RESEND_API_KEY is not configured.");
+    }
+    console.info(`[dev] Login code for ${email}: ${otp}`);
+    return;
+  }
+
+  // The Resend SDK reports failures in `error` rather than throwing.
+  const { error } = await new Resend(apiKey).emails.send({
+    from: process.env.EMAIL_FROM || "HealthOS <onboarding@resend.dev>",
+    to: email,
+    subject: "Your Health OS Login Code",
+    html: `
+      <div style="font-family: sans-serif; padding: 20px;">
+        <h2 style="color: #10b981;">Health OS Authentication</h2>
+        <p>Your 6-digit login code is:</p>
+        <h1 style="font-size: 32px; letter-spacing: 4px; color: #111;">${otp}</h1>
+        <p style="color: #666; font-size: 12px;">This code will expire in 5 minutes.</p>
+      </div>
+    `,
+  });
+
+  if (error) throw new Error(`Resend rejected the email: ${error.message}`);
+}
+
+export async function POST(request: Request) {
+  const body = await readJsonObject(request);
+  if (!body) return invalidBodyResponse();
+
+  const email = normalizeEmail(body.email);
+  if (!email) {
+    return Response.json({ error: "Invalid email address" }, { status: 400 });
+  }
+
+  if (!checkRateLimit(`otp-send:${clientIp(request)}`, 20, HOUR_MS)) {
+    return rateLimitedResponse();
+  }
+
   try {
-    const body = await req.json();
-    const { email } = body;
+    const otp = generateRandomOtp();
+    const decision = await createOtpChallenge(email, otp);
 
-    if (!email || !email.includes("@")) {
-      return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+    if (decision !== "ok") {
+      const error =
+        decision === "cooldown"
+          ? "Please wait 30 seconds before requesting another code."
+          : "Too many login codes requested. Please try again later.";
+      return Response.json({ error }, { status: 429 });
     }
 
-    // 1. Generate a random 6-digit OTP
-    const otp = generateRandomOtp();
+    try {
+      await deliverOtp(email, otp);
+    } catch (deliveryError) {
+      await cancelOtpChallenge(email);
+      throw deliveryError;
+    }
 
-    // 2. Encrypt it into a stateless hash (valid for 5 minutes)
-    const hash = generateOtpHash(email, otp, 5);
-
-    // 3. Send the OTP via email
-    await resend.emails.send({
-      from: "HealthOS <onboarding@resend.dev>", // Using resend.dev for testing, change to your domain in production
-      to: email,
-      subject: "Your Health OS Login Code",
-      html: `
-        <div style="font-family: sans-serif; padding: 20px;">
-          <h2 style="color: #10b981;">Health OS Authentication</h2>
-          <p>Your 6-digit login code is:</p>
-          <h1 style="font-size: 32px; letter-spacing: 4px; color: #111;">${otp}</h1>
-          <p style="color: #666; font-size: 12px;">This code will expire in 5 minutes.</p>
-        </div>
-      `,
-    });
-
-    // 4. Return the encrypted hash to the client
-    // The client MUST save this hash (e.g. in state) and send it back during verification
-    return NextResponse.json({ 
-      success: true, 
-      message: "OTP sent successfully", 
-      hash: hash 
-    });
-
+    return Response.json({ success: true, message: "OTP sent successfully" });
   } catch (error) {
     console.error("Error sending OTP:", error);
-    return NextResponse.json({ error: "Failed to send OTP" }, { status: 500 });
+    return Response.json({ error: "Failed to send login code. Please try again." }, { status: 500 });
   }
 }

@@ -5,7 +5,29 @@
  * Principle: "Use software for certainty; use AI for uncertainty."
  */
 
-import { calculateFoodMacros } from "./ifctData";
+export interface DietMeal {
+  time?: string;
+  name?: string;
+  messItems?: string;
+  additions?: string;
+  proteinG?: number;
+  calories?: number;
+  timingReason?: string;
+}
+
+export type DietPlan = Record<
+  string,
+  { meals: DietMeal[]; dailySummary?: { totalCalories: number; totalProteinG: number } }
+>;
+
+const WEEK_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+/** True when every day of the week has at least one meal. */
+export function isCompleteDietPlan(plan: unknown): plan is DietPlan {
+  if (!plan || typeof plan !== "object") return false;
+  const days = plan as DietPlan;
+  return WEEK_DAYS.every((day) => Array.isArray(days[day]?.meals) && days[day].meals.length > 0);
+}
 
 export interface MealTarget {
   name: string;
@@ -73,7 +95,22 @@ export function getRecommendedAdditions(
 
   if (deficitProtein <= 0) return additions;
 
-  if (pref === "veg" || pref === "vegetarian") {
+  if (pref === "vegan") {
+    if (deficitProtein >= 15) {
+      additions.push({
+        item: "Soya Chunks (50g Dry)",
+        proteinG: 26.0,
+        calories: 173,
+        description: "50g Soya Chunks, soaked and cooked",
+      });
+    }
+    additions.push({
+      item: "Roasted Chana (50g)",
+      proteinG: 9.0,
+      calories: 180,
+      description: "50g Roasted Chana as a snack",
+    });
+  } else if (pref === "veg" || pref === "vegetarian") {
     if (deficitProtein >= 20) {
       additions.push({
         item: "Whey Protein (1 Scoop = 32g)",
@@ -152,29 +189,29 @@ export function getRecommendedAdditions(
  * Programmatically audits and verifies macro calculations in generated diet plans,
  * eliminating LLM arithmetic hallucinations.
  */
-export function auditAndFixDietPlanMath(dietPlan: Record<string, any>): Record<string, any> {
+export function auditAndFixDietPlanMath(dietPlan: DietPlan): DietPlan {
   if (!dietPlan || typeof dietPlan !== "object") return dietPlan;
 
-  const auditedPlan: Record<string, any> = {};
+  const auditedPlan: DietPlan = {};
 
   for (const [dayKey, dayData] of Object.entries(dietPlan)) {
-    if (dayData && typeof dayData === "object" && Array.isArray((dayData as any).meals)) {
-      const auditedMeals = (dayData as any).meals.map((meal: any) => {
+    if (dayData && typeof dayData === "object" && Array.isArray(dayData.meals)) {
+      const auditedMeals = dayData.meals.map((meal) => {
         if (!meal || typeof meal !== "object") return meal;
         let computedProtein = 0;
         let computedCalories = 0;
 
-        // Parse individual items from messItems and additions text if format matches "Name (Details - Xg P, Y kcal)"
-        const textToScan = `${meal.messItems || ""} ${meal.additions || ""}`;
+        const textToScan = `${meal.messItems || ""}\n${meal.additions || ""}`;
 
-        // Regex pattern to extract macro numbers from parenthesis: e.g. "(... - 6g P, 120 kcal)"
-        const macroMatches = textToScan.matchAll(/\(([^)]*?(\d+(?:\.\d+)?)\s*g\s*P[^)]*?(\d+)\s*kcal[^)]*?)\)/gi);
+        // Reads "5.2g P, 105 kcal" on each item. \b stops "100g Paneer" being
+        // read as protein, and the decimal group keeps "71.5 kcal" whole.
+        const macroMatches = textToScan.matchAll(/(\d+(?:\.\d+)?)\s*g\s*p(?:rotein)?\b[^\n]*?(\d+(?:\.\d+)?)\s*kcal/gi);
 
         let matchFound = false;
         for (const match of macroMatches) {
           matchFound = true;
-          const protVal = parseFloat(match[2]);
-          const calVal = parseInt(match[3], 10);
+          const protVal = parseFloat(match[1]);
+          const calVal = parseFloat(match[2]);
           if (!isNaN(protVal)) computedProtein += protVal;
           if (!isNaN(calVal)) computedCalories += calVal;
         }
@@ -191,8 +228,8 @@ export function auditAndFixDietPlanMath(dietPlan: Record<string, any>): Record<s
       });
 
       // Calculate daily total
-      const dailyCalories = auditedMeals.reduce((sum: number, m: any) => sum + m.calories, 0);
-      const dailyProteinG = Math.round(auditedMeals.reduce((sum: number, m: any) => sum + m.proteinG, 0) * 10) / 10;
+      const dailyCalories = auditedMeals.reduce((sum, m) => sum + (m.calories || 0), 0);
+      const dailyProteinG = Math.round(auditedMeals.reduce((sum, m) => sum + (m.proteinG || 0), 0) * 10) / 10;
 
       auditedPlan[dayKey] = {
         meals: auditedMeals,

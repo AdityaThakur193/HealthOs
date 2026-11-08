@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import CustomPopup from "@/components/CustomPopup";
 import { Download, AlertTriangle, Scale } from "lucide-react";
-import { getGroupedEvents } from "@/lib/timelineUtils";
+import { fetchAllTimelineEvents, getGroupedEvents, TimelineEntry, TimelinePayload } from "@/lib/timelineUtils";
+import { clearClientSession } from "@/components/SessionWatcher";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 
@@ -24,7 +25,7 @@ export default function Journey() {
   const [weeklyWorkouts, setWeeklyWorkouts] = useState(0);
   const [avgSleepHours, setAvgSleepHours] = useState(0);
   const [weightDelta, setWeightDelta] = useState<number | null>(null);
-  const [allEvents, setAllEvents] = useState<any[]>([]);
+  const [allEvents, setAllEvents] = useState<TimelineEntry[]>([]);
 
   // UI state
   const [exporting, setExporting] = useState(false);
@@ -37,7 +38,7 @@ export default function Journey() {
   const { popupState, showCustomAlert, showCustomConfirm } = useConfirmDialog();
 
   // Log Editing states
-  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [editingEvent, setEditingEvent] = useState<TimelineEntry | null>(null);
   const [editMealName, setEditMealName] = useState("");
   const [editMealCalories, setEditMealCalories] = useState("");
   const [editMealProtein, setEditMealProtein] = useState("");
@@ -48,22 +49,24 @@ export default function Journey() {
 
   const loadJourneyData = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
 
     try {
-      // Fetch Timeline Events
-      const timelineRes = await fetch(`/api/timeline?userId=${userId}&t=${Date.now()}`, { cache: "no-store" });
-      if (timelineRes.ok) {
-        const timelineData = await timelineRes.json();
-        const events = timelineData.events || [];
+      {
+        const events = await fetchAllTimelineEvents();
         setAllEvents(events);
+
+        // Open the newest day and collapse the older ones on first load.
+        setCollapsedDates((current) => {
+          if (Object.keys(current).length > 0) return current;
+          return Object.fromEntries(getGroupedEvents(events).map(([dateStr], index) => [dateStr, index > 0]));
+        });
 
         // Process Weight History (last 14 days)
         const weightEvents = events
-          .filter((e: any) => e.type === "weight")
-          .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+          .filter((e) => e.type === "weight")
+          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-        const weightPoints: WeightPoint[] = weightEvents.map((w: any) => ({
+        const weightPoints: WeightPoint[] = weightEvents.map((w) => ({
           date: new Date(w.timestamp).toLocaleDateString([], { month: "short", day: "numeric" }),
           weight: Number(w.payload.weightKg),
         }));
@@ -80,14 +83,14 @@ export default function Journey() {
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
         const recentEvents = events.filter(
-          (e: any) => new Date(e.timestamp).getTime() >= sevenDaysAgo.getTime()
+          (e) => new Date(e.timestamp).getTime() >= sevenDaysAgo.getTime()
         );
 
-        const workoutCount = recentEvents.filter((e: any) => e.type === "workout").length;
+        const workoutCount = recentEvents.filter((e) => e.type === "workout").length;
         setWeeklyWorkouts(workoutCount);
 
-        const sleepEvents = recentEvents.filter((e: any) => e.type === "sleep");
-        const totalSleep = sleepEvents.reduce((sum: number, s: any) => sum + (s.payload.hours || 0), 0);
+        const sleepEvents = recentEvents.filter((e) => e.type === "sleep");
+        const totalSleep = sleepEvents.reduce((sum, s) => sum + (s.payload.hours || 0), 0);
         setAvgSleepHours(sleepEvents.length ? Math.round((totalSleep / sleepEvents.length) * 10) / 10 : 0);
       }
     } catch (err) {
@@ -99,28 +102,16 @@ export default function Journey() {
 
   useEffect(() => {
     if (userId) {
+      // Async data load: state only changes after the response arrives.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadJourneyData();
     }
   }, [userId, loadJourneyData]);
 
-  // Set default collapsed headers on initial load (collapse all except the first day)
-  useEffect(() => {
-    if (allEvents.length > 0) {
-      const groups = getGroupedEvents(allEvents);
-      if (groups.length > 0 && Object.keys(collapsedDates).length === 0) {
-        const initialCollapsed: Record<string, boolean> = {};
-        groups.forEach(([dateStr], idx) => {
-          initialCollapsed[dateStr] = idx > 0; // collapse older days
-        });
-        setCollapsedDates(initialCollapsed);
-      }
-    }
-  }, [allEvents]);
-
-  const handleStartEditEvent = (event: any) => {
+  const handleStartEditEvent = (event: TimelineEntry) => {
     setEditingEvent(event);
     if (event.type === "meal") {
-      const mealName = event.payload.mealName || event.payload.foods?.map((f: any) => f.name).join(", ") || "Meal";
+      const mealName = event.payload.mealName || event.payload.foods?.map((f) => f.name).join(", ") || "Meal";
       setEditMealName(mealName);
       setEditMealCalories(String(event.payload.totalCalories || 0));
       setEditMealProtein(String(event.payload.totalProteinG || 0));
@@ -142,17 +133,22 @@ export default function Journey() {
     if (editingEvent.payload.isConsolidated) {
       // Save each updated sub-event individually in parallel
       try {
-        const promises = editingEvent.payload.subEvents.map((sub: any) => {
+        const promises = (editingEvent.payload.subEvents || []).map((sub) => {
+          const amountL = Number(sub.payload.amountL) || 0;
           return fetch("/api/timeline", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               eventId: sub._id || sub.id,
-              payload: { amountL: Number(sub.payload.amountL) || 0 }
+              payload: { amountL, amountMl: Math.round(amountL * 1000) }
             })
           });
         });
-        await Promise.all(promises);
+        const results = await Promise.all(promises);
+        if (results.some((res) => !res.ok)) {
+          showCustomAlert("Update Failed", "Some water entries could not be saved. Amounts must be between 0 and 10 L.", "error");
+          return;
+        }
         setEditingEvent(null);
         loadJourneyData();
         window.dispatchEvent(new Event("profileUpdated"));
@@ -163,7 +159,7 @@ export default function Journey() {
       return;
     }
 
-    const payload: any = { ...editingEvent.payload };
+    const payload: TimelinePayload = { ...editingEvent.payload };
     const timestamp = editingEvent.timestamp;
 
     if (editingEvent.type === "meal") {
@@ -179,10 +175,13 @@ export default function Journey() {
       payload.weightKg = Number(editWeight) || 0;
     } else if (editingEvent.type === "steps") {
       payload.count = Number(editSteps) || 0;
+      payload.steps = payload.count;
+      payload.caloriesBurned = Math.round(payload.count * 0.04);
     } else if (editingEvent.type === "sleep") {
       payload.hours = Number(editSleep) || 0;
     } else if (editingEvent.type === "water") {
       payload.amountL = Number(editWater) || 0;
+      payload.amountMl = Math.round(payload.amountL * 1000);
     }
 
     try {
@@ -262,12 +261,12 @@ export default function Journey() {
 
     setDeleting(true);
     try {
-      const res = await fetch(`/api/profile?email=${profile.email}`, {
-        method: "DELETE",
-      });
+      const res = await fetch("/api/profile", { method: "DELETE" });
       if (res.ok) {
         localStorage.clear();
         router.push("/login");
+      } else {
+        showCustomAlert("Deletion Failed", "Failed to delete account. Please try again.", "error");
       }
     } catch (err) {
       console.error("Failed to delete account:", err);
@@ -275,6 +274,12 @@ export default function Journey() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleSignOut = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    clearClientSession();
+    router.push("/login");
   };
 
   const handleDeleteEvent = async (eventId: string) => {
@@ -285,14 +290,7 @@ export default function Journey() {
         method: "DELETE",
       });
       if (res.ok) {
-        const userId = localStorage.getItem("healthos_userId");
-        if (userId) {
-          const timelineRes = await fetch(`/api/timeline?userId=${userId}&t=${Date.now()}`, { cache: "no-store" });
-          if (timelineRes.ok) {
-            const data = await timelineRes.json();
-            setAllEvents(data.events || []);
-          }
-        }
+        setAllEvents(await fetchAllTimelineEvents());
       } else {
         showCustomAlert("Deletion Failed", "We could not delete the log entry. Please try again.", "error");
       }
@@ -302,7 +300,8 @@ export default function Journey() {
     }
   };
 
-  const groupedEvents = getGroupedEvents(allEvents);
+  // Habit check-ins are managed on the Habits page but stay in exports.
+  const groupedEvents = getGroupedEvents(allEvents.filter((event) => event.type !== "habit"));
 
   if (authLoading || loading) {
     return (
@@ -428,7 +427,7 @@ export default function Journey() {
       {/* Main Single Question Indicator */}
       <div className="bg-[#8ba893]/5 border border-[#8ba893]/10 rounded-2xl p-4 animate-in-delay-1 text-center">
         <span className="text-[9px] font-extrabold uppercase tracking-widest text-[#8ba893] block mb-1">Single Core Question</span>
-        <h2 className="text-sm font-semibold text-white font-heading">"How am I changing?"</h2>
+        <h2 className="text-sm font-semibold text-white font-heading">&quot;How am I changing?&quot;</h2>
       </div>
 
       {/* SVG Weight Chart Card */}
@@ -503,13 +502,13 @@ export default function Journey() {
                   
                   {!isCollapsed && (
                     <div className="space-y-2 pl-1 transition-all">
-                      {events.map((event: any) => {
+                      {events.map((event) => {
                         let details = "";
                         let title = event.type.toUpperCase();
                         
                         if (event.type === "meal") {
                           title = "Meal Log";
-                          const foodsList = event.payload.foods?.map((f: any) => f.name).join(", ") || "Meal Log";
+                          const foodsList = event.payload.foods?.map((f) => f.name).join(", ") || "Meal Log";
                           details = `${foodsList} (${event.payload.totalCalories || 0} kcal, ${event.payload.totalProteinG || 0}g protein)`;
                         } else if (event.type === "weight") {
                           title = "Weight Log";
@@ -550,7 +549,7 @@ export default function Journey() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteEvent(event._id || event.id);
+                                  handleDeleteEvent(event._id);
                                 }}
                                 className="w-5.5 h-5.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center font-bold text-xs select-none cursor-pointer"
                                 title="Delete log"
@@ -600,6 +599,13 @@ export default function Journey() {
             <span>{deleting ? "Deleting..." : "Delete Account"}</span>
           </button>
         </div>
+
+        <button
+          onClick={handleSignOut}
+          className="w-full py-3 text-xs font-semibold rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 transition-all cursor-pointer"
+        >
+          Sign Out
+        </button>
       </div>
 
       {/* Log Editor Modal Overlay */}
@@ -630,7 +636,7 @@ export default function Journey() {
               {editingEvent.payload?.isConsolidated ? (
                 <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
                   <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Consolidated Entries:</p>
-                  {editingEvent.payload.subEvents?.map((sub: any, idx: number) => (
+                  {editingEvent.payload.subEvents?.map((sub, idx) => (
                     <div key={sub._id || sub.id || idx} className="flex items-center justify-between p-2 bg-white/5 rounded-xl border border-white/5 text-[11px]">
                       <span className="text-[10px] text-zinc-400 font-medium pl-1">
                         {new Date(sub.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -642,15 +648,15 @@ export default function Journey() {
                           defaultValue={sub.payload.amountL || 0}
                           onChange={(e) => {
                             const val = Number(e.target.value) || 0;
-                            setEditingEvent((prev: any) => {
+                            setEditingEvent((prev) => {
                               if (!prev) return null;
-                              const updatedSubEvents = prev.payload.subEvents.map((item: any) => {
+                              const updatedSubEvents = (prev.payload.subEvents || []).map((item) => {
                                 if ((item._id || item.id) === (sub._id || sub.id)) {
                                   return { ...item, payload: { ...item.payload, amountL: val } };
                                 }
                                 return item;
                               });
-                              const total = updatedSubEvents.reduce((sum: number, item: any) => sum + (Number(item.payload.amountL) || 0), 0);
+                              const total = updatedSubEvents.reduce((sum, item) => sum + (Number(item.payload.amountL) || 0), 0);
                               return {
                                 ...prev,
                                 payload: {
@@ -670,13 +676,13 @@ export default function Journey() {
                             if (confirmed) {
                               await fetch(`/api/timeline?eventId=${sub._id || sub.id}`, { method: "DELETE" });
                               
-                              setEditingEvent((prev: any) => {
+                              setEditingEvent((prev) => {
                                 if (!prev) return null;
-                                const filteredSubEvents = prev.payload.subEvents.filter((item: any) => (item._id || item.id) !== (sub._id || sub.id));
+                                const filteredSubEvents = (prev.payload.subEvents || []).filter((item) => (item._id || item.id) !== (sub._id || sub.id));
                                 if (filteredSubEvents.length === 0) {
                                   return null;
                                 }
-                                const total = filteredSubEvents.reduce((sum: number, item: any) => sum + (Number(item.payload.amountL) || 0), 0);
+                                const total = filteredSubEvents.reduce((sum, item) => sum + (Number(item.payload.amountL) || 0), 0);
                                 return {
                                   ...prev,
                                   payload: {
@@ -803,7 +809,7 @@ export default function Journey() {
                     onClick={async () => {
                       const confirmed = await showCustomConfirm("Delete Log", "Are you sure you want to permanently delete this timeline entry?", true);
                       if (confirmed) {
-                        handleDeleteEvent(editingEvent._id || editingEvent.id);
+                        handleDeleteEvent(editingEvent._id);
                         setEditingEvent(null);
                       }
                     }}

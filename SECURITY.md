@@ -31,25 +31,27 @@ If you discover a security vulnerability in **Health OS**, please **DO NOT** cre
 
 Health OS implements defense-in-depth security principles across all API routes, database integrations, and client components:
 
-### 1. NoSQL Injection Prevention
-- All user inputs passed to MongoDB query objects (`TimelineEvent.find()`, `UserProfile.findOne()`) are sanitized to reject MongoDB query operators (`$ne`, `$gt`, `$where`, `$expr`).
-- Validated via automated unit tests in `src/__tests__/security.test.ts`.
+### 1. Sessions & Data Isolation
+- Users sign in with a single-use emailed code. A successful login sets an HTTP-only, signed, `SameSite=Lax` session cookie.
+- API routes take identity only from the session and filter every timeline lookup by the signed-in user. Integration tests in `src/__tests__/apiIntegration.test.ts` verify this against a real MongoDB instance.
+- Login codes are stored as HMAC hashes, expire after 5 minutes, and lock after 5 wrong guesses. Sending is rate limited.
 
-### 2. Strict Input & Identifier Validation
-- **Hex ObjectId Validation**: User IDs and event IDs are strictly validated against a 24-character hexadecimal regex (`/^[0-9a-fA-F]{24}$/`). Non-conforming IDs are safely rejected or coerced before reaching the database driver.
-- **Email Regex Validation**: User email inputs are validated using the official RFC 5322 standard regex before profile creation.
+### 2. NoSQL Injection Prevention
+- Identifiers from request bodies must be strings of the expected format, so objects containing MongoDB operators (`$ne`, `$gt`) are rejected before reaching a query.
 
-### 3. XSS & HTML Injection Mitigation
-- All user-generated text inputs (meal notes, coach chat messages, custom diet preferences) are stripped of executable `<script>` tags and sanitized with HTML entity escaping (`&lt;`, `&gt;`, `&quot;`) prior to state storage and DOM rendering.
+### 3. Input Validation
+- Profile values, timeline payloads, image sizes and types, and text lengths are validated in `src/lib/validation.ts`.
+- AI output is treated as untrusted: coach replies are limited to a fixed set of actions and written through the same validated routes as user input.
 
-### 4. Zero Secrets in Client Bundles
-- Sensitive API keys (`GEMINI_API_KEY`, `GROQ_API_KEY`, `MONGODB_URI`) are strictly server-side environment variables (`process.env`) and are **never** prefixed with `NEXT_PUBLIC_`.
+### 4. XSS Mitigation
+- User and AI text is rendered through React, which escapes it. The app does not use `dangerouslySetInnerHTML`.
+
+### 5. Zero Secrets in Client Bundles
+- Sensitive values (`AUTH_SECRET`, `RESEND_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `MONGODB_URI`) are strictly server-side environment variables (`process.env`) and are **never** prefixed with `NEXT_PUBLIC_`.
 - All AI vision analysis and coaching prompts execute exclusively in serverless API routes (`/api/vision`, `/api/coach`, `/api/diet/generate`).
 
 ---
 
-## ⚙️ OpenSSF & Automated Security Workflows
+## ⚙️ Automated Checks
 
-Our GitHub repository runs automated continuous security scans on every pull request:
-- **Dependabot**: Scans package dependencies weekly for known CVE vulnerabilities and opens automated security PRs.
-- **GitHub Actions CI (`.github/workflows/ci.yml`)**: Runs TypeScript strict type validation and security unit test suites on every push.
+**GitHub Actions CI (`.github/workflows/ci.yml`)** runs ESLint, TypeScript strict validation, the test suite, and a production build on every push and pull request to `main`.

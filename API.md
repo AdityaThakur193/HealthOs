@@ -4,204 +4,213 @@ This document describes the serverless HTTP API routes provided by **Health OS**
 
 ---
 
+## 🔐 Authentication
+
+Users sign in with an emailed one-time code. A successful verification sets an HTTP-only, signed `healthos_session` cookie, valid for 30 days.
+
+Every route outside `/api/auth/*` requires that cookie and returns `401` without it. The signed-in user always comes from the session. Routes never accept a `userId` or `email` from the client to decide whose data to read or change.
+
+Routes that need a finished profile return `403` with `{ "notInitialized": true }` until onboarding is complete.
+
+---
+
 ## 📑 API Endpoints Summary
 
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
-| [`/api/profile`](#1-get--post-apiprofile) | `GET`, `POST` | Fetch or update user biometrics, goals, and target macros |
-| [`/api/timeline`](#2-get--post--delete-apitimeline) | `GET`, `POST`, `DELETE` | Log, query, or delete chronological health timeline events |
-| [`/api/vision`](#3-post-apivision) | `POST` | Process meal photos using Gemini 2.5 Vision & ICMR-NIN IFCT 2017 math |
-| [`/api/diet/generate`](#4-post-apidietgenerate) | `POST` | Generate grounded weekly diet plan with MPS protein spacing |
-| [`/api/mess-menu/parse`](#5-post-apimess-menuparse) | `POST` | Parse unstructured mess menu image/text into structured weekly JSON |
-| [`/api/coach`](#6-post-apicoach) | `POST` | Generate contextual daily coaching insights for dashboard HUD |
-| [`/api/coach/chat`](#7-post-apicoachchat) | `POST` | Conversational health assistant stream/response |
-| [`/api/review`](#8-get-apireview) | `GET` | Calculate Sunday weekly review, weight delta, and metabolic TDEE shift |
+| `/api/auth/send-otp` | `POST` | Email a 6-digit login code |
+| `/api/auth/verify-otp` | `POST` | Exchange a code for a session cookie |
+| `/api/auth/logout` | `POST` | Clear the session cookie |
+| `/api/profile` | `GET`, `POST`, `DELETE` | Read, update, or permanently delete the signed-in user's profile |
+| `/api/timeline` | `GET`, `POST`, `PUT`, `DELETE` | Query, log, edit, or delete health timeline events |
+| `/api/habits` | `GET`, `POST` | Read habits with statistics; check in, save, delete, or reset habits |
+| `/api/vision` | `POST` | Analyze a meal photo or text using AI detection and IFCT 2017 math |
+| `/api/diet/generate` | `POST` | Generate a weekly diet plan with audited macros |
+| `/api/mess-menu/parse` | `POST` | Parse a mess menu image or text into structured JSON |
+| `/api/coach` | `POST` | Generate today's coaching insight for the dashboard |
+| `/api/coach/chat` | `POST` | Conversational coach that returns a reply and an optional action |
+| `/api/review` | `GET` | Calculate the review for the last seven calendar days |
 
 ---
 
-## 1. `GET | POST /api/profile`
+## Limits
 
-### `GET /api/profile`
-Fetches the user profile by email or user ID.
+AI routes are rate limited per user. Limits are counted per server instance, so they are a best-effort brake on spend. A route over its limit returns `429`; `/api/coach` falls back to rule-based coaching instead.
 
-**Query Parameters:**
-- `email` (string, optional): User email address.
-- `userId` (string, optional): User MongoDB ObjectId hex.
+| Route | Per hour |
+| :--- | :--- |
+| `/api/vision` | 40 |
+| `/api/coach/chat` | 60 |
+| `/api/coach` (AI calls) | 30 |
+| `/api/mess-menu/parse` | 10 |
+| `/api/diet/generate` | 8 |
 
-**Response `200 OK`:**
+---
+
+## `POST /api/auth/send-otp`
+
+```json
+{ "email": "user@example.com" }
+```
+
+Returns `200 { "success": true }`. Returns `429` if a code was sent in the last 30 seconds, or after 5 codes in an hour.
+
+## `POST /api/auth/verify-otp`
+
+```json
+{ "email": "user@example.com", "otp": "123456", "tz": "Asia/Kolkata" }
+```
+
+`tz` is the browser's IANA timezone, used to work out the user's calendar day on the server. On success the response sets the session cookie:
+
+```json
+{ "success": true, "email": "user@example.com", "userId": null }
+```
+
+`userId` is `null` for a new user who still has to complete onboarding. A code works once, expires after 5 minutes, and is locked after 5 wrong guesses.
+
+---
+
+## `GET | POST | DELETE /api/profile`
+
+`GET` returns the profile with adaptive TDEE state, or `{ "notInitialized": true }`.
+
 ```json
 {
-  "profile": {
-    "_id": "6a4c73d185dcfe8a2843fb2f",
-    "name": "ADI",
-    "email": "adityath2305@gmail.com",
-    "age": 22,
-    "gender": "male",
-    "heightCm": 178,
-    "weightKg": 74.5,
-    "goal": "recomp",
-    "tdee": 2450,
-    "targetCalories": 2200,
-    "targetProteinG": 150,
-    "strictMessOnly": false,
-    "dietPreference": "non_veg"
-  }
+  "profile": { "_id": "6a4c73d185dcfe8a2843fb2f", "name": "Asha", "email": "user@example.com", "tdee": 2450, "targetCalories": 2200, "targetProteinG": 150 },
+  "tdeeMode": "calibrating",
+  "daysRemaining": 4,
+  "avgCalories": 2100,
+  "weightDeltaKg": 0,
+  "streak": 3
 }
 ```
 
-### `POST /api/profile`
-Creates or updates physical biometrics and target goals.
+`POST` creates or updates the profile. Required fields:
 
-**Request Body:**
 ```json
 {
-  "email": "adityath2305@gmail.com",
-  "name": "ADI",
+  "name": "Asha",
   "age": 22,
-  "gender": "male",
-  "heightCm": 178,
-  "weightKg": 74.5,
+  "gender": "female",
+  "heightCm": 165,
+  "weightKg": 60,
   "goal": "recomp",
   "activityLevel": "moderate",
   "gymExperience": "intermediate"
 }
 ```
 
----
+Omitted optional fields keep their stored values. Calculated calorie targets never go below 1,200 kcal (1,500 kcal for men) unless the user sets custom macros.
 
-## 2. `GET | POST | DELETE /api/timeline`
-
-### `GET /api/timeline`
-Queries chronological events with limit pagination.
-
-**Query Parameters:**
-- `userId` (string, required): 24-character hex ObjectId.
-- `type` (string, optional): Filter by `meal`, `weight`, `workout`, `sleep`, or `water`.
-- `limit` (number, optional, default: 50, max: 100).
-- `before` (ISO Date string, optional): Pagination cursor.
-
-**Response `200 OK`:**
-```json
-{
-  "events": [
-    {
-      "_id": "66a1b2c3d4e5f67890123456",
-      "userId": "6a4c73d185dcfe8a2843fb2f",
-      "type": "meal",
-      "timestamp": "2026-07-25T08:30:00.000Z",
-      "payload": {
-        "foods": [
-          { "name": "Whole Wheat Roti", "quantity": 2, "estimatedCalories": 170, "proteinG": 6.4 },
-          { "name": "Yellow Dal", "quantity": 1, "estimatedCalories": 105, "proteinG": 5.2 }
-        ],
-        "totalCalories": 275,
-        "totalProteinG": 11.6
-      },
-      "source": "ai_vision"
-    }
-  ],
-  "count": 1,
-  "hasMore": false
-}
-```
+`DELETE` permanently removes the profile, timeline, habits, and AI memory, and clears the session.
 
 ---
 
-## 3. `POST /api/vision`
+## `/api/timeline`
 
-Analyzes meal image using visual detection contract and attaches ICMR-NIN IFCT 2017 portion math.
+### `GET`
 
-**Request Body:**
+| Query | Description |
+| :--- | :--- |
+| `type` | Optional event type |
+| `limit` | Default 50, maximum 500 |
+| `before` | ISO date cursor for pagination |
+
 ```json
-{
-  "image": "data:image/jpeg;base64,...",
-  "userId": "6a4c73d185dcfe8a2843fb2f"
-}
+{ "events": [], "count": 0, "hasMore": false }
 ```
 
-**Response `200 OK`:**
+### `POST`
+
 ```json
-{
-  "foods": [
-    {
-      "name": "Whole Wheat Roti",
-      "dishName": "roti",
-      "quantity": 2,
-      "unitType": "piece",
-      "preparationStyle": "standard",
-      "estimatedCalories": 170,
-      "proteinG": 6.4,
-      "carbsG": 35.0,
-      "fatG": 0.8
-    }
-  ],
-  "confidence": 0.92,
-  "isMock": false
-}
+{ "type": "weight", "payload": { "weightKg": 74.5 }, "timestamp": "2026-07-25T08:30:00.000Z", "source": "manual" }
 ```
+
+`type` is one of `weight`, `meal`, `workout`, `sleep`, `steps`, `photo`, `measurement`, `note`, `water`. Payloads are range checked, and meals flagged as mock data are rejected.
+
+### `PUT`
+
+```json
+{ "eventId": "66a1b2c3d4e5f67890123456", "payload": { "weightKg": 74.2 } }
+```
+
+The payload is merged into the stored event and validated. Returns `404` if the event does not belong to the signed-in user.
+
+### `DELETE`
+
+`/api/timeline?eventId=<id>`. Returns `404` if the event does not belong to the signed-in user.
 
 ---
 
-## 4. `POST /api/diet/generate`
+## `/api/habits`
 
-Generates weekly diet plan with MPS leucine spacing and programmatic post-audit verification.
+`GET` returns active habits with strength, streaks, and a 30-day heatmap, plus a summary. Starter habits are created on first use.
 
-**Request Body:**
-```json
-{
-  "email": "adityath2305@gmail.com",
-  "strictMessOnly": false
-}
-```
+`POST` takes an `action`:
 
-**Response `200 OK`:**
-```json
-{
-  "success": true,
-  "dietPlan": {
-    "monday": {
-      "meals": [
-        {
-          "time": "8:00 AM",
-          "name": "Breakfast",
-          "messItems": "• Whole Wheat Roti (2 pieces - 6.4g P, 170 kcal)\n• Yellow Dal (1 Katori - 5.2g P, 105 kcal)",
-          "additions": "• Whey Protein (1 Scoop - 24g P, 120 kcal)",
-          "proteinG": 35.6,
-          "calories": 395,
-          "timingReason": "High protein breakfast to trigger MPS leucine threshold post-overnight fast."
-        }
-      ],
-      "dailySummary": {
-        "totalCalories": 2200,
-        "totalProteinG": 150.0
-      }
-    }
-  }
-}
-```
+| Action | Body |
+| :--- | :--- |
+| `checkin` | `{ "checkin": { "habitId": "...", "completed": true, "value": 1, "date": "2026-07-25" } }` |
+| `save` | `{ "habit": { "id": "optional", "title": "..." } }` |
+| `delete` | `{ "habitId": "..." }` |
+| `reset` | No extra fields |
 
 ---
 
-## 8. `GET /api/review`
+## `POST /api/vision`
 
-Calculates Sunday weekly review, weight trend delta, and metabolic TDEE adjustments.
+```json
+{ "imageBase64": "data:image/jpeg;base64,...", "mimeType": "image/jpeg" }
+```
 
-**Query Parameters:**
-- `userId` (string, required): 24-character hex ObjectId.
+Send `mealText` instead of an image to analyze a description. The response has `analysis`, `isMock`, and `source`. When `isMock` is `true`, AI was unavailable and the result is demo data that `/api/timeline` refuses to save.
 
-**Response `200 OK`:**
+---
+
+## `POST /api/diet/generate`
+
+```json
+{ "strictMessOnly": false }
+```
+
+Requires a parsed mess menu on the profile. Respects diet preference, allergies, and medical conditions, then re-sums every meal in code. Returns `{ "success": true, "dietPlan": {}, "savedProfile": {} }`, or `502` if the model returns an incomplete week.
+
+---
+
+## `POST /api/mess-menu/parse`
+
+Send `{ "text": "..." }` (up to 50,000 characters) or `{ "image": "data:image/...", "mimeType": "image/jpeg" }`. Returns `{ "parsedMenu": { "monday": { "breakfast": "", "lunch": "", "snacks": "", "dinner": "" } } }`.
+
+---
+
+## `POST /api/coach`
+
+Takes no body. Returns `{ "recommendation": { "greeting", "status", "primaryInsight", "actionItems", "motivation" }, "context": {} }`.
+
+## `POST /api/coach/chat`
+
+```json
+{ "message": "I weigh 74 kg today", "history": [{ "role": "user", "content": "..." }] }
+```
+
+Returns `{ "message": "...", "action": "log_weight", "updatedData": { "weightKg": 74 } }`. Unknown actions are downgraded to `none`, and the client applies the action through the routes above, so their validation still runs.
+
+---
+
+## `GET /api/review`
+
+Takes no parameters. Covers today and the previous six days in the user's timezone.
+
 ```json
 {
-  "weeklyReview": {
-    "startWeight": 75.2,
-    "endWeight": 74.5,
-    "weightDelta": -0.7,
-    "avgDailyCalories": 2180,
-    "targetCalories": 2200,
-    "adherenceRate": 0.95,
-    "previousTdee": 2450,
-    "newTdee": 2480,
-    "recommendation": "Metabolic expenditure increased by +30 kcal/day based on steady fat loss."
+  "review": {
+    "weekNumber": 3,
+    "dateRange": { "start": "19 Jul", "end": "25 Jul" },
+    "weight": { "startKg": 75.2, "endKg": 74.5, "deltaKg": -0.7 },
+    "nutrition": { "avgCalories": 2180, "avgProteinG": 140, "calorieAdherence": 85, "proteinAdherence": 70, "daysLogged": 6 },
+    "training": { "sessionsCompleted": 4, "totalVolumeKg": 18000, "topExercise": "Barbell Bench Press (2 RIR)" },
+    "recovery": { "avgSleepHours": 7.2, "avgSteps": 8400, "daysWithSleep": 6 }
   }
 }
 ```
