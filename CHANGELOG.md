@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mess-aware coaching. Both coaches now know the time, mess hours, Sunday and holiday timings, and which meals are logged, and they no longer suggest a meal that has closed. Mess hours can be edited in Settings.
 - The home coach reuses its message until something relevant changes, which reduces AI calls.
 - The chat coach can now see today's logs, habits, adaptive TDEE and exam or sick mode.
+- Workout builder. Everyone starts from a template for their training days and can change any day, on the workout page or through the coach.
 - Meal reminders. A notification in the last hour before a meal closes, only if it hasn't been logged. Each meal can be turned on or off.
 - Tap-to-log from today's mess menu. Pick what you took and adjust the amounts. Your last amount is only a starting point, and nothing is saved until you confirm.
 - Rebuilt diet planner. Code now chooses realistic portions from what the mess serves, using IFCT 2017 data, and says when a target can't be reached. AI only estimates dishes IFCT doesn't cover, and those are labelled.
@@ -24,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Coach chat now loads the profile from the database instead of trusting one sent by the client, and only accepts known actions.
 
 ### Fixed
+- The 4-day and 5-day templates had the wrong number of sessions.
+- Rest days had no way to reach the rest of the week.
 - The meal screen could show different numbers from what was saved, and changing a portion discarded ingredient-level math.
 - Meals logged through chat now use IFCT numbers wherever the food and amount are known.
 - Pinch-to-zoom is no longer disabled.

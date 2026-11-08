@@ -80,7 +80,7 @@ graph TD
 
 ### 4. Evidence-Based Gym Engine & Progressive Overload
 - **Engine Solution** (`src/lib/workoutPlans.ts`):
-  - Supports 3-day, 4-day, 5-day, and 6-day training splits.
+  - Provides templates for 3-day, 4-day, 5-day, and 6-day splits, which users can change day by day or through the coach.
   - Implements double progression logic: suggests a weight increase (+2.5kg, or +2.0kg for dumbbell and lateral work) once every top set reaches the top of the rep range.
   - Curated YouTube exercise video timestamp links embedded directly into exercise cards.
 
