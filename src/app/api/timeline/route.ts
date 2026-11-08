@@ -1,126 +1,107 @@
 import { NextRequest } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { TimelineEvent } from "@/lib/db/models";
-import { getLocalEvents, createLocalEvent, deleteLocalEventById, updateLocalEvent } from "@/lib/db/fallback";
+import { getLocalEvents, createLocalEvent, deleteLocalEventById, updateLocalEvent, LocalEvent } from "@/lib/db/fallback";
+import { requireUserSession } from "@/lib/auth/session";
+import {
+  CLIENT_EVENT_SOURCES,
+  TIMELINE_EVENT_TYPES,
+  invalidBodyResponse,
+  isValidDate,
+  isValidEventId,
+  readJsonObject,
+  validateTimelinePayload,
+} from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
+
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 500;
+
+function databaseOfflineResponse(): Response {
+  return Response.json({ error: "Database offline. Please try again later." }, { status: 503 });
+}
+
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
+function includes<T extends string>(list: readonly T[], value: unknown): value is T {
+  return list.includes(value as T);
+}
+
+function parseLimit(raw: string | null): number {
+  const parsed = parseInt(raw || "", 10);
+  return Number.isNaN(parsed) || parsed < 1 ? DEFAULT_LIMIT : Math.min(parsed, MAX_LIMIT);
+}
 
 /**
  * GET /api/timeline
  */
 export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const userId = searchParams.get("userId");
-  const type = searchParams.get("type");
-  const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
-  const before = searchParams.get("before");
+  const session = requireUserSession(request);
+  if (session instanceof Response) return session;
 
-  if (!userId) {
-    return Response.json(
-      { error: "userId query parameter is required" },
-      { status: 400 }
-    );
+  const { searchParams } = request.nextUrl;
+  const type = searchParams.get("type");
+  const before = searchParams.get("before");
+  const limit = parseLimit(searchParams.get("limit"));
+
+  if (before && !isValidDate(before)) {
+    return Response.json({ error: "before must be a valid date" }, { status: 400 });
   }
 
   try {
     await connectDB();
 
-    const query: Record<string, unknown> = { userId };
+    const query: Record<string, unknown> = { userId: session.userId };
     if (type) query.type = type;
     if (before) query.timestamp = { $lt: new Date(before) };
 
+    // Older meals may embed a full photo; lists never need it.
     const events = await TimelineEvent.find(query)
+      .select("-payload.imagePreview")
       .sort({ timestamp: -1 })
       .limit(limit)
       .lean();
 
-    return Response.json({
-      events,
-      count: events.length,
-      hasMore: events.length === limit,
-    });
+    return Response.json({ events, count: events.length, hasMore: events.length === limit });
   } catch (error) {
-    console.warn("⚠️ MongoDB connection failed on timeline GET. Querying local file DB.");
-    if (process.env.NODE_ENV === "production") {
-      return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
-    }
+    console.warn("Timeline GET could not reach MongoDB:", error);
+    if (isProduction()) return databaseOfflineResponse();
+
     const events = await getLocalEvents({
-      userId,
+      userId: session.userId,
       type: type || undefined,
       limit,
       before: before || undefined,
     });
-    return Response.json({
-      events,
-      count: events.length,
-      hasMore: events.length === limit,
-    });
+    return Response.json({ events, count: events.length, hasMore: events.length === limit });
   }
-}
-
-/**
- * Strict Edge Case & Sanity Validator for Timeline Entries
- */
-function validateTimelinePayload(type: string, payload: any): string | null {
-  if (!payload || typeof payload !== "object") return "Payload must be a valid object.";
-
-  if (type === "water") {
-    const amount = Number(payload.amountL);
-    if (isNaN(amount) || amount <= 0) return "Water amount must be greater than 0 L.";
-    if (amount > 10) return "Water intake cannot exceed 10 Liters in a single log for safety.";
-  }
-
-  if (type === "sleep") {
-    const hours = Number(payload.hours);
-    if (isNaN(hours) || hours <= 0) return "Sleep duration must be greater than 0.";
-    if (hours > 24) return "Sleep duration cannot exceed 24 hours in a single day.";
-  }
-
-  if (type === "steps") {
-    const count = Number(payload.count || payload.steps);
-    if (isNaN(count) || count < 0) return "Step count cannot be negative.";
-    if (count > 100000) return "Step count cannot exceed 100,000 steps in a single log.";
-  }
-
-  if (type === "weight") {
-    const weight = Number(payload.weightKg);
-    if (isNaN(weight) || weight < 25 || weight > 350) {
-      return "Weight measurement must be between 25 kg and 350 kg.";
-    }
-  }
-
-  if (type === "meal") {
-    if (payload.isMock === true || payload.source === "mock") {
-      return "Cannot log demo or mock meal data to timeline.";
-    }
-    const cal = Number(payload.totalCalories);
-    if (!isNaN(cal) && (cal < 0 || cal > 10000)) {
-      return "Meal calories must be between 0 and 10,000 kcal.";
-    }
-  }
-
-  return null; // Valid
 }
 
 /**
  * POST /api/timeline
  */
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { userId, type, timestamp, payload, tags, source } = body;
+  const session = requireUserSession(request);
+  if (session instanceof Response) return session;
+
+  const body = await readJsonObject(request);
+  if (!body) return invalidBodyResponse();
+  const { type, timestamp, payload, tags, source } = body;
 
   if (source === "mock") {
-    return Response.json(
-      { error: "Cannot log demo or mock meal data to timeline." },
-      { status: 400 }
-    );
+    return Response.json({ error: "Cannot log demo or mock meal data to timeline." }, { status: 400 });
   }
-
-  if (!userId || !type || !payload) {
-    return Response.json(
-      { error: "userId, type, and payload are required" },
-      { status: 400 }
-    );
+  if (!includes(TIMELINE_EVENT_TYPES, type) || type === "habit") {
+    return Response.json({ error: "A valid event type is required" }, { status: 400 });
+  }
+  if (timestamp !== undefined && !isValidDate(timestamp)) {
+    return Response.json({ error: "timestamp must be a valid date" }, { status: 400 });
+  }
+  if (source !== undefined && !includes(CLIENT_EVENT_SOURCES, source)) {
+    return Response.json({ error: "Invalid event source" }, { status: 400 });
   }
 
   const validationError = validateTimelinePayload(type, payload);
@@ -128,48 +109,38 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: validationError }, { status: 400 });
   }
 
+  const eventPayload = payload as Record<string, unknown>;
+  const eventTime = timestamp ? new Date(timestamp as string) : new Date();
+  const eventTags = Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === "string") : [];
+
   try {
     await connectDB();
-
-    // Convert string userId to ObjectId (chatbot sends string, schema needs ObjectId)
-    let userObjectId: any = userId;
-    try {
-      userObjectId = new (require("mongoose").Types.ObjectId)(userId);
-    } catch {
-      // If userId is not a valid ObjectId hex string, keep as-is
-    }
-
     const event = await TimelineEvent.create({
-      userId: userObjectId,
+      userId: session.userId,
       type,
-      timestamp: timestamp ? new Date(timestamp) : new Date(),
-      payload,
-      tags: tags || [],
+      timestamp: eventTime,
+      payload: eventPayload,
+      tags: eventTags,
       source: source || "manual",
     });
-
     return Response.json({ event }, { status: 201 });
-  } catch (error: any) {
-    // Log the REAL error so we can debug it
-    console.error("❌ Timeline POST error:", error?.message || error);
-
-    // Validation/cast errors are NOT connection errors — surface them immediately
-    if (error?.name === "ValidationError" || error?.name === "CastError") {
-      console.error("❌ Mongoose validation/cast error (not a connection issue):", JSON.stringify(error?.errors));
-      return Response.json({ error: `Validation failed: ${error.message}` }, { status: 400 });
+  } catch (error) {
+    const name = (error as Error)?.name;
+    if (name === "ValidationError" || name === "CastError") {
+      if (isProduction() || !session.userId.startsWith("local_user_")) {
+        return Response.json({ error: "The log entry is invalid." }, { status: 400 });
+      }
     }
 
-    // Actual connection failures fall back to local file in dev
-    console.warn("⚠️ MongoDB connection failed on timeline POST. Saving to local file DB.");
-    if (process.env.NODE_ENV === "production") {
-      return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
-    }
+    console.warn("Timeline POST could not reach MongoDB:", error);
+    if (isProduction()) return databaseOfflineResponse();
+
     const event = await createLocalEvent({
-      userId,
+      userId: session.userId,
       type,
-      timestamp: timestamp || new Date().toISOString(),
-      payload,
-      tags: tags || [],
+      timestamp: eventTime.toISOString(),
+      payload: eventPayload,
+      tags: eventTags,
       source: source || "manual",
     });
     return Response.json({ event }, { status: 201 });
@@ -180,80 +151,80 @@ export async function POST(request: NextRequest) {
  * DELETE /api/timeline
  */
 export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const eventId = searchParams.get("eventId");
+  const session = requireUserSession(request);
+  if (session instanceof Response) return session;
 
-    if (!eventId) {
-      return Response.json({ error: "eventId is required" }, { status: 400 });
-    }
-
-    try {
-      await connectDB();
-      const res = await TimelineEvent.deleteOne({ _id: eventId });
-      if (res.deletedCount === 0) {
-        return Response.json({ error: "Event not found" }, { status: 404 });
-      }
-      console.log(`✅ Deleted MongoDB timeline event: ${eventId}`);
-    } catch (dbError) {
-      console.warn("⚠️ MongoDB offline. Deleting local JSON record.");
-      if (process.env.NODE_ENV === "production") {
-        return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
-      }
-      const deleted = await deleteLocalEventById(eventId);
-      if (!deleted) {
-        return Response.json({ error: "Event not found" }, { status: 404 });
-      }
-      console.log(`✅ Deleted local JSON event: ${eventId}`);
-    }
-
-    return Response.json({ success: true });
-  } catch (error) {
-    console.error("Timeline DELETE error:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+  const eventId = request.nextUrl.searchParams.get("eventId");
+  if (!isValidEventId(eventId)) {
+    return Response.json({ error: "A valid eventId is required" }, { status: 400 });
   }
+
+  let deleted: boolean;
+  try {
+    await connectDB();
+    const result = await TimelineEvent.deleteOne({ _id: eventId, userId: session.userId });
+    deleted = result.deletedCount > 0;
+  } catch (error) {
+    console.warn("Timeline DELETE could not reach MongoDB:", error);
+    if (isProduction()) return databaseOfflineResponse();
+    deleted = await deleteLocalEventById(eventId, session.userId);
+  }
+
+  return deleted
+    ? Response.json({ success: true })
+    : Response.json({ error: "Event not found" }, { status: 404 });
 }
 
 /**
  * PUT /api/timeline
  */
 export async function PUT(request: NextRequest) {
+  const session = requireUserSession(request);
+  if (session instanceof Response) return session;
+
+  const body = await readJsonObject(request);
+  if (!body) return invalidBodyResponse();
+  const { eventId, payload, timestamp } = body;
+
+  if (!isValidEventId(eventId) || !payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return Response.json({ error: "A valid eventId and payload are required" }, { status: 400 });
+  }
+  if (timestamp !== undefined && !isValidDate(timestamp)) {
+    return Response.json({ error: "timestamp must be a valid date" }, { status: 400 });
+  }
+
+  const changes = payload as Record<string, unknown>;
+
   try {
-    const body = await request.json();
-    const { eventId, payload, timestamp } = body;
-
-    if (!eventId || !payload) {
-      return Response.json({ error: "eventId and payload are required" }, { status: 400 });
+    await connectDB();
+    const existing = await TimelineEvent.findOne({ _id: eventId, userId: session.userId });
+    if (!existing) {
+      return Response.json({ error: "Event not found" }, { status: 404 });
     }
 
-    try {
-      await connectDB();
-      const updateDoc: any = { payload };
-      if (timestamp) {
-        updateDoc.timestamp = new Date(timestamp);
-      }
-      
-      const updatedEvent = await TimelineEvent.findOneAndUpdate(
-        { _id: eventId },
-        { $set: updateDoc },
-        { new: true }
-      );
-      
-      console.log(`✅ Updated MongoDB timeline event: ${eventId}`);
-      return Response.json({ event: updatedEvent });
-    } catch (dbError) {
-      console.warn("⚠️ MongoDB offline. Updating local JSON record.");
-      if (process.env.NODE_ENV === "production") {
-        return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
-      }
-      
-      const updatedEvent = await updateLocalEvent(eventId, { payload, timestamp });
-      console.log(`✅ Updated local JSON event: ${eventId}`);
-      return Response.json({ event: updatedEvent });
+    // Edits send only the changed fields; keep the rest of the entry.
+    const merged = { ...existing.payload, ...changes };
+    const validationError = validateTimelinePayload(existing.type, merged);
+    if (validationError) {
+      return Response.json({ error: validationError }, { status: 400 });
     }
+
+    existing.payload = merged;
+    existing.markModified("payload");
+    if (timestamp) existing.timestamp = new Date(timestamp as string);
+    await existing.save();
+
+    return Response.json({ event: existing });
   } catch (error) {
-    console.error("Timeline PUT error:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    console.warn("Timeline PUT could not reach MongoDB:", error);
+    if (isProduction()) return databaseOfflineResponse();
+
+    const event: LocalEvent | null = await updateLocalEvent(eventId, session.userId, {
+      payload: changes,
+      timestamp: timestamp as string | undefined,
+    });
+    return event
+      ? Response.json({ event })
+      : Response.json({ error: "Event not found" }, { status: 404 });
   }
 }
-

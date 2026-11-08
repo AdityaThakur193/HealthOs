@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import ProgressRing from "@/components/ProgressRing";
-import MacroBar from "@/components/MacroBar";
 import CoachInsight from "@/components/CoachInsight";
 import CustomPopup from "@/components/CustomPopup";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { getTodaysWorkout } from "@/lib/workoutPlans";
+import { dayKey } from "@/lib/dateUtils";
+import { aggregateDailyEvents, TimelineEntry, TimelinePayload } from "@/lib/timelineUtils";
+import type { CoachRecommendation } from "@/lib/gemini";
 import { Flame, Dumbbell, Droplet, Footprints, Moon, Sparkles, Scale, GraduationCap, Compass, Calendar, Zap, Activity, Camera, Beef, X } from "lucide-react";
 
 interface TodayState {
@@ -26,9 +28,11 @@ interface TodayState {
 
 export default function Dashboard() {
   const router = useRouter();
-  const { profile, setProfile, userId, loading: authLoading } = useAuthGuard();
+  const { profile, userId, loading: authLoading } = useAuthGuard();
   const profileRef = useRef(profile);
-  profileRef.current = profile;
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
   const [today, setToday] = useState<TodayState>({
     calories: 0,
     protein: 0,
@@ -40,11 +44,11 @@ export default function Dashboard() {
     waterL: 0,
     burnedToday: 0,
   });
-  const [coachData, setCoachData] = useState<any>(null);
+  const [coachData, setCoachData] = useState<CoachRecommendation | null>(null);
   const [coachLoading, setCoachLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
-  const [activeEvent, setActiveEvent] = useState<any>(null);
+  const [activeEvent, setActiveEvent] = useState<TimelineEntry | null>(null);
   const [tdeeMode, setTdeeMode] = useState<"adaptive" | "calibrating">("calibrating");
   const [daysRemaining, setDaysRemaining] = useState(14);
   const [avgCalories, setAvgCalories] = useState(0);
@@ -52,12 +56,12 @@ export default function Dashboard() {
   const [showTdeeModal, setShowTdeeModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [streak, setStreak] = useState(0);
-  const [todayEvents, setTodayEvents] = useState<any[]>([]);
+  const [todayEvents, setTodayEvents] = useState<TimelineEntry[]>([]);
 
   const { popupState, showCustomAlert, showCustomConfirm } = useConfirmDialog();
 
   // Log editing states
-  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [editingEvent, setEditingEvent] = useState<TimelineEntry | null>(null);
   const [editMealName, setEditMealName] = useState("");
   const [editMealCalories, setEditMealCalories] = useState("");
   const [editMealProtein, setEditMealProtein] = useState("");
@@ -66,10 +70,10 @@ export default function Dashboard() {
   const [editSleep, setEditSleep] = useState("");
   const [editWater, setEditWater] = useState("");
 
-  const handleStartEditEvent = (event: any) => {
+  const handleStartEditEvent = (event: TimelineEntry) => {
     setEditingEvent(event);
     if (event.type === "meal") {
-      const mealName = event.payload.mealName || event.payload.foods?.map((f: any) => f.name).join(", ") || "Meal";
+      const mealName = event.payload.mealName || event.payload.foods?.map((f) => f.name).join(", ") || "Meal";
       setEditMealName(mealName);
       setEditMealCalories(String(event.payload.totalCalories || 0));
       setEditMealProtein(String(event.payload.totalProteinG || 0));
@@ -86,7 +90,7 @@ export default function Dashboard() {
 
   const handleSaveEditEvent = async () => {
     if (!editingEvent) return;
-    const payload: any = { ...editingEvent.payload };
+    const payload: TimelinePayload = { ...editingEvent.payload };
     const timestamp = editingEvent.timestamp;
 
     if (editingEvent.type === "meal") {
@@ -102,10 +106,13 @@ export default function Dashboard() {
       payload.weightKg = Number(editWeight) || 0;
     } else if (editingEvent.type === "steps") {
       payload.count = Number(editSteps) || 0;
+      payload.steps = payload.count;
+      payload.caloriesBurned = Math.round(payload.count * 0.04);
     } else if (editingEvent.type === "sleep") {
       payload.hours = Number(editSleep) || 0;
     } else if (editingEvent.type === "water") {
       payload.amountL = Number(editWater) || 0;
+      payload.amountMl = Math.round(payload.amountL * 1000);
     }
 
     try {
@@ -121,10 +128,7 @@ export default function Dashboard() {
 
       if (res.ok) {
         setEditingEvent(null);
-        const userId = localStorage.getItem("healthos_userId");
-        if (userId) {
-          fetchDashboardData(userId);
-        }
+        fetchDashboardData();
         window.dispatchEvent(new Event("profileUpdated"));
       } else {
         showCustomAlert("Update Failed", "We could not save the changes to this log entry. Please try again.", "error");
@@ -139,25 +143,22 @@ export default function Dashboard() {
   const [weightInput, setWeightInput] = useState("");
   const [stepsInput, setStepsInput] = useState("");
   const [sleepInput, setSleepInput] = useState("");
-  const [mealNameInput, setMealNameInput] = useState("");
-  const [mealCalInput, setMealCalInput] = useState("");
-  const [mealProtInput, setMealProtInput] = useState("");
 
   // Controls which input form is expanded in the quick log drawer
   const [activeForm, setActiveForm] = useState<"none" | "steps" | "sleep" | "meal">("none");
 
-  const fetchDashboardData = useCallback(async (userId: string) => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       // 1. Fetch Today's events
-      const todayRes = await fetch(`/api/timeline?userId=${userId}&t=${Date.now()}`, { cache: "no-store" });
+      const todayRes = await fetch(`/api/timeline?t=${Date.now()}`, { cache: "no-store" });
       if (todayRes.ok) {
         const data = await todayRes.json();
-        const events = data.events || [];
+        const events: TimelineEntry[] = data.events || [];
 
         // Filter and find active busy calendar events (travel, exams, sick)
-        const notes = events.filter((e: any) => e.type === "note");
+        const notes = events.filter((e) => e.type === "note");
         const todayDate = new Date();
-        const foundActiveEvent = notes.find((n: any) => {
+        const foundActiveEvent = notes.find((n) => {
           if (!n.payload || !n.payload.startDate || !n.payload.endDate) return false;
           const start = new Date(n.payload.startDate);
           const end = new Date(n.payload.endDate);
@@ -167,46 +168,11 @@ export default function Dashboard() {
         });
         setActiveEvent(foundActiveEvent || null);
 
-        // Aggregate today's stats
-        let cal = 0;
-        let prot = 0;
-        let carbsVal = 0;
-        let fatsVal = 0;
-        let wDone = false;
-        let sleep = 0;
-        let stepCount = 0;
-        let water = 0;
-        let burned = 0;
-
-        events.forEach((event: any) => {
-          // Check if event is from today
-          const eventDate = new Date(event.timestamp).toDateString();
-          const todayDateStr = new Date().toDateString();
-          if (eventDate === todayDateStr) {
-            if (event.type === "meal") {
-              cal += event.payload.totalCalories || 0;
-              prot += event.payload.totalProteinG || 0;
-              carbsVal += event.payload.totalCarbsG || event.payload.foods?.reduce((s: number, f: any) => s + (Number(f.carbsG) || 0), 0) || 0;
-              fatsVal += event.payload.totalFatG || event.payload.foods?.reduce((s: number, f: any) => s + (Number(f.fatG) || 0), 0) || 0;
-            } else if (event.type === "workout") {
-              wDone = true;
-              burned += Number(event.payload.caloriesBurned) || 0;
-            } else if (event.type === "sleep") {
-              sleep = Number(event.payload.hours) || 0;
-            } else if (event.type === "steps") {
-              const count = Number(event.payload.count || event.payload.steps) || 0;
-              stepCount += count;
-              burned += Number(event.payload.caloriesBurned) || Math.round(count * 0.04);
-            } else if (event.type === "water") {
-              water += event.payload.amountL || 0;
-            }
-          }
-        });
-
         // Store today's events for log management/deletion
         const todayDateStr = new Date().toDateString();
-        const todaysLogs = events.filter((event: any) => 
-          new Date(event.timestamp).toDateString() === todayDateStr
+        // Habit check-ins are managed on the Habits page.
+        const todaysLogs = events.filter((event) =>
+          event.type !== "habit" && new Date(event.timestamp).toDateString() === todayDateStr
         );
         setTodayEvents(todaysLogs);
 
@@ -217,30 +183,14 @@ export default function Dashboard() {
             if (cached) bmr = Number(JSON.parse(cached)?.bmr) || 0;
           } catch {}
         }
-        const burnedToday = Math.round(bmr + burned);
-
-        setToday({
-          calories: Math.round(cal),
-          protein: Math.round(prot),
-          carbs: Math.round(carbsVal),
-          fats: Math.round(fatsVal),
-          workoutDone: wDone,
-          sleepHours: Math.round(sleep * 10) / 10,
-          steps: Math.round(stepCount),
-          waterL: Math.round(water * 10) / 10,
-          burnedToday,
-        });
+        setToday(aggregateDailyEvents(events, new Date(), bmr));
       }
 
       setLoading(false); // Dashboard metrics rendered INSTANTLY!
 
       // 2. Fetch AI Coach insight asynchronously (non-blocking)
       setCoachLoading(true);
-      fetch("/api/coach", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      })
+      fetch("/api/coach", { method: "POST" })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data && data.recommendation) setCoachData(data.recommendation);
@@ -261,10 +211,7 @@ export default function Dashboard() {
         method: "DELETE",
       });
       if (res.ok) {
-        const userId = localStorage.getItem("healthos_userId");
-        if (userId) {
-          await initDashboard();
-        }
+        await initDashboard();
       } else {
         showCustomAlert("Deletion Failed", "We could not delete the log entry. Please try again.", "error");
       }
@@ -281,7 +228,7 @@ export default function Dashboard() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch(`/api/profile?email=${encodeURIComponent(profile.email)}&t=${Date.now()}`, { cache: "no-store" });
+      const res = await fetch(`/api/profile?t=${Date.now()}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setTdeeMode(data.tdeeMode || "calibrating");
@@ -290,10 +237,10 @@ export default function Dashboard() {
         setWeightDeltaKg(data.weightDeltaKg || 0);
         setStreak(data.streak || 0);
       }
-      await fetchDashboardData(userId);
-    } catch (err: any) {
+      await fetchDashboardData();
+    } catch (err) {
       console.error("Dashboard init error", err);
-      setErrorMsg(err.message || "Failed to load dashboard metrics. Ensure database is online.");
+      setErrorMsg(err instanceof Error ? err.message : "Failed to load dashboard metrics. Ensure database is online.");
     } finally {
       setLoading(false);
     }
@@ -307,24 +254,17 @@ export default function Dashboard() {
 
   // Re-fetch dashboard whenever chatbot logs health data
   useEffect(() => {
-    const refresh = () => {
-      const uid = localStorage.getItem("healthos_userId");
-      if (uid) fetchDashboardData(uid);
-    };
+    const refresh = () => fetchDashboardData();
     window.addEventListener("chatbotDataLogged", refresh);
     return () => window.removeEventListener("chatbotDataLogged", refresh);
-  }, []);
+  }, [fetchDashboardData]);
 
-  const handleQuickLog = async (type: string, payload: any) => {
-    const userId = localStorage.getItem("healthos_userId");
-    if (!userId) return;
-
+  const handleQuickLog = async (type: string, payload: TimelinePayload) => {
     try {
       const res = await fetch("/api/timeline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId,
           type,
           payload,
           source: "manual",
@@ -332,28 +272,24 @@ export default function Dashboard() {
       });
 
       if (res.ok) {
-        await fetchDashboardData(userId);
+        await fetchDashboardData();
         setQuickLogOpen(false);
       } else {
         const errText = await res.text().catch(() => "Unknown error");
         showCustomAlert("Logging Failed", `Could not save entry: ${errText || "Please try again."}`, "error");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Quick log error", err);
-      showCustomAlert("Logging Failed", err.message || "An unexpected error occurred. Please try again.", "error");
+      showCustomAlert("Logging Failed", err instanceof Error ? err.message : "An unexpected error occurred. Please try again.", "error");
     }
   };
 
   const handleQuickWater = async () => {
-    const userId = localStorage.getItem("healthos_userId");
-    if (!userId) return;
-
     try {
       const res = await fetch("/api/timeline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId,
           type: "water",
           payload: { amountL: 0.25, glasses: 1 },
           source: "manual",
@@ -361,7 +297,7 @@ export default function Dashboard() {
       });
 
       if (res.ok) {
-        await fetchDashboardData(userId);
+        await fetchDashboardData();
       }
     } catch (err) {
       console.error("Quick water log error", err);
@@ -369,19 +305,18 @@ export default function Dashboard() {
   };
 
   const handleToggleExamSickMode = async (modeType: "exam" | "sick" | "normal") => {
-    const userId = localStorage.getItem("healthos_userId");
-    if (!userId) return;
-
     try {
       if (modeType === "normal") {
+        // Removing the note is what ends the mode; otherwise it returns on reload.
+        const noteId = activeEvent?._id || activeEvent?.id;
+        if (noteId) await fetch(`/api/timeline?eventId=${noteId}`, { method: "DELETE" });
         setActiveEvent(null);
       } else {
-        const todayStr = new Date().toISOString().split("T")[0];
+        const todayStr = dayKey();
         const res = await fetch("/api/timeline", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userId,
             type: "note",
             payload: {
               title: modeType === "exam" ? "Exam Period" : "Sick Day",
@@ -393,7 +328,7 @@ export default function Dashboard() {
           }),
         });
         if (res.ok) {
-          await fetchDashboardData(userId);
+          await fetchDashboardData();
         }
       }
     } catch (err) {
@@ -432,8 +367,6 @@ export default function Dashboard() {
 
   const targetCal = profile?.targetCalories || 2200;
   const targetProt = profile?.targetProteinG || 150;
-  const targetFats = Math.round((targetCal * 0.25) / 9);
-  const targetCarbs = Math.round((targetCal - (targetProt * 4) - (targetFats * 9)) / 4);
   const sleepTarget = profile?.sleepTarget || 8;
   
   // Scale steps goal if busy event is active (guilt-free dynamic target scaling)
@@ -472,24 +405,18 @@ export default function Dashboard() {
   // Calculate Readiness Score dynamically based on Sleep & Sick states (guilt-free & honest)
   let readinessScore: number | null = null;
   let readinessStatus = "Calibrating 🔋";
-  let readinessDescription = "Log last night's sleep to calculate today's readiness score.";
 
   const isSick = activeEvent && activeEvent.payload.event_type === "sick";
 
   if (isSick) {
     readinessScore = 30;
     readinessStatus = "Low Energy (Sick) 🤒";
-    readinessDescription = "Take it easy today. Focus on rest and hydration without guilt.";
   } else if (today.sleepHours > 0) {
     readinessScore = Math.min(100, Math.round((today.sleepHours / sleepTarget) * 100));
     readinessStatus = readinessScore >= 80 ? "Fully Charged ⚡" : readinessScore >= 60 ? "Steady State 🔋" : "Low Energy ⚠️";
-    readinessDescription = readinessScore >= 80 
-      ? "Sleep goal met. You are physically ready for optimal performance today." 
-      : "Under-slept. Scale down workout intensity and prioritize recovery.";
   } else {
     readinessScore = null;
     readinessStatus = "Calibrating 🔋";
-    readinessDescription = "Log last night's sleep to unlock today's readiness score.";
   }
 
   // Checklist computation
@@ -850,7 +777,7 @@ export default function Dashboard() {
       {/* Today's Checklist (Bespoke Unified Dividers List) */}
       <div className="p-5 space-y-4 animate-in-delay-3 border border-white/5 bg-white/2 rounded-tl-3xl rounded-br-3xl text-left">
         <div className="flex justify-between items-baseline">
-          <h3 className="text-xs font-extrabold text-zinc-400 tracking-tight">Today's Mission</h3>
+          <h3 className="text-xs font-extrabold text-zinc-400 tracking-tight">Today&apos;s Mission</h3>
           <span className="text-xs font-bold text-[#8ba893]">{missionScore}% Done</span>
         </div>
 
@@ -897,7 +824,7 @@ export default function Dashboard() {
       </div>
 
       <div className="p-5 space-y-4 animate-in-delay-3 border border-white/5 bg-white/2 rounded-tl-3xl rounded-br-3xl text-left">
-        <h3 className="text-xs font-extrabold text-zinc-400 tracking-tight">Today's Logs</h3>
+        <h3 className="text-xs font-extrabold text-zinc-400 tracking-tight">Today&apos;s Logs</h3>
         {todayEvents.length === 0 ? (
           <div className="text-center py-6 px-4 border border-dashed border-white/10 rounded-2xl">
             <Sparkles className="w-5 h-5 text-[#8ba893] mx-auto animate-pulse" />
@@ -914,7 +841,7 @@ export default function Dashboard() {
               
               if (event.type === "meal") {
                 title = event.payload.loggedVia === "chatbot" ? "Meal Log" : "Meal Capture";
-                const foodsList = event.payload.foods?.map((f: any) => f.name).join(", ") || event.payload.mealType || "Meal";
+                const foodsList = event.payload.foods?.map((f) => f.name).join(", ") || event.payload.mealType || "Meal";
                 details = `${foodsList} (${event.payload.totalCalories || 0} kcal, ${event.payload.totalProteinG || event.payload.totalProtein || 0}g protein)`;
               } else if (event.type === "weight") {
                 title = "Weight Log";
@@ -949,7 +876,7 @@ export default function Dashboard() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeleteEvent(event._id || event.id);
+                      handleDeleteEvent(event._id);
                     }}
                     className="w-6 h-6 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center select-none cursor-pointer flex-shrink-0"
                     title="Delete log"
@@ -1380,7 +1307,7 @@ export default function Dashboard() {
                 <ul className="list-disc pl-4 space-y-1 text-[10px] text-zinc-400">
                   <li><strong>Log Morning Weight:</strong> Tracks rate of body weight changes.</li>
                   <li><strong>Snap Meal Photos:</strong> AI analyzes and updates your calories/protein.</li>
-                  <li><strong>Track Sleep:</strong> Unlocks your daily readiness HUD and scales targets if you're fatigued.</li>
+                  <li><strong>Track Sleep:</strong> Unlocks your daily readiness HUD and scales targets if you&apos;re fatigued.</li>
                 </ul>
               </div>
             </div>
@@ -1519,7 +1446,7 @@ export default function Dashboard() {
                   onClick={async () => {
                     const confirmed = await showCustomConfirm("Delete Log", "Are you sure you want to permanently delete this timeline entry?", true);
                     if (confirmed) {
-                      handleDeleteEvent(editingEvent._id || editingEvent.id);
+                      handleDeleteEvent(editingEvent._id);
                       setEditingEvent(null);
                     }
                   }}

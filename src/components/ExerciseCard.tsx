@@ -137,7 +137,7 @@ export default function ExerciseCard({
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-1.5 w-full py-1.5 text-[10px] text-zinc-400 hover:text-white transition-colors bg-white/5 rounded-lg hover:bg-white/10 font-medium"
             >
-              <span>Can't view? Open on YouTube ↗</span>
+              <span>Can&apos;t view? Open on YouTube ↗</span>
             </a>
           </motion.div>
         );

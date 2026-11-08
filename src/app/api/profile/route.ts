@@ -1,233 +1,86 @@
 import { NextRequest } from "next/server";
 import connectDB from "@/lib/mongodb";
-import { UserProfile, TimelineEvent } from "@/lib/db/models";
-import { getLocalProfile, saveLocalProfile, createLocalEvent, deleteLocalEvents, countLocalEvents, deleteLocalProfile } from "@/lib/db/fallback";
-import { calculateAdaptiveTdee } from "@/lib/tdee";
+import { AIMemory, Habit, HabitLog, OtpChallenge, TimelineEvent, UserProfile } from "@/lib/db/models";
+import { getLocalProfile, saveLocalProfile, deleteLocalEvents, deleteLocalProfile } from "@/lib/db/fallback";
+import { calculateAdaptiveTdee, calculateHealthTargets, goalCalorieTarget, ActivityLevel, Gender, Goal } from "@/lib/tdee";
+import { calculateLoggingStreak } from "@/lib/timelineUtils";
+import { clearSessionCookieHeader, createSessionToken, requireSession, Session, sessionCookieHeader } from "@/lib/auth/session";
+import { invalidBodyResponse, readJsonObject, validateProfileChoices, validateProfileMetrics } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Helper to calculate TDEE, BMR, and targets (deterministic math).
- */
-function calculateHealthTargets(data: {
-  age: number;
-  gender: "male" | "female" | "other";
-  heightCm: number;
-  weightKg: number;
-  targetWeightKg?: number;
-  neckCm?: number;
-  waistCm?: number;
-  hipCm?: number;
-  customCalories?: number;
-  customProtein?: number;
-  useCustomMacros?: boolean;
-  goal: "lose_fat" | "build_muscle" | "maintain" | "recomp" | "general_health";
-  activityLevel: "sedentary" | "light" | "moderate" | "active" | "very_active";
-  gymExperience: "beginner" | "intermediate" | "advanced";
-}) {
-  // 1. Calculate body fat percentage if measurements are provided (US Navy Method)
-  let bodyFatPct: number | null = null;
-  if (data.neckCm && data.waistCm && data.heightCm) {
-    const neck = data.neckCm;
-    const waist = data.waistCm;
-    const height = data.heightCm;
-    if (waist > neck) {
-      if (data.gender === "male") {
-        const waistIn = waist / 2.54;
-        const neckIn = neck / 2.54;
-        const heightIn = height / 2.54;
-        if (waistIn > neckIn) {
-          bodyFatPct = 86.010 * Math.log10(waistIn - neckIn) - 70.041 * Math.log10(heightIn) + 36.76;
-        }
-      } else {
-        const hip = data.hipCm || 0;
-        if (hip > 0) {
-          const waistIn = waist / 2.54;
-          const hipIn = hip / 2.54;
-          const neckIn = neck / 2.54;
-          const heightIn = height / 2.54;
-          if ((waistIn + hipIn) > neckIn) {
-            bodyFatPct = 163.205 * Math.log10(waistIn + hipIn - neckIn) - 97.684 * Math.log10(heightIn) - 78.387;
-          }
-        }
-      }
-    }
-  }
-
-  // 2. Calculate BMR
-  let bmr = 0;
-  if (bodyFatPct !== null && bodyFatPct > 0 && !isNaN(bodyFatPct)) {
-    // Katch-McArdle BMR (gold standard based on lean mass)
-    const leanMass = data.weightKg * (1 - bodyFatPct / 100);
-    bmr = 370 + 21.6 * leanMass;
-  } else {
-    // Mifflin-St Jeor fallback
-    bmr = 10 * data.weightKg + 6.25 * data.heightCm - 5 * data.age;
-    if (data.gender === "male") {
-      bmr += 5;
-    } else if (data.gender === "female") {
-      bmr -= 161;
-    } else {
-      bmr -= 80;
-    }
-  }
-
-  const multipliers = {
-    sedentary: 1.2,
-    light: 1.375,
-    moderate: 1.55,
-    active: 1.725,
-    very_active: 1.9,
-  };
-  const tdee = bmr * multipliers[data.activityLevel];
-
-  // Calculate reference weight based on body composition (BMI rules)
-  const heightM = data.heightCm / 100;
-  const bmi = data.weightKg / (heightM * heightM);
-  let referenceWeight = data.weightKg;
-  if (bmi > 25) {
-    const idealWeight = 22 * heightM * heightM;
-    referenceWeight = data.targetWeightKg || idealWeight;
-  }
-
-  let targetCalories = tdee;
-  let targetProteinG = referenceWeight * 2.0;
-
-  if (data.goal === "lose_fat") {
-    targetCalories -= 500;
-    targetProteinG = referenceWeight * 2.2;
-  } else if (data.goal === "build_muscle") {
-    targetCalories += 300;
-    targetProteinG = referenceWeight * 1.8;
-  } else if (data.goal === "recomp") {
-    targetCalories -= 100;
-    targetProteinG = referenceWeight * 2.3;
-  }
-
-  // Apply custom calorie/protein target overrides if requested (Philosophy 18: Autonomy)
-  if (data.useCustomMacros) {
-    if (data.customCalories && data.customCalories > 0) {
-      targetCalories = data.customCalories;
-    }
-    if (data.customProtein && data.customProtein > 0) {
-      targetProteinG = data.customProtein;
-    }
-  }
-
-  return {
-    bmr: Math.round(bmr),
-    tdee: Math.round(tdee),
-    targetCalories: Math.round(targetCalories),
-    targetProteinG: Math.round(targetProteinG),
-  };
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
 }
 
+function toNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? NaN : parsed;
+}
 
+/** Keeps the signed session's userId in step with the stored profile. */
+function sessionHeaders(session: Session, userId: string): HeadersInit | undefined {
+  if (session.userId === userId) return undefined;
+  const token = createSessionToken({ email: session.email, userId, tz: session.tz });
+  return { "Set-Cookie": sessionCookieHeader(token) };
+}
 
 export async function GET(request: NextRequest) {
+  const session = requireSession(request);
+  if (session instanceof Response) return session;
+
   try {
-    const { searchParams } = new URL(request.url);
-    const email = searchParams.get("email");
-
-    if (!email) {
-      return Response.json({ notInitialized: true }, { status: 200 });
-    }
-
     await connectDB();
-    const profileDoc = await UserProfile.findOne({ email: email.toLowerCase() });
+    const profileDoc = await UserProfile.findOne({ email: session.email });
 
     if (!profileDoc) {
-      return Response.json({ notInitialized: true }, { status: 200 });
+      return Response.json({ notInitialized: true });
     }
 
     const profile = profileDoc.toObject();
+    const userId = String(profile._id);
 
-    // Query events to calculate Adaptive TDEE
-    const events = await TimelineEvent.find({ userId: profile._id }).lean();
-    const tdeeResult = calculateAdaptiveTdee(profile, events);
+    // Only the fields the TDEE and streak calculations read.
+    const events = await TimelineEvent.find({ userId: profile._id })
+      .select("type timestamp payload.totalCalories payload.weightKg")
+      .lean();
+    const tdeeResult = calculateAdaptiveTdee(profile, events, session.tz);
 
-    // If adaptive TDEE is computed and differs from stored, let's update it in the DB
     if (tdeeResult.status === "adaptive" && tdeeResult.calculatedTdee !== profile.tdee) {
       profileDoc.tdee = tdeeResult.calculatedTdee;
-      
-      // Re-calculate target calories based on goal if custom macros overrides are NOT enabled
       if (!profileDoc.useCustomMacros) {
-        let newTargetCalories = tdeeResult.calculatedTdee;
-        if (profileDoc.goal === "lose_fat") {
-          newTargetCalories -= 500;
-        } else if (profileDoc.goal === "build_muscle") {
-          newTargetCalories += 300;
-        } else if (profileDoc.goal === "recomp") {
-          newTargetCalories -= 100;
-        }
-        profileDoc.targetCalories = Math.round(newTargetCalories);
+        profileDoc.targetCalories = goalCalorieTarget(tdeeResult.calculatedTdee, profileDoc.goal, profileDoc.gender);
       }
-      
       await profileDoc.save();
       profile.tdee = profileDoc.tdee;
       profile.targetCalories = profileDoc.targetCalories;
     }
 
-    // Calculate Logging Streak
-    const uniqueLoggingDays = new Set(
-      events.map((e) => new Date(e.timestamp).toDateString())
+    return Response.json(
+      {
+        profile,
+        tdeeMode: tdeeResult.status,
+        daysRemaining: tdeeResult.daysRemaining,
+        avgCalories: tdeeResult.avgCalories,
+        weightDeltaKg: tdeeResult.weightDeltaKg,
+        streak: calculateLoggingStreak(events.map((event) => event.timestamp), session.tz),
+      },
+      { headers: sessionHeaders(session, userId) }
     );
-
-    let streak = 0;
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    const todayStr = startOfToday.toDateString();
-    const yesterday = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
-    const yesterdayStr = yesterday.toDateString();
-
-    let currentCheck = startOfToday;
-    if (uniqueLoggingDays.has(todayStr)) {
-      streak = 1;
-      currentCheck = yesterday;
-    } else if (uniqueLoggingDays.has(yesterdayStr)) {
-      streak = 1;
-      currentCheck = new Date(yesterday.getTime() - 24 * 60 * 60 * 1000);
-    }
-
-    if (streak > 0) {
-      while (true) {
-        const dateStr = currentCheck.toDateString();
-        if (uniqueLoggingDays.has(dateStr)) {
-          streak++;
-          currentCheck = new Date(currentCheck.getTime() - 24 * 60 * 60 * 1000);
-        } else {
-          break;
-        }
-      }
-    }
-
-    return Response.json({
-      profile,
-      tdeeMode: tdeeResult.status,
-      daysRemaining: tdeeResult.daysRemaining,
-      avgCalories: tdeeResult.avgCalories,
-      weightDeltaKg: tdeeResult.weightDeltaKg,
-      streak,
-    });
   } catch (error) {
-    console.warn("⚠️ MongoDB connection failed. Falling back to local file DB.");
-    if (process.env.NODE_ENV === "production") {
-      return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
+    console.warn("Profile GET could not reach MongoDB:", error);
+    if (isProduction()) {
+      return Response.json({ error: "Database offline. Please try again later." }, { status: 503 });
     }
-    const { searchParams } = new URL(request.url);
-    const email = searchParams.get("email");
-    const profile = await getLocalProfile(email || undefined);
-    if (!profile) {
-      return Response.json({ notInitialized: true }, { status: 200 });
-    }
-    return Response.json({
-      profile,
-      tdeeMode: "calibrating",
-      daysRemaining: 14,
-      avgCalories: 0,
-      weightDeltaKg: 0,
-    });
+
+    const profile = await getLocalProfile(session.email);
+    if (!profile) return Response.json({ notInitialized: true });
+
+    return Response.json(
+      { profile, tdeeMode: "calibrating", daysRemaining: 14, avgCalories: 0, weightDeltaKg: 0, streak: 0 },
+      { headers: sessionHeaders(session, profile._id) }
+    );
   }
 }
 
@@ -235,9 +88,83 @@ export async function GET(request: NextRequest) {
  * POST /api/profile
  */
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const {
-    name,
+  const session = requireSession(request);
+  if (session instanceof Response) return session;
+
+  const body = await readJsonObject(request);
+  if (!body) return invalidBodyResponse();
+
+  const { name, goal, activityLevel, gymExperience, gender } = body;
+  const email = session.email;
+
+  if (typeof name !== "string" || !name.trim() || !body.age || !gender || !body.heightCm || !body.weightKg || !goal || !activityLevel || !gymExperience) {
+    return Response.json(
+      { error: "Basics, physical details, goal, activity level, and experience are required" },
+      { status: 400 }
+    );
+  }
+
+  const choiceError = validateProfileChoices(body);
+  if (choiceError) return Response.json({ error: choiceError }, { status: 400 });
+
+  let existing: Record<string, unknown> | null = null;
+  try {
+    await connectDB();
+    existing = await UserProfile.findOne({ email }).lean<Record<string, unknown>>();
+  } catch (error) {
+    if (isProduction()) {
+      console.error("Profile POST could not reach MongoDB:", error);
+      return Response.json({ error: "Database offline. Please try again later." }, { status: 503 });
+    }
+    existing = await getLocalProfile(email);
+  }
+
+  /** Field from the request when present, otherwise the stored value. */
+  const pick = <T>(key: string, fallback: T): T =>
+    body[key] !== undefined ? (body[key] as T) : ((existing?.[key] as T | undefined) ?? fallback);
+
+  const age = toNumber(body.age) as number;
+  const heightCm = toNumber(body.heightCm) as number;
+  const weightKg = toNumber(body.weightKg) as number;
+  const targetWeightKg = toNumber(body.targetWeightKg) ?? (existing?.targetWeightKg as number | undefined) ?? weightKg;
+  const sleepTarget = toNumber(body.sleepTarget) ?? (existing?.sleepTarget as number | undefined) ?? 8;
+
+  const metrics = validateProfileMetrics({ age, heightCm, weightKg, targetWeightKg, sleepTarget });
+  if (!metrics.valid) {
+    return Response.json({ error: metrics.errors[0] }, { status: 400 });
+  }
+
+  const neckCm = toNumber(body.neckCm);
+  const waistCm = toNumber(body.waistCm);
+  const hipCm = toNumber(body.hipCm);
+  const customCalories = toNumber(body.customCalories);
+  const customProtein = toNumber(body.customProtein);
+  const useCustomMacros = pick<boolean>("useCustomMacros", false);
+  const gymFrequency = toNumber(body.gymFrequency) ?? (existing?.gymFrequency as number | undefined) ?? 4;
+
+  const optionalNumbers = [neckCm, waistCm, hipCm, customCalories, customProtein, gymFrequency];
+  if (optionalNumbers.some((value) => value !== undefined && (Number.isNaN(value) || value < 0))) {
+    return Response.json({ error: "Measurements and custom targets must be positive numbers." }, { status: 400 });
+  }
+
+  const targets = calculateHealthTargets({
+    age,
+    gender: gender as Gender,
+    heightCm,
+    weightKg,
+    targetWeightKg,
+    neckCm,
+    waistCm,
+    hipCm,
+    customCalories,
+    customProtein,
+    useCustomMacros,
+    goal: goal as Goal,
+    activityLevel: activityLevel as ActivityLevel,
+  });
+
+  const profileData: Record<string, unknown> & { email: string } = {
+    name: name.trim(),
     email,
     age,
     gender,
@@ -248,158 +175,82 @@ export async function POST(request: NextRequest) {
     activityLevel,
     gymExperience,
     gymFrequency,
-    gymAccess,
-    messAccess,
-    dietPreference,
-    foodAllergies,
-    medicalConditions,
+    gymAccess: pick("gymAccess", "college_gym"),
+    messAccess: pick("messAccess", "hostel_mess"),
+    dietPreference: pick("dietPreference", "none"),
+    foodAllergies: pick<string[]>("foodAllergies", []),
+    medicalConditions: pick<string[]>("medicalConditions", []),
     sleepTarget,
-    collegeSchedule,
+    collegeSchedule: pick("collegeSchedule", ""),
+    strictMessOnly: pick("strictMessOnly", false),
+    customDietPreferences: pick("customDietPreferences", ""),
     neckCm,
     waistCm,
     hipCm,
     customCalories,
     customProtein,
     useCustomMacros,
-    strictMessOnly,
-    customDietPreferences,
-  } = body;
-
-  if (!name || !email || !age || !gender || !heightCm || !weightKg || !goal || !activityLevel || !gymExperience) {
-    return Response.json(
-      { error: "Basics, physical details, goal, activity level, and experience are required" },
-      { status: 400 }
-    );
-  }
-
-  const parsedWeight = parseFloat(weightKg);
-
-  const targets = calculateHealthTargets({
-    age: parseInt(age),
-    gender,
-    heightCm: parseInt(heightCm),
-    weightKg: parsedWeight,
-    targetWeightKg: targetWeightKg ? parseFloat(targetWeightKg) : undefined,
-    neckCm: neckCm ? parseFloat(neckCm) : undefined,
-    waistCm: waistCm ? parseFloat(waistCm) : undefined,
-    hipCm: hipCm ? parseFloat(hipCm) : undefined,
-    customCalories: customCalories ? parseInt(customCalories) : undefined,
-    customProtein: customProtein ? parseInt(customProtein) : undefined,
-    useCustomMacros: useCustomMacros || false,
-    goal,
-    activityLevel,
-    gymExperience,
-  });
-
-  let existingProfile: any = null;
-  try {
-    await connectDB();
-    existingProfile = await UserProfile.findOne({ email }).lean();
-  } catch (err) {
-    existingProfile = await getLocalProfile(email);
-  }
-
-  const profileData: any = {
-    name,
-    email,
-    age: parseInt(age),
-    gender,
-    heightCm: parseInt(heightCm),
-    weightKg: parsedWeight,
-    targetWeightKg: targetWeightKg ? parseFloat(targetWeightKg) : parsedWeight,
-    goal,
-    activityLevel,
-    gymExperience,
-    gymFrequency: gymFrequency !== undefined ? parseInt(gymFrequency) : (existingProfile?.gymFrequency || 4),
-    gymAccess: gymAccess || existingProfile?.gymAccess || "college_gym",
-    messAccess: messAccess || existingProfile?.messAccess || "hostel_mess",
-    dietPreference: dietPreference || existingProfile?.dietPreference || "none",
-    foodAllergies: foodAllergies || existingProfile?.foodAllergies || [],
-    medicalConditions: medicalConditions || existingProfile?.medicalConditions || [],
-    sleepTarget: parseInt(sleepTarget || "8"),
-    collegeSchedule: collegeSchedule || existingProfile?.collegeSchedule || "",
-    strictMessOnly: strictMessOnly !== undefined ? strictMessOnly : (existingProfile?.strictMessOnly || false),
-    neckCm: neckCm ? parseFloat(neckCm) : undefined,
-    waistCm: waistCm ? parseFloat(waistCm) : undefined,
-    hipCm: hipCm ? parseFloat(hipCm) : undefined,
-    customCalories: customCalories ? parseInt(customCalories) : undefined,
-    customProtein: customProtein ? parseInt(customProtein) : undefined,
-    useCustomMacros: useCustomMacros !== undefined ? useCustomMacros : (existingProfile?.useCustomMacros || false),
-    customDietPreferences: customDietPreferences !== undefined ? customDietPreferences : (existingProfile?.customDietPreferences || ""),
     ...targets,
   };
 
-  if (body.messMenu !== undefined) {
-    profileData.messMenu = body.messMenu;
-  }
-  if (body.dietPlan !== undefined) {
-    profileData.dietPlan = body.dietPlan;
-  }
-
-  let savedProfile: any = null;
-  let isNewProfile = false;
+  if (body.messMenu !== undefined) profileData.messMenu = body.messMenu;
+  if (body.dietPlan !== undefined) profileData.dietPlan = body.dietPlan;
 
   try {
-    isNewProfile = !existingProfile;
-
-    savedProfile = await UserProfile.findOneAndUpdate(
+    const saved = await UserProfile.findOneAndUpdate(
       { email },
       { $set: profileData },
-      { new: true, upsert: true }
+      { new: true, upsert: true, runValidators: true }
     );
+    return Response.json({ profile: saved }, { headers: sessionHeaders(session, String(saved._id)) });
   } catch (error) {
-    console.warn("⚠️ MongoDB connection failed during POST. Saving to local file DB.");
-    if (process.env.NODE_ENV === "production") {
-      return Response.json({ error: "Database offline. Please try again later." }, { status: 500 });
+    if ((error as Error)?.name === "ValidationError") {
+      return Response.json({ error: "Some profile details are invalid." }, { status: 400 });
     }
-    const existingLocal = await getLocalProfile(email);
-    isNewProfile = !existingLocal;
-    savedProfile = await saveLocalProfile(profileData);
+    console.warn("Profile save could not reach MongoDB:", error);
+    if (isProduction()) {
+      return Response.json({ error: "Database offline. Please try again later." }, { status: 503 });
+    }
+    const saved = await saveLocalProfile(profileData);
+    return Response.json({ profile: saved }, { headers: sessionHeaders(session, saved._id) });
   }
-
-
-
-  return Response.json({ profile: savedProfile }, { status: 200 });
 }
 
 /**
  * DELETE /api/profile
+ * Permanently removes the signed-in user's account and all of their data.
  */
 export async function DELETE(request: NextRequest) {
+  const session = requireSession(request);
+  if (session instanceof Response) return session;
+
+  const clearCookie = { headers: { "Set-Cookie": clearSessionCookieHeader() } };
+
   try {
-    const { searchParams } = new URL(request.url);
-    const email = searchParams.get("email");
-
-    if (!email) {
-      return Response.json({ error: "email is required" }, { status: 400 });
+    await connectDB();
+    const profile = await UserProfile.findOne({ email: session.email }).select("_id").lean();
+    if (profile) {
+      const userId = profile._id;
+      await Promise.all([
+        TimelineEvent.deleteMany({ userId }),
+        Habit.deleteMany({ userId }),
+        HabitLog.deleteMany({ userId }),
+        AIMemory.deleteMany({ userId }),
+      ]);
+      await UserProfile.deleteOne({ _id: userId });
     }
-
-    try {
-      await connectDB();
-      const profile = await UserProfile.findOne({ email: email.toLowerCase() });
-      if (profile) {
-        const userId = profile._id.toString();
-        // Delete all timeline events for this user
-        await TimelineEvent.deleteMany({ userId });
-        // Delete user profile
-        await UserProfile.deleteOne({ email: email.toLowerCase() });
-        console.log(`✅ Deleted MongoDB profile and timeline events for: ${email}`);
-      }
-    } catch (dbError) {
-      console.warn("⚠️ MongoDB offline. Deleting local JSON record.");
-      const profile = await getLocalProfile(email);
-      if (profile) {
-        const userId = profile._id.toString();
-        await deleteLocalEvents(userId);
-        await deleteLocalProfile(email);
-        console.log(`✅ Deleted local JSON profile and events for: ${email}`);
-      }
-    }
-
-    return Response.json({ success: true });
+    await OtpChallenge.deleteOne({ email: session.email });
+    return Response.json({ success: true }, clearCookie);
   } catch (error) {
-    console.error("Profile DELETE error:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    console.warn("Profile DELETE could not reach MongoDB:", error);
+    if (isProduction()) {
+      return Response.json({ error: "Database offline. Please try again later." }, { status: 503 });
+    }
+    const profile = await getLocalProfile(session.email);
+    if (profile) {
+      await deleteLocalEvents(profile._id);
+      await deleteLocalProfile(session.email);
+    }
+    return Response.json({ success: true }, clearCookie);
   }
 }
-

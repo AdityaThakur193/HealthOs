@@ -1,41 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-/**
- * Validation Logic for Profile Metrics & API Payloads
- */
-function validateProfileMetrics(data: {
-  age?: number;
-  heightCm?: number;
-  weightKg?: number;
-  targetWeightKg?: number;
-  sleepTarget?: number;
-}): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  if (data.age !== undefined && (data.age < 10 || data.age > 120)) {
-    errors.push("Age must be between 10 and 120.");
-  }
-  if (data.heightCm !== undefined && (data.heightCm < 50 || data.heightCm > 250)) {
-    errors.push("Height must be between 50 cm and 250 cm.");
-  }
-  if (data.weightKg !== undefined && (data.weightKg < 20 || data.weightKg > 500)) {
-    errors.push("Weight must be between 20 kg and 500 kg.");
-  }
-  if (data.targetWeightKg !== undefined && (data.targetWeightKg < 20 || data.targetWeightKg > 500)) {
-    errors.push("Target weight must be between 20 kg and 500 kg.");
-  }
-  if (data.sleepTarget !== undefined && (data.sleepTarget < 1 || data.sleepTarget > 24)) {
-    errors.push("Sleep target must be between 1 and 24 hours.");
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-
-function validateMessMenuInput(text: string): { valid: boolean; error?: string } {
-  if (typeof text !== "string") return { valid: false, error: "Input must be text." };
-  if (text.length > 50000) return { valid: false, error: "Mess menu exceeds maximum limit of 50,000 characters." };
-  return { valid: true };
-}
+import { validateImageInput, validateMessMenuInput, validateProfileMetrics, validateTimelinePayload } from "../lib/validation";
 
 describe("API Payloads & Edge Case Validation", () => {
   describe("Profile Physical Metrics Boundaries", () => {
@@ -83,44 +47,42 @@ describe("API Payloads & Edge Case Validation", () => {
   });
 
   describe("Timeline Payload Edge Cases & Sanity Validation", () => {
-    it("should reject unrealistic water intake (e.g. 100L of water)", () => {
-      const waterVal = (amount: number) => {
-        if (amount <= 0 || amount > 10) return "Invalid water";
-        return "Valid";
-      };
-      expect(waterVal(100)).toBe("Invalid water");
-      expect(waterVal(-2)).toBe("Invalid water");
-      expect(waterVal(1.5)).toBe("Valid");
+    it("should bound water intake", () => {
+      expect(validateTimelinePayload("water", { amountL: 100 })).toContain("cannot exceed");
+      expect(validateTimelinePayload("water", { amountL: -2 })).toContain("greater than 0");
+      expect(validateTimelinePayload("water", { amountL: 1.5 })).toBeNull();
     });
 
-    it("should reject sleep durations > 24 hours or <= 0", () => {
-      const sleepVal = (hours: number) => {
-        if (hours <= 0 || hours > 24) return "Invalid sleep";
-        return "Valid";
-      };
-      expect(sleepVal(28)).toBe("Invalid sleep");
-      expect(sleepVal(0)).toBe("Invalid sleep");
-      expect(sleepVal(7.5)).toBe("Valid");
+    it("should bound sleep duration", () => {
+      expect(validateTimelinePayload("sleep", { hours: 28 })).toContain("cannot exceed");
+      expect(validateTimelinePayload("sleep", { hours: 0 })).toContain("greater than 0");
+      expect(validateTimelinePayload("sleep", { hours: 7.5 })).toBeNull();
     });
 
-    it("should reject step counts > 100,000 or negative steps", () => {
-      const stepsVal = (count: number) => {
-        if (count < 0 || count > 100000) return "Invalid steps";
-        return "Valid";
-      };
-      expect(stepsVal(500000)).toBe("Invalid steps");
-      expect(stepsVal(-50)).toBe("Invalid steps");
-      expect(stepsVal(8500)).toBe("Valid");
+    it("should bound step counts, reading count before steps", () => {
+      expect(validateTimelinePayload("steps", { count: 500000 })).toContain("cannot exceed");
+      expect(validateTimelinePayload("steps", { count: -50 })).toContain("negative");
+      expect(validateTimelinePayload("steps", { count: 0, steps: 999999 })).toBeNull();
+      expect(validateTimelinePayload("steps", { count: 8500 })).toBeNull();
     });
 
-    it("should reject impossible human weight logs", () => {
-      const weightVal = (w: number) => {
-        if (w < 25 || w > 350) return "Invalid weight";
-        return "Valid";
-      };
-      expect(weightVal(15)).toBe("Invalid weight");
-      expect(weightVal(900)).toBe("Invalid weight");
-      expect(weightVal(74.5)).toBe("Valid");
+    it("should bound weight logs", () => {
+      expect(validateTimelinePayload("weight", { weightKg: 15 })).toContain("between 25 kg and 350 kg");
+      expect(validateTimelinePayload("weight", { weightKg: 900 })).toContain("between 25 kg and 350 kg");
+      expect(validateTimelinePayload("weight", { weightKg: 74.5 })).toBeNull();
+    });
+
+    it("should refuse mock meals and non-object payloads", () => {
+      expect(validateTimelinePayload("meal", { isMock: true, totalCalories: 100 })).toContain("mock");
+      expect(validateTimelinePayload("meal", [])).toContain("valid object");
+    });
+  });
+
+  describe("Image Input Limits", () => {
+    it("should reject oversized and unsupported images", () => {
+      expect(validateImageInput("a".repeat(11 * 1024 * 1024), "image/jpeg")).toContain("too large");
+      expect(validateImageInput("abc", "application/pdf")).toContain("Unsupported");
+      expect(validateImageInput("abc", "image/jpeg")).toBeNull();
     });
   });
 });

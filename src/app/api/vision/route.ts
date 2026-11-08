@@ -1,7 +1,11 @@
+import crypto from "crypto";
 import { NextRequest } from "next/server";
 import { analyzeMealImage, analyzeMealTextWithGroq, MealAnalysis, DetectedFoodItem } from "@/lib/gemini";
 import { calculateFoodMacros } from "@/lib/ifctData";
 import { matchIngredient, resolveCulinaryPortion } from "@/lib/ifctMatcher";
+import { requireUserSession } from "@/lib/auth/session";
+import { checkRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
+import { invalidBodyResponse, MAX_MEAL_TEXT_CHARS, readJsonObject, validateImageInput } from "@/lib/validation";
 
 export function getMockMealAnalysis(): MealAnalysis {
   const item1 = calculateFoodMacros("Roti", 2, "piece");
@@ -182,7 +186,7 @@ export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnaly
       name: food.name || computed.name,
       dishName: food.dishName || computed.id,
       quantity: computed.quantity,
-      unitType: (computed.unitType as any) || "piece",
+      unitType: (computed.unitType as DetectedFoodItem["unitType"]) || "piece",
       estimatedCalories: computed.calories,
       proteinG: computed.proteinG,
       carbsG: computed.carbsG,
@@ -239,7 +243,21 @@ export function enrichMealAnalysisWithIFCT(rawAnalysis: MealAnalysis): MealAnaly
   };
 }
 
+const VISION_CACHE_MAX_ENTRIES = 200;
 const visionCache = new Map<string, MealAnalysis>();
+
+function cacheAnalysis(key: string, analysis: MealAnalysis) {
+  if (visionCache.size >= VISION_CACHE_MAX_ENTRIES) {
+    const oldest = visionCache.keys().next().value;
+    if (oldest !== undefined) visionCache.delete(oldest);
+  }
+  visionCache.set(key, analysis);
+}
+
+function isQuotaError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /quota|429|resource_exhausted|rate limit/i.test(message);
+}
 
 /**
  * POST /api/vision
@@ -248,26 +266,40 @@ const visionCache = new Map<string, MealAnalysis>();
  * Uses Gemini 2.5 Flash Vision for image capture, with Groq AI (openai/gpt-oss-20b) + ICMR-NIN IFCT 2017 fallback!
  */
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { imageBase64, mimeType, mealText } = body;
+  const session = requireUserSession(request);
+  if (session instanceof Response) return session;
 
+  const body = await readJsonObject(request);
+  if (!body) return invalidBodyResponse();
+  const imageBase64 = body.imageBase64 as string | undefined;
+  const mimeType = body.mimeType as string | undefined;
+  const mealText = body.mealText as string | undefined;
+
+  if (imageBase64) {
+    const imageError = validateImageInput(imageBase64, mimeType);
+    if (imageError) return Response.json({ error: imageError }, { status: 400 });
+  }
+  if (mealText !== undefined && (typeof mealText !== "string" || mealText.length > MAX_MEAL_TEXT_CHARS)) {
+    return Response.json({ error: "Meal description is too long." }, { status: 400 });
+  }
+  if (!checkRateLimit(`vision:${session.userId}`, 40, 60 * 60 * 1000)) {
+    return rateLimitedResponse();
+  }
+
+  try {
     // Handle pure text meal analysis request
     if (mealText && !imageBase64) {
       try {
-        console.log(`⚡ Analyzing text meal description using Groq AI + IFCT 2017: "${mealText}"...`);
         const rawAnalysis = await analyzeMealTextWithGroq(mealText);
         const analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
         return Response.json({ analysis, isMock: false, source: "groq_text" });
-      } catch (groqErr: any) {
-        console.warn("⚠️ Groq text meal analysis failed, using mock fallback:", groqErr);
-        const errMsg = groqErr?.message || String(groqErr);
-        const isQuota = /quota|429|resource_exhausted|rate limit/i.test(errMsg);
+      } catch (groqErr) {
+        console.warn("Groq text meal analysis failed, using mock fallback:", groqErr);
         return Response.json({
           analysis: getMockMealAnalysis(),
           isMock: true,
           source: "mock",
-          mockReason: isQuota ? "quota_exceeded" : "api_error",
+          mockReason: isQuotaError(groqErr) ? "quota_exceeded" : "api_error",
         });
       }
     }
@@ -280,10 +312,9 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-    const imageKey = cleanBase64.slice(0, 100) + cleanBase64.slice(-100) + cleanBase64.length;
+    const imageKey = crypto.createHash("sha256").update(cleanBase64).digest("hex");
 
     if (visionCache.has(imageKey)) {
-      console.log("⚡ Returning cached Vision Analysis result for identical image submission...");
       return Response.json({ analysis: visionCache.get(imageKey)!, isMock: false, source: "cache" });
     }
 
@@ -296,23 +327,21 @@ export async function POST(request: NextRequest) {
 
     if (geminiKey && geminiKey !== "your_gemini_api_key_here") {
       try {
-        console.log("⚡ Analyzing meal image using Gemini Vision + IFCT 2017 Engine...");
         const rawAnalysis = await analyzeMealImage(cleanBase64, mimeType || "image/jpeg");
         analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
-        visionCache.set(imageKey, analysis);
+        cacheAnalysis(imageKey, analysis);
         isMock = false;
         source = "gemini_vision";
-      } catch (geminiError: any) {
-        console.warn("⚠️ Gemini Vision API call failed, attempting Groq text fallback:", geminiError);
-        const errMsg = geminiError?.message || String(geminiError);
-        const isQuota = /quota|429|resource_exhausted|rate limit/i.test(errMsg);
+      } catch (geminiError) {
+        console.warn("Gemini Vision call failed, attempting Groq text fallback:", geminiError);
+        const isQuota = isQuotaError(geminiError);
         if (mealText) {
           try {
             const rawAnalysis = await analyzeMealTextWithGroq(mealText);
             analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
             isMock = false;
             source = "groq_text_fallback";
-          } catch (groqError) {
+          } catch {
             analysis = getMockMealAnalysis();
             isMock = true;
             source = "mock";
@@ -327,21 +356,17 @@ export async function POST(request: NextRequest) {
       }
     } else if (mealText) {
       try {
-        console.log("⚡ No Gemini key; analyzing meal text using Groq AI...");
         const rawAnalysis = await analyzeMealTextWithGroq(mealText);
         analysis = enrichMealAnalysisWithIFCT(rawAnalysis);
         isMock = false;
         source = "groq_text";
-      } catch (groqError: any) {
+      } catch (groqError) {
         analysis = getMockMealAnalysis();
         isMock = true;
         source = "mock";
-        const errMsg = groqError?.message || String(groqError);
-        const isQuota = /quota|429|resource_exhausted|rate limit/i.test(errMsg);
-        mockReason = isQuota ? "quota_exceeded" : "api_error";
+        mockReason = isQuotaError(groqError) ? "quota_exceeded" : "api_error";
       }
     } else {
-      console.log("⚠️ No Gemini API key configured. Using mock IFCT analysis.");
       analysis = getMockMealAnalysis();
       isMock = true;
       source = "mock";

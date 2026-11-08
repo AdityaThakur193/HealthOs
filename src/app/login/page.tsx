@@ -8,7 +8,6 @@ export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
-  const [hash, setHash] = useState("");
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -33,7 +32,6 @@ export default function Login() {
       const data = await res.json();
       
       if (res.ok && data.success) {
-        setHash(data.hash);
         setStep(2);
       } else {
         setError(data.error || "Failed to send login code.");
@@ -57,39 +55,30 @@ export default function Login() {
     setError("");
 
     try {
-      // 1. Verify OTP
       const verifyRes = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), otp, hash }),
+        body: JSON.stringify({
+          email: email.trim(),
+          otp,
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
       });
+      const verifyData = await verifyRes.json();
 
       if (!verifyRes.ok) {
-        const verifyData = await verifyRes.json();
         setError(verifyData.error || "Invalid or expired code.");
-        setLoading(false);
         return;
       }
 
-      // 2. If OTP is valid, proceed with login/profile fetching
-      const profileRes = await fetch(`/api/profile?email=${encodeURIComponent(email.trim())}`);
-      
-      if (profileRes.ok) {
-        const profileData = await profileRes.json();
-        
-        // Save to local storage for session isolation
-        localStorage.setItem("healthos_email", email.trim().toLowerCase());
+      // The server has set the session cookie; this only enables instant rendering.
+      localStorage.setItem("healthos_email", verifyData.email);
 
-        if (profileData.notInitialized) {
-          // New user -> direct to onboarding wizard
-          router.push(`/onboarding?email=${encodeURIComponent(email.trim())}`);
-        } else {
-          // Existing user -> set ID and enter dashboard
-          localStorage.setItem("healthos_userId", profileData.profile._id);
-          router.push("/");
-        }
+      if (verifyData.userId) {
+        localStorage.setItem("healthos_userId", verifyData.userId);
+        router.push("/");
       } else {
-        setError("Verified, but unable to load profile data.");
+        router.push(`/onboarding?email=${encodeURIComponent(verifyData.email)}`);
       }
     } catch (err) {
       console.error("Login connection error:", err);

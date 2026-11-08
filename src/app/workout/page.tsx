@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import type { TimelineEntry } from "@/lib/timelineUtils";
 import GlassCard from "@/components/GlassCard";
 import ExerciseCard from "@/components/ExerciseCard";
 import CustomPopup from "@/components/CustomPopup";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
-import { getTodaysWorkout, getWeekSchedule, type WorkoutPlan } from "@/lib/workoutPlans";
-import { Dumbbell, Flame, Lightbulb, Plus, Activity, BookOpen, Compass, ChevronDown, CheckCircle, Info } from "lucide-react";
+import { calculateProgression, getTodaysWorkout, getWeekSchedule, type PreviousSet, type WorkoutPlan } from "@/lib/workoutPlans";
+import { Dumbbell, Flame, Lightbulb, Plus, Compass, CheckCircle } from "lucide-react";
 
 interface ExerciseState {
   id: string;
@@ -29,7 +30,7 @@ export default function WorkoutTracker() {
   const [fetchingHistory, setFetchingHistory] = useState(true);
   const [exercises, setExercises] = useState<ExerciseState[]>([]);
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
-  const [pastWorkouts, setPastWorkouts] = useState<any[]>([]);
+  const [pastWorkouts, setPastWorkouts] = useState<TimelineEntry[]>([]);
   const [showHowToLog, setShowHowToLog] = useState(false);
   const [customExName, setCustomExName] = useState("");
   const [customExMuscle, setCustomExMuscle] = useState("");
@@ -40,21 +41,8 @@ export default function WorkoutTracker() {
 
   const loadWorkoutData = useCallback(async () => {
     if (!userId || !profile) return;
-    setFetchingHistory(true);
     try {
-      let todaysPlan: WorkoutPlan;
-      
-      // Override with DB-stored personalized plan if available
-      if ((profile as any).customWorkoutPlan && (profile as any).customWorkoutPlan[selectedDay]) {
-        todaysPlan = (profile as any).customWorkoutPlan[selectedDay];
-      } else {
-        todaysPlan = getTodaysWorkout({
-          gymFrequency: profile.gymFrequency,
-          gymExperience: profile.gymExperience,
-          goal: profile.goal,
-        }, selectedDay);
-      }
-      
+      const todaysPlan = getTodaysWorkout(profile, selectedDay);
       setPlan(todaysPlan);
 
       // If rest day, no exercises to load
@@ -78,8 +66,8 @@ export default function WorkoutTracker() {
         })),
       }));
 
-      // Fetch timeline workout events to find previous history
-      const res = await fetch(`/api/timeline?userId=${userId}&type=workout&limit=5`);
+      // Each split day repeats weekly at best, so look back far enough to reach it.
+      const res = await fetch("/api/timeline?type=workout&limit=30");
       if (res.ok) {
         const data = await res.json();
         const pastEvents = data.events || [];
@@ -92,45 +80,23 @@ export default function WorkoutTracker() {
             if (!prevExercises) continue;
 
             const prevEx = prevExercises.find(
-              (pe: any) => pe.id === currentEx.id || pe.name === currentEx.name
+              (pe: { id?: string; name: string; sets?: PreviousSet[] }) => pe.id === currentEx.id || pe.name === currentEx.name
             );
+            if (!prevEx?.sets?.length) continue;
 
-            if (prevEx && prevEx.sets && prevEx.sets.length > 0) {
-              const completedSets = prevEx.sets.filter((s: any) => s.completed);
-              const activeSets = completedSets.length > 0 ? completedSets : prevEx.sets;
+            const progression = calculateProgression(prevEx.sets, currentEx.targetReps, currentEx.id);
+            if (!progression) continue;
 
-              const maxWeight = Math.max(...activeSets.map((s: any) => s.weight || 0));
-
-              const setsAtMaxWeight = activeSets.filter((s: any) => s.weight === maxWeight);
-              const maxRepsAtMaxWeight = setsAtMaxWeight.length > 0
-                ? Math.max(...setsAtMaxWeight.map((s: any) => s.reps || 0))
-                : 0;
-
-              const targetRepParts = currentEx.targetReps.split("-");
-              const maxTargetReps = parseInt(targetRepParts[targetRepParts.length - 1]);
-
-              let suggestedWeight = maxWeight;
-
-              if (maxRepsAtMaxWeight >= maxTargetReps && maxWeight > 0) {
-                const isDumbbell =
-                  currentEx.id.includes("dumbbell") ||
-                  currentEx.id.includes("db") ||
-                  currentEx.id.includes("lateral");
-                const increment = isDumbbell ? 2 : 2.5;
-                suggestedWeight = maxWeight + increment;
-              }
-
-              return {
-                ...currentEx,
-                previousWeight: maxWeight > 0 ? maxWeight : undefined,
-                suggestedWeight: suggestedWeight > 0 ? suggestedWeight : undefined,
-                sets: currentEx.sets.map(() => ({
-                  weight: suggestedWeight,
-                  reps: 0,
-                  completed: false,
-                })),
-              };
-            }
+            return {
+              ...currentEx,
+              previousWeight: progression.previousWeight,
+              suggestedWeight: progression.suggestedWeight,
+              sets: currentEx.sets.map(() => ({
+                weight: progression.suggestedWeight,
+                reps: 0,
+                completed: false,
+              })),
+            };
           }
 
           return currentEx;
@@ -149,6 +115,8 @@ export default function WorkoutTracker() {
 
   useEffect(() => {
     if (userId && profile) {
+      // Async data load: state only changes after the response arrives.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadWorkoutData();
     }
   }, [userId, profile, loadWorkoutData]);
@@ -221,8 +189,7 @@ export default function WorkoutTracker() {
   };
 
   const handleFinishWorkout = async () => {
-    const userId = localStorage.getItem("healthos_userId");
-    if (!userId || !plan) return;
+    if (!plan) return;
 
     let totalVolume = 0;
     let loggedSetsCount = 0;
@@ -263,7 +230,6 @@ export default function WorkoutTracker() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId,
           type: "workout",
           payload: {
             name: plan.name,
@@ -278,9 +244,12 @@ export default function WorkoutTracker() {
 
       if (res.ok) {
         router.push("/");
+      } else {
+        showCustomAlert("Save Failed", "We could not save this workout. Please try again.", "error");
       }
     } catch (err) {
       console.error(err);
+      showCustomAlert("Connection Error", "We could not reach the server to save this workout.", "error");
     } finally {
       setLoading(false);
     }
@@ -423,10 +392,11 @@ export default function WorkoutTracker() {
         let schedule = getWeekSchedule(frequency);
         
         // If DB custom plan is active, map the names dynamically
-        if ((profile as any).customWorkoutPlan) {
+        const customPlan = profile.customWorkoutPlan as Record<number, WorkoutPlan> | undefined;
+        if (customPlan) {
           schedule = [0, 1, 2, 3, 4, 5, 6].map(day => ({
             day,
-            name: (profile as any).customWorkoutPlan[day] ? (profile as any).customWorkoutPlan[day].name : "Rest Day"
+            name: customPlan[day] ? customPlan[day].name : "Rest Day"
           })).filter(s => s.name !== "Rest Day");
         }
 
@@ -622,11 +592,11 @@ export default function WorkoutTracker() {
                       <span className="group-open:rotate-180 transition-transform">▼</span>
                     </summary>
                     <ul className="mt-2 space-y-1.5 pl-1 text-[10px] text-zinc-400 list-disc list-inside">
-                      {w.payload.exercises?.map((ex: any, eIdx: number) => {
-                        const doneSets = ex.sets?.filter((s: any) => s.completed) || [];
+                      {w.payload.exercises?.map((ex, eIdx) => {
+                        const doneSets = ex.sets?.filter((s) => s.completed) || [];
                         return (
                           <li key={eIdx} className="capitalize">
-                            <strong>{ex.name}</strong>: {doneSets.length} sets logged (max {Math.max(...doneSets.map((s: any) => s.weight || 0))}kg)
+                            <strong>{ex.name}</strong>: {doneSets.length} sets logged (max {Math.max(...doneSets.map((s) => s.weight || 0))}kg)
                           </li>
                         );
                       })}
@@ -727,7 +697,7 @@ function HowToLogModal({ open, onClose }: { open: boolean; onClose: () => void }
           onClick={onClose}
           className="btn-primary w-full py-2.5 font-bold text-xs flex-shrink-0"
         >
-          Let's Lift
+          Let&apos;s Lift
         </button>
       </GlassCard>
     </div>

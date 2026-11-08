@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 export default function SplashScreen({ onComplete }: { onComplete: () => void }) {
   const [phase, setPhase] = useState<"enter" | "hold" | "exit">("enter");
 
-  const handleComplete = useCallback(onComplete, [onComplete]);
-
   useEffect(() => {
     const t1 = setTimeout(() => setPhase("hold"), 300);
     const t2 = setTimeout(() => setPhase("exit"), 2400);
-    const t3 = setTimeout(() => handleComplete(), 3000);
+    const t3 = setTimeout(() => onComplete(), 3000);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [handleComplete]);
+  }, [onComplete]);
 
   return (
     <>

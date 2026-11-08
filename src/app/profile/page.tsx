@@ -1,18 +1,23 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import GlassCard from "@/components/GlassCard";
 import { 
-  User, Calendar, Soup, Sparkles, Upload, Trash2, 
-  Settings, AlertTriangle, Clock, ArrowRight, Save, Loader2
+  User, Calendar, Soup, Sparkles, Upload, AlertTriangle, Clock, Save, Loader2
 } from "lucide-react";
 import CustomPopup from "@/components/CustomPopup";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 
+import type { TimelineEntry } from "@/lib/timelineUtils";
+import type { DietMeal, DietPlan } from "@/lib/dietEngine";
+
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: string }>;
+};
+
 export default function ProfilePage() {
-  const router = useRouter();
   
   // Tab control: 'specs' | 'calendar' | 'mess' | 'diet'
   const [activeTab, setActiveTab] = useState<"specs" | "calendar" | "mess" | "diet">("specs");
@@ -38,7 +43,7 @@ export default function ProfilePage() {
   const [customDietPreferences, setCustomDietPreferences] = useState("");
 
   // PWA Install Prompt States
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<InstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
 
@@ -46,7 +51,7 @@ export default function ProfilePage() {
     // Listen for PWA install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as InstallPromptEvent);
       setIsInstallable(true);
     };
 
@@ -55,6 +60,8 @@ export default function ProfilePage() {
     // Detect iOS and verify display mode
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+    // Browser-only value, so it can only be read after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsIOS(isIosDevice);
 
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
@@ -89,7 +96,7 @@ export default function ProfilePage() {
   };
 
 
-  const { popupState, showCustomAlert, showCustomConfirm } = useConfirmDialog();
+  const { popupState, showCustomAlert } = useConfirmDialog();
 
   const [neckCm, setNeckCm] = useState("");
   const [waistCm, setWaistCm] = useState("");
@@ -100,19 +107,19 @@ export default function ProfilePage() {
 
   // Mess Menu States
   const [rawMenuInput, setRawMenuInput] = useState("");
-  const [parsedMenu, setParsedMenu] = useState<any>(null);
+  const [parsedMenu, setParsedMenu] = useState<Record<string, Record<string, string>> | null>(null);
   const [parsingMenu, setParsingMenu] = useState(false);
   const [savingMenu, setSavingMenu] = useState(false);
   const [menuActiveDay, setMenuActiveDay] = useState<string>("monday");
   const [showSuccessMenu, setShowSuccessMenu] = useState(false);
 
   // Diet Plan States
-  const [dietPlan, setDietPlan] = useState<any>(null);
+  const [dietPlan, setDietPlan] = useState<DietPlan | null>(null);
   const [generatingDiet, setGeneratingDiet] = useState(false);
   const [dietActiveDay, setDietActiveDay] = useState<string>("monday");
 
   // Calendar Event Manager States
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<TimelineEntry[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [eventTitle, setEventTitle] = useState("");
   const [eventType, setEventType] = useState<"exam" | "travel" | "sick">("exam");
@@ -122,6 +129,8 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!profile) return;
+    // Copies the loaded profile into the editable form fields.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(false);
 
     if (profile.messMenu) {
@@ -235,12 +244,11 @@ export default function ProfilePage() {
 
   const loadCalendarEvents = useCallback(async () => {
     if (!userId) return;
-    setLoadingEvents(true);
     try {
-      const timelineRes = await fetch(`/api/timeline?userId=${userId}&t=${Date.now()}`, { cache: "no-store" });
+      const timelineRes = await fetch(`/api/timeline?t=${Date.now()}`, { cache: "no-store" });
       if (timelineRes.ok) {
         const timelineData = await timelineRes.json();
-        const notes = (timelineData.events || []).filter((e: any) => e.type === "note");
+        const notes = (timelineData.events || []).filter((e: TimelineEntry) => e.type === "note");
         setEvents(notes);
       }
     } catch (err) {
@@ -252,6 +260,8 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (userId) {
+      // Async data load: state only changes after the response arrives.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadCalendarEvents();
     }
   }, [userId, loadCalendarEvents]);
@@ -262,12 +272,10 @@ export default function ProfilePage() {
 
     setSavingSpecs(true);
     try {
-      const email = localStorage.getItem("healthos_email");
       const res = await fetch("/api/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
           name: name.trim(),
           age: parseInt(age),
           gender: profile?.gender,
@@ -315,7 +323,6 @@ export default function ProfilePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId,
           type: "note",
           payload: {
             title: eventTitle.trim(),
@@ -333,10 +340,10 @@ export default function ProfilePage() {
         setEndDate("");
 
         // Refresh events list
-        const timelineRes = await fetch(`/api/timeline?userId=${userId}`);
+        const timelineRes = await fetch("/api/timeline");
         if (timelineRes.ok) {
           const timelineData = await timelineRes.json();
-          const notes = (timelineData.events || []).filter((e: any) => e.type === "note");
+          const notes = (timelineData.events || []).filter((e: TimelineEntry) => e.type === "note");
           setEvents(notes);
         }
       }
@@ -358,10 +365,10 @@ export default function ProfilePage() {
 
       if (res.ok) {
         // Refresh events list
-        const timelineRes = await fetch(`/api/timeline?userId=${userId}`);
+        const timelineRes = await fetch("/api/timeline");
         if (timelineRes.ok) {
           const timelineData = await timelineRes.json();
-          const notes = (timelineData.events || []).filter((e: any) => e.type === "note");
+          const notes = (timelineData.events || []).filter((e: TimelineEntry) => e.type === "note");
           setEvents(notes);
         }
       }
@@ -440,7 +447,7 @@ export default function ProfilePage() {
   };
 
   const updateMealField = (day: string, meal: string, value: string) => {
-    setParsedMenu((prev: any) => ({
+    setParsedMenu((prev) => ({
       ...prev,
       [day]: {
         ...prev?.[day],
@@ -450,8 +457,7 @@ export default function ProfilePage() {
   };
 
   const handleSaveMessMenu = async () => {
-    const email = localStorage.getItem("healthos_email");
-    if (!email || !profile) return;
+    if (!profile) return;
 
     setSavingMenu(true);
     try {
@@ -465,7 +471,6 @@ export default function ProfilePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
           name: profile.name,
           age: profile.age,
           gender: profile.gender,
@@ -510,22 +515,12 @@ export default function ProfilePage() {
   };
 
   const handleGenerateDietPlan = async () => {
-    const email = localStorage.getItem("healthos_email");
-    if (!email) return;
-
     setGeneratingDiet(true);
     try {
       const res = await fetch("/api/diet/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          email,
-          strictMessOnly,
-          targetCalories: profile?.targetCalories || 2000,
-          targetProteinG: profile?.targetProteinG || 150,
-          goal: profile?.goal || "recomp",
-          dietPreference: profile?.dietPreference || "none"
-        }),
+        body: JSON.stringify({ strictMessOnly }),
       });
 
       if (res.ok) {
@@ -957,7 +952,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <p className="text-[10px] text-zinc-500 leading-relaxed">
-              Install this app directly on your device's home screen. Enjoy full-screen standalone view, offline tracking support, and direct access from your app library.
+              Install this app directly on your device&apos;s home screen. Enjoy full-screen standalone view, offline tracking support, and direct access from your app library.
             </p>
             <button
               type="button"
@@ -996,7 +991,7 @@ export default function ProfilePage() {
                 <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Type of Event</label>
                 <select
                   value={eventType}
-                  onChange={(e: any) => setEventType(e.target.value)}
+                  onChange={(e) => setEventType(e.target.value as typeof eventType)}
                   className="input-glass text-xs h-11 px-3 bg-zinc-950 text-white border border-white/10 rounded-xl w-full"
                 >
                   <option value="exam">📝 Exams Prep Period (Steps target $\rightarrow$ 5,000)</option>
@@ -1049,8 +1044,8 @@ export default function ProfilePage() {
               <div className="space-y-3">
                 {events.map((ev, i) => {
                   const payload = ev.payload;
-                  const startStr = new Date(payload.startDate).toLocaleDateString([], { month: "short", day: "numeric" });
-                  const endStr = new Date(payload.endDate).toLocaleDateString([], { month: "short", day: "numeric" });
+                  const startStr = new Date(payload.startDate as string).toLocaleDateString([], { month: "short", day: "numeric" });
+                  const endStr = new Date(payload.endDate as string).toLocaleDateString([], { month: "short", day: "numeric" });
                   const emoji = payload.event_type === "exam" ? "📝" : payload.event_type === "travel" ? "✈️" : "🤒";
 
                   return (
@@ -1064,7 +1059,7 @@ export default function ProfilePage() {
                           {startStr} — {endStr}
                         </p>
                         <div className="pt-1">
-                          {getEventBadge(payload.startDate, payload.endDate)}
+                          {getEventBadge(payload.startDate as string, payload.endDate as string)}
                         </div>
                       </div>
                       
@@ -1259,7 +1254,7 @@ export default function ProfilePage() {
               <div className="space-y-1">
                 <h3 className="text-sm font-bold text-white">Hostel Mess Menu Required</h3>
                 <p className="text-xs text-zinc-500 leading-relaxed max-w-sm mx-auto">
-                  Before we can construct your custom diet plan, we need your hostel's mess menu. Please go to the **Mess Menu** tab first to paste or upload it.
+                  Before we can construct your custom diet plan, we need your hostel&apos;s mess menu. Please go to the **Mess Menu** tab first to paste or upload it.
                 </p>
               </div>
             </GlassCard>
@@ -1334,8 +1329,8 @@ export default function ProfilePage() {
                   {dietPlan && dietPlan[dietActiveDay] && dietPlan[dietActiveDay].meals && dietPlan[dietActiveDay].meals.length > 0 && (
                     (() => {
                       const meals = dietPlan[dietActiveDay].meals;
-                      const plannedCal = meals.reduce((sum: number, m: any) => sum + (Number(m.calories) || 0), 0);
-                      const plannedProt = meals.reduce((sum: number, m: any) => sum + (Number(m.proteinG) || 0), 0);
+                      const plannedCal = meals.reduce((sum: number, m: DietMeal) => sum + (Number(m.calories) || 0), 0);
+                      const plannedProt = meals.reduce((sum: number, m: DietMeal) => sum + (Number(m.proteinG) || 0), 0);
                       const targetCal = profile?.targetCalories || 2000;
                       const targetProt = profile?.targetProteinG || 150;
                       const calPercent = Math.min(100, Math.round((plannedCal / targetCal) * 100));
@@ -1405,7 +1400,7 @@ export default function ProfilePage() {
                         No meals configured for this day. Regenerate to populate.
                       </p>
                     ) : (
-                      dietPlan[dietActiveDay].meals.map((meal: any, idx: number) => (
+                      dietPlan[dietActiveDay].meals.map((meal: DietMeal, idx: number) => (
                         <GlassCard key={idx} className="p-4 border border-white/5 bg-white/1 relative overflow-hidden flex flex-col gap-2.5">
                           <div className="absolute top-0 right-0 w-24 h-24 bg-[#c87a53]/2 blur-[30px] rounded-full -z-10" />
                           
@@ -1433,13 +1428,13 @@ export default function ProfilePage() {
                             {/* Mess Items Choice */}
                             <div className="p-3 bg-zinc-950/40 rounded-xl border border-white/5">
                               <span className="text-[8.5px] font-extrabold text-zinc-500 uppercase tracking-widest block mb-2 text-left">🥣 From Hostel Mess</span>
-                              {renderFoodList(meal.messItems)}
+                              {renderFoodList(meal.messItems || "")}
                             </div>
 
                             {/* Required Additions */}
                             <div className="p-3 bg-[#8ba893]/3 rounded-xl border border-[#8ba893]/10">
                               <span className="text-[8.5px] font-extrabold text-[#8ba893] uppercase tracking-widest block mb-2 text-left">➕ Custom Additions / Supplements</span>
-                              {renderFoodList(meal.additions, true)}
+                              {renderFoodList(meal.additions || "", true)}
                             </div>
                           </div>
 

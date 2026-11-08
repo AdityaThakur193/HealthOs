@@ -11,6 +11,8 @@ export default function SplashWrapper({ children }: { children: React.ReactNode 
     // Only show once per browser session
     const seen = sessionStorage.getItem("healthos_splash_seen");
     if (!seen) {
+      // sessionStorage only exists in the browser, so this must wait for hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowSplash(true);
     }
     setMounted(true);

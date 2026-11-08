@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import * as geminiModule from "../lib/gemini";
-import { POST, getMockMealAnalysis, enrichMealAnalysisWithIFCT } from "../app/api/vision/route";
+import type { MealAnalysis } from "../lib/gemini";
+import { POST, enrichMealAnalysisWithIFCT } from "../app/api/vision/route";
+import { createSessionToken, SESSION_COOKIE } from "../lib/auth/session";
+
+const sessionCookie = `${SESSION_COOKIE}=${createSessionToken({ email: "vision@example.com", userId: "local_user_vision" })}`;
+
+function authedRequest(url: string, init: { method: string; body?: string }) {
+  return new NextRequest(url, { ...init, headers: { cookie: sessionCookie } });
+}
 
 vi.mock("../lib/gemini", async (importOriginal) => {
   const actual = await importOriginal<typeof geminiModule>();
@@ -11,6 +19,11 @@ vi.mock("../lib/gemini", async (importOriginal) => {
     analyzeMealTextWithGroq: vi.fn(),
   };
 });
+
+// No database in this suite: saves must not reach the developer's local_db.json.
+vi.mock("../lib/db/fallback", () => ({
+  createLocalEvent: vi.fn(async (event: object) => ({ ...event, _id: "local_event_test" })),
+}));
 
 describe("Vision Route isMock Flag Correctness", () => {
   const originalEnv = process.env;
@@ -26,9 +39,9 @@ describe("Vision Route isMock Flag Correctness", () => {
 
   describe("enrichMealAnalysisWithIFCT unit validation", () => {
     it("should throw an error when foods array is missing or invalid instead of silently returning mock data", () => {
-      expect(() => enrichMealAnalysisWithIFCT({} as any)).toThrow("foods array missing or invalid");
-      expect(() => enrichMealAnalysisWithIFCT({ foods: null } as any)).toThrow("foods array missing or invalid");
-      expect(() => enrichMealAnalysisWithIFCT({ foods: "invalid" as any } as any)).toThrow("foods array missing or invalid");
+      expect(() => enrichMealAnalysisWithIFCT({} as unknown as MealAnalysis)).toThrow("foods array missing or invalid");
+      expect(() => enrichMealAnalysisWithIFCT({ foods: null } as unknown as MealAnalysis)).toThrow("foods array missing or invalid");
+      expect(() => enrichMealAnalysisWithIFCT({ foods: "invalid" } as unknown as MealAnalysis)).toThrow("foods array missing or invalid");
     });
 
     it("should clamp excessive quantities and append a warning to notes", () => {
@@ -54,7 +67,7 @@ describe("Vision Route isMock Flag Correctness", () => {
     it("should return isMock: true when Gemini fails with an error and no mealText is provided", async () => {
       vi.mocked(geminiModule.analyzeMealImage).mockRejectedValueOnce(new Error("Gemini quota exceeded"));
 
-      const req = new NextRequest("http://localhost:3000/api/vision", {
+      const req = authedRequest("http://localhost:3000/api/vision", {
         method: "POST",
         body: JSON.stringify({
           imageBase64: "base64_sample_image_data_test_1",
@@ -74,7 +87,7 @@ describe("Vision Route isMock Flag Correctness", () => {
     it("should return isMock: true and mockReason: 'api_error' when Gemini fails with a non-quota error", async () => {
       vi.mocked(geminiModule.analyzeMealImage).mockRejectedValueOnce(new Error("500 Internal Server Error"));
 
-      const req = new NextRequest("http://localhost:3000/api/vision", {
+      const req = authedRequest("http://localhost:3000/api/vision", {
         method: "POST",
         body: JSON.stringify({
           imageBase64: "base64_sample_image_data_test_1b",
@@ -93,7 +106,7 @@ describe("Vision Route isMock Flag Correctness", () => {
     it("should return isMock: true and mockReason: 'missing_key' when GEMINI_API_KEY is not configured", async () => {
       process.env.GEMINI_API_KEY = "your_gemini_api_key_here";
 
-      const req = new NextRequest("http://localhost:3000/api/vision", {
+      const req = authedRequest("http://localhost:3000/api/vision", {
         method: "POST",
         body: JSON.stringify({
           imageBase64: "base64_sample_image_data_test_1c",
@@ -111,13 +124,13 @@ describe("Vision Route isMock Flag Correctness", () => {
 
     it("should return isMock: true when Gemini returns an invalid response (missing foods array)", async () => {
       vi.mocked(geminiModule.analyzeMealImage).mockResolvedValueOnce({
-        foods: null as any,
+        foods: null as unknown as MealAnalysis["foods"],
         totalCalories: 0,
         totalProteinG: 0,
         confidence: 0,
       });
 
-      const req = new NextRequest("http://localhost:3000/api/vision", {
+      const req = authedRequest("http://localhost:3000/api/vision", {
         method: "POST",
         body: JSON.stringify({
           imageBase64: "base64_sample_image_data_test_2",
@@ -150,7 +163,7 @@ describe("Vision Route isMock Flag Correctness", () => {
         confidence: 0.95,
       });
 
-      const req = new NextRequest("http://localhost:3000/api/vision", {
+      const req = authedRequest("http://localhost:3000/api/vision", {
         method: "POST",
         body: JSON.stringify({
           imageBase64: "base64_sample_image_data_test_3",
@@ -172,7 +185,7 @@ describe("Vision Route isMock Flag Correctness", () => {
     it("should return isMock: true when pure text analysis with Groq fails", async () => {
       vi.mocked(geminiModule.analyzeMealTextWithGroq).mockRejectedValueOnce(new Error("Groq API rate limit"));
 
-      const req = new NextRequest("http://localhost:3000/api/vision", {
+      const req = authedRequest("http://localhost:3000/api/vision", {
         method: "POST",
         body: JSON.stringify({
           mealText: "2 rotis and yellow dal",
@@ -190,13 +203,13 @@ describe("Vision Route isMock Flag Correctness", () => {
 
     it("should return isMock: true when Groq text analysis returns an invalid response (missing foods)", async () => {
       vi.mocked(geminiModule.analyzeMealTextWithGroq).mockResolvedValueOnce({
-        foods: undefined as any,
+        foods: undefined as unknown as MealAnalysis["foods"],
         totalCalories: 0,
         totalProteinG: 0,
         confidence: 0,
       });
 
-      const req = new NextRequest("http://localhost:3000/api/vision", {
+      const req = authedRequest("http://localhost:3000/api/vision", {
         method: "POST",
         body: JSON.stringify({
           mealText: "unparseable text description",
@@ -215,13 +228,13 @@ describe("Vision Route isMock Flag Correctness", () => {
     it("should return isMock: true when Gemini fails and Groq fallback also returns invalid foods", async () => {
       vi.mocked(geminiModule.analyzeMealImage).mockRejectedValueOnce(new Error("Gemini down"));
       vi.mocked(geminiModule.analyzeMealTextWithGroq).mockResolvedValueOnce({
-        foods: null as any,
+        foods: null as unknown as MealAnalysis["foods"],
         totalCalories: 0,
         totalProteinG: 0,
         confidence: 0,
       });
 
-      const req = new NextRequest("http://localhost:3000/api/vision", {
+      const req = authedRequest("http://localhost:3000/api/vision", {
         method: "POST",
         body: JSON.stringify({
           imageBase64: "base64_sample_image_data_test_4",
@@ -242,7 +255,7 @@ describe("Vision Route isMock Flag Correctness", () => {
     it("should reject saving meal event when source is 'mock'", async () => {
       const { POST: timelinePOST } = await import("../app/api/timeline/route");
 
-      const req = new NextRequest("http://localhost:3000/api/timeline", {
+      const req = authedRequest("http://localhost:3000/api/timeline", {
         method: "POST",
         body: JSON.stringify({
           userId: "user_test_mock_guard_1",
@@ -264,7 +277,7 @@ describe("Vision Route isMock Flag Correctness", () => {
     it("should reject saving meal event when payload contains isMock: true", async () => {
       const { POST: timelinePOST } = await import("../app/api/timeline/route");
 
-      const req = new NextRequest("http://localhost:3000/api/timeline", {
+      const req = authedRequest("http://localhost:3000/api/timeline", {
         method: "POST",
         body: JSON.stringify({
           userId: "user_test_mock_guard_2",
@@ -307,7 +320,7 @@ describe("Vision Route isMock Flag Correctness", () => {
         source: "mock",
       };
 
-      const req = new NextRequest("http://localhost:3000/api/timeline", {
+      const req = authedRequest("http://localhost:3000/api/timeline", {
         method: "POST",
         body: JSON.stringify(bypassPayload),
       });
@@ -338,7 +351,7 @@ describe("Vision Route isMock Flag Correctness", () => {
         source: "ai_vision",
       };
 
-      const req = new NextRequest("http://localhost:3000/api/timeline", {
+      const req = authedRequest("http://localhost:3000/api/timeline", {
         method: "POST",
         body: JSON.stringify(legitimatePayload),
       });

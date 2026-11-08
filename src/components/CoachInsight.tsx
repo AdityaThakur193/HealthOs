@@ -29,6 +29,8 @@ const statusConfig = {
   },
 };
 
+type ActionItem = string | { task?: string; text?: string; action?: string; why?: string; reason?: string };
+
 export default function CoachInsight({
   status,
   greeting,
@@ -87,7 +89,7 @@ export default function CoachInsight({
 
       {/* Action Items List */}
       <div className="space-y-2.5 pt-1 text-left">
-        {actionItems.map((item: any, i) => {
+        {(actionItems as ActionItem[]).map((item, i) => {
           let text = "";
           if (item && typeof item === "object") {
             const task = item.task || item.text || item.action || "";
