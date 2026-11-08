@@ -91,7 +91,7 @@ You have 10 possible actions. Choose the correct one based on what the user says
 1. log_meal — User mentions food they ate (any meal, snack, drink with calories)
    updatedData: {
      mealType: "breakfast"|"lunch"|"dinner"|"snack",
-     items: [{ name, portionSize: "small"|"medium"|"large", estimatedCalories, proteinG, carbsG, fatG }],
+     items: [{ name (one food per item, e.g. "Roti"), quantity: number (the amount the user said), unit: "piece"|"katori"|"plate"|"scoop"|"gram", estimatedCalories, proteinG, carbsG, fatG }],
      totalCalories: number,
      totalProtein: number,
      totalCarbs: number,

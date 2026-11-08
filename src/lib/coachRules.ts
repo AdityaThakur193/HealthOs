@@ -1,6 +1,7 @@
 import { EVENT_STEP_TARGETS } from "./constants";
 import { auditAndFixDietPlanMath, DietPlan } from "./dietEngine";
 import { formatMealTime } from "./mealWindows";
+import { ifctPortion } from "./dietPlanner";
 import type { CoachContext, CoachRecommendation } from "./gemini";
 
 interface CoachRulesProfile {
@@ -136,6 +137,44 @@ export function buildRuleBasedCoach(context: CoachContext, profile: CoachRulesPr
   };
 }
 
+interface CoachMealItem {
+  name?: string;
+  quantity?: number;
+  unit?: string;
+  estimatedCalories?: number;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
+  estimated?: boolean;
+}
+
+type CoachMeal = Record<string, unknown> & { items?: CoachMealItem[] };
+
+/** Replaces the AI's numbers with IFCT wherever the food and amount are known. */
+export function groundCoachMeal(meal: CoachMeal): CoachMeal {
+  if (!Array.isArray(meal.items) || meal.items.length === 0) return meal;
+
+  const items = meal.items.map((item) => {
+    const quantity = Number(item.quantity);
+    const portion = item.name && quantity > 0 ? ifctPortion(item.name, quantity, item.unit) : null;
+    return portion
+      ? { ...item, estimatedCalories: portion.calories, proteinG: portion.proteinG, carbsG: portion.carbsG, fatG: portion.fatG, estimated: false }
+      : { ...item, estimated: true };
+  });
+
+  const total = (key: "estimatedCalories" | "proteinG" | "carbsG" | "fatG") =>
+    Math.round(items.reduce((sum, item) => sum + (Number(item[key]) || 0), 0) * 10) / 10;
+
+  return {
+    ...meal,
+    items,
+    totalCalories: Math.round(total("estimatedCalories")),
+    totalProtein: total("proteinG"),
+    totalCarbs: total("carbsG"),
+    totalFat: total("fatG"),
+  };
+}
+
 const ALLOWED_ACTIONS = [
   "log_meal",
   "log_steps",
@@ -154,6 +193,10 @@ export function normalizeCoachReply(raw: unknown): { message: string; action: st
   const reply = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const action = typeof reply.action === "string" && ALLOWED_ACTIONS.includes(reply.action) ? reply.action : "none";
   let updatedData = action === "none" ? null : reply.updatedData ?? null;
+
+  if (action === "log_meal" && updatedData && typeof updatedData === "object") {
+    updatedData = groundCoachMeal(updatedData as CoachMeal);
+  }
 
   if (action === "update_diet" && updatedData && typeof updatedData === "object") {
     updatedData = auditAndFixDietPlanMath(updatedData as DietPlan);

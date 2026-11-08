@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
 import connectDB from "@/lib/mongodb";
-import { AIMemory, LeanUserProfile, TimelineEvent, UserProfile } from "@/lib/db/models";
+import { LeanUserProfile, TimelineEvent, UserProfile } from "@/lib/db/models";
 import { getLocalEvents, getLocalProfile, saveLocalProfile } from "@/lib/db/fallback";
 import { calculateAdaptiveTdee, goalCalorieTarget, TimelineLike } from "@/lib/tdee";
 import { DietPlan } from "@/lib/dietEngine";
-import { buildWeeklyPlan, findFoodsNeedingEstimates, FoodEstimates, WEEK_DAYS } from "@/lib/dietPlanner";
-import { estimateMessFoods } from "@/lib/gemini";
+import { buildWeeklyPlan, findFoodsNeedingEstimates, WEEK_DAYS } from "@/lib/dietPlanner";
+import { loadFoodEstimates } from "@/lib/foodEstimates";
 import { MEAL_NAMES, resolveMessTimings } from "@/lib/mealWindows";
 import { requireUserSession } from "@/lib/auth/session";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
@@ -13,8 +13,6 @@ import { readJsonObject } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
-const ESTIMATES_KEY = "mess_food_estimates";
-const MAX_ESTIMATES_PER_REQUEST = 80;
 const PLANS_PER_HOUR = 30;
 
 const MEAL_BY_LABEL: Record<string, string> = {
@@ -23,37 +21,6 @@ const MEAL_BY_LABEL: Record<string, string> = {
   "Evening Snack": "snacks",
   Dinner: "dinner",
 };
-
-/**
- * Saved estimates keep a dish's numbers stable between rebuilds and mean
- * the AI is only asked about each dish once.
- */
-async function loadEstimates(userId: string, needed: string[]): Promise<FoodEstimates> {
-  let saved: FoodEstimates = {};
-  try {
-    const entry = await AIMemory.findOne({ userId, layer: 4, key: ESTIMATES_KEY }).lean();
-    saved = (entry?.value as FoodEstimates) ?? {};
-  } catch {
-    // Without saved estimates the AI is simply asked again.
-  }
-
-  const missing = needed.filter((name) => !saved[name]).slice(0, MAX_ESTIMATES_PER_REQUEST);
-  if (missing.length === 0) return saved;
-
-  try {
-    const merged = { ...saved, ...(await estimateMessFoods(missing)) };
-    await AIMemory.updateOne(
-      { userId, layer: 4, key: ESTIMATES_KEY },
-      { $set: { value: merged } },
-      { upsert: true }
-    ).catch((error) => console.warn("Could not save food estimates:", error));
-    return merged;
-  } catch (error) {
-    // The plan still works; those foods are shown as unknown and not counted.
-    console.warn("Food estimates unavailable:", error);
-    return saved;
-  }
-}
 
 function savedVariants(plan: LeanUserProfile["dietPlan"]): Record<string, number> {
   const generated = plan?.generatedPlan as DietPlan | undefined;
@@ -132,7 +99,7 @@ export async function POST(request: NextRequest) {
       variants[key] = (variants[key] ?? 0) + 1;
     }
 
-    const estimates = await loadEstimates(session.userId, findFoodsNeedingEstimates(menu));
+    const estimates = await loadFoodEstimates(session.userId, findFoodsNeedingEstimates(menu));
 
     const plan = buildWeeklyPlan({
       menu,

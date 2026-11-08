@@ -1,6 +1,5 @@
 "use client";
 
-import { calculateFoodMacros } from "@/lib/ifctData";
 import { AlertTriangle } from "lucide-react";
 
 export interface MealFood {
@@ -34,26 +33,14 @@ export default function MealResultCard({
   const currentQty = Math.max(0.5, food.quantity || 1);
   const unit = food.unitType || "piece";
 
-  // Check if item is unmatched in database
-  const isUnmatched = Boolean(
-    food.unmatched || !calculateFoodMacros(food.dishName || food.name, 1).matched
-  );
+  const isUnmatched = Boolean(food.unmatched);
 
-  // If matched, compute real-time IFCT 2017 macros; if unmatched, use current food values
-  const calculated = isUnmatched
-    ? {
-        calories: food.estimatedCalories || 0,
-        proteinG: food.proteinG || 0,
-        carbsG: food.carbsG || 0,
-        fatG: food.fatG || 0,
-        weightGrams: food.weightGrams || 0,
-      }
-    : calculateFoodMacros(
-        food.dishName || food.name,
-        currentQty,
-        unit,
-        food.preparationStyle || "standard"
-      );
+  // Always the values that will be saved, so the screen and the log can't disagree.
+  const calculated = {
+    calories: food.estimatedCalories || 0,
+    proteinG: food.proteinG || 0,
+    weightGrams: food.weightGrams || 0,
+  };
 
   return (
     <div className="glass-card p-4 space-y-3">

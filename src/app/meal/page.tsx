@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { TimelineEntry } from "@/lib/timelineUtils";
 import GlassCard from "@/components/GlassCard";
@@ -10,7 +10,8 @@ import { Camera, Edit3, AlertTriangle } from "lucide-react";
 import { compressImage } from "@/lib/imageUtils";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { motion } from "framer-motion";
-import { calculateFoodMacros, CAMPUS_PRESETS } from "@/lib/ifctData";
+import { CAMPUS_PRESETS } from "@/lib/ifctData";
+import MenuMealLogger from "@/components/MenuMealLogger";
 
 interface FoodItem {
   name: string;
@@ -35,7 +36,7 @@ export default function MealCapture() {
 
   // Flow State: 'idle' | 'analyzing' | 'results'
   const [state, setState] = useState<"idle" | "analyzing" | "results">("idle");
-  const [mode, setMode] = useState<"photo" | "manual">("photo");
+  const [mode, setMode] = useState<"menu" | "photo" | "manual">("menu");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [foods, setFoods] = useState<FoodItem[]>([]);
   const [confidence, setConfidence] = useState(0.9);
@@ -134,6 +135,13 @@ export default function MealCapture() {
     }
   };
 
+  const handleMenuLogged = () => {
+    setShowSuccess(true);
+    setTimeout(() => router.push("/"), 1200);
+  };
+
+  const handleMenuUnavailable = useCallback(() => setMode("photo"), []);
+
   const handleTriggerCamera = () => {
     cameraInputRef.current?.click();
   };
@@ -146,28 +154,17 @@ export default function MealCapture() {
     setFoods((prev) =>
       prev.map((f, i) => {
         if (i !== index) return f;
-        const isUnmatched = Boolean(f.unmatched || !calculateFoodMacros(f.dishName || f.name, 1).matched);
-        if (isUnmatched) {
-          const oldQty = Math.max(0.5, f.quantity || 1);
-          const ratio = newQty / oldQty;
-          return {
-            ...f,
-            quantity: newQty,
-            estimatedCalories: Math.round((f.estimatedCalories || 0) * ratio),
-            proteinG: Math.round(((f.proteinG || 0) * ratio) * 10) / 10,
-            carbsG: Math.round(((f.carbsG || 0) * ratio) * 10) / 10,
-            fatG: Math.round(((f.fatG || 0) * ratio) * 10) / 10,
-          };
-        }
-        const computed = calculateFoodMacros(f.dishName || f.name, newQty, f.unitType, f.preparationStyle);
+        // Scaling what's on screen keeps ingredient-level math intact.
+        const oldQty = Math.max(0.25, f.quantity || 1);
+        const ratio = newQty / oldQty;
         return {
           ...f,
           quantity: newQty,
-          estimatedCalories: computed.calories,
-          proteinG: computed.proteinG,
-          carbsG: computed.carbsG,
-          fatG: computed.fatG,
-          weightGrams: computed.weightGrams,
+          estimatedCalories: Math.round((f.estimatedCalories || 0) * ratio),
+          proteinG: Math.round(((f.proteinG || 0) * ratio) * 10) / 10,
+          carbsG: Math.round(((f.carbsG || 0) * ratio) * 10) / 10,
+          fatG: Math.round(((f.fatG || 0) * ratio) * 10) / 10,
+          weightGrams: f.weightGrams ? Math.round(f.weightGrams * ratio) : f.weightGrams,
         };
       })
     );
@@ -300,7 +297,7 @@ export default function MealCapture() {
       <div className="flex items-center justify-between py-2 border-b border-white/5 animate-in">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Pillar 2</span>
-          <h1 className="text-xl font-bold text-white mt-0.5">AI Meal Capture</h1>
+          <h1 className="text-xl font-bold text-white mt-0.5">Log a Meal</h1>
         </div>
       </div>
 
@@ -325,12 +322,20 @@ export default function MealCapture() {
       {state === "idle" && (
         <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 animate-in">
           <button
+            onClick={() => setMode("menu")}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              mode === "menu" ? "bg-brand-500 text-white shadow-md" : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            Mess Menu
+          </button>
+          <button
             onClick={() => setMode("photo")}
             className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               mode === "photo" ? "bg-brand-500 text-white shadow-md" : "text-zinc-400 hover:text-white"
             }`}
           >
-            <Camera className="w-3.5 h-3.5" /> AI Photo Capture
+            <Camera className="w-3.5 h-3.5" /> Photo
           </button>
           <button
             onClick={() => setMode("manual")}
@@ -338,7 +343,7 @@ export default function MealCapture() {
               mode === "manual" ? "bg-brand-500 text-white shadow-md" : "text-zinc-400 hover:text-white"
             }`}
           >
-            <Edit3 className="w-3.5 h-3.5" /> Manual Meal Log
+            <Edit3 className="w-3.5 h-3.5" /> Manual
           </button>
         </div>
       )}
@@ -346,7 +351,13 @@ export default function MealCapture() {
       {/* Capture Forms Area */}
       {state === "idle" && (
         <div className="space-y-6 animate-in-delay-1">
-          {mode === "photo" ? (
+          {mode === "menu" ? (
+            <MenuMealLogger
+              onLogged={handleMenuLogged}
+              onUnavailable={handleMenuUnavailable}
+              onError={(message) => showCustomAlert("Save Failed", message, "error")}
+            />
+          ) : mode === "photo" ? (
             <div className="grid grid-cols-2 gap-4">
               {/* Camera Action Card */}
               <GlassCard
@@ -504,7 +515,7 @@ export default function MealCapture() {
                 {history.map((h, i) => (
                   <GlassCard key={i} className="p-4 flex items-center justify-between">
                     <div>
-                      <h4 className="text-xs font-semibold text-white capitalize">{h.payload.foods?.[0]?.name || h.payload.name || "Logged Meal"}</h4>
+                      <h4 className="text-xs font-semibold text-white capitalize">{h.payload.foods?.map((f) => f.name).join(", ") || h.payload.name || "Logged Meal"}</h4>
                       <p className="text-[10px] text-zinc-500 mt-0.5">
                         {new Date(h.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </p>
@@ -596,7 +607,7 @@ export default function MealCapture() {
           {/* Summary header */}
           <div className="p-4 bg-brand-500/5 border border-brand-500/20 rounded-2xl flex items-center justify-between">
             <div>
-              {foods.some((f) => f.unmatched || !calculateFoodMacros(f.dishName || f.name, 1).matched) ? (
+              {foods.some((f) => f.unmatched) ? (
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 w-fit">
                   <AlertTriangle className="w-3 h-3" /> Unmatched Food Detected
                 </span>
@@ -610,9 +621,9 @@ export default function MealCapture() {
                 {foods.reduce((sum, f) => sum + (f.estimatedCalories || 0), 0)}
               </span>
               <p className="text-[10px] text-zinc-500">
-                {foods.some((f) => f.unmatched || !calculateFoodMacros(f.dishName || f.name, 1).matched)
+                {foods.some((f) => f.unmatched)
                   ? "Estimated / User-Edited kcal"
-                  : "IFCT 2017 Verified kcal"}
+                  : "Calculated From IFCT 2017"}
               </p>
             </div>
           </div>

@@ -29,7 +29,8 @@ export interface FoodEstimate {
   fatG: number;
 }
 
-export type FoodEstimates = Record<string, FoodEstimate>;
+/** A null entry means the AI was asked and had no answer. */
+export type FoodEstimates = Record<string, FoodEstimate | null>;
 
 interface PortionRule {
   start: number;
@@ -43,6 +44,8 @@ interface PlannedFood {
   unit: string;
   calories: number;
   proteinG: number;
+  carbsG: number;
+  fatG: number;
   source: "ifct" | "estimated" | "unknown";
   rule: PortionRule;
   quantity: number;
@@ -189,7 +192,7 @@ function fitsDiet(name: string, dietPreference: string | undefined): boolean {
   }
 }
 
-function fromIfct(name: string): Pick<PlannedFood, "name" | "unit" | "calories" | "proteinG"> | null {
+function fromIfct(name: string): Pick<PlannedFood, "name" | "unit" | "calories" | "proteinG" | "carbsG" | "fatG"> | null {
   if (COMPOSITE_DISH.test(name)) return null;
   // Mess paneer is a curry, not a 100g block of raw paneer.
   const lookup = /paneer/i.test(name) ? "paneer gravy" : name;
@@ -199,11 +202,11 @@ function fromIfct(name: string): Pick<PlannedFood, "name" | "unit" | "calories" 
   const isPlainDal = item.id === "dal_toor" && !/tadka|fry/i.test(name);
   const prep = isPlainDal ? "thin_mess" : item.id === "dal_toor" ? "dal_tadka" : "standard";
   const macros = calculateFoodMacros(lookup, 1, item.standardUnit, prep);
-  return { name, unit: item.standardUnit, calories: macros.calories, proteinG: macros.proteinG };
+  return { name, unit: item.standardUnit, calories: macros.calories, proteinG: macros.proteinG, carbsG: macros.carbsG, fatG: macros.fatG };
 }
 
 /** Simple foods IFCT covers by ingredient get IFCT numbers at the estimated serving size. */
-function groundEstimate(name: string, estimate: FoodEstimate): Pick<FoodEstimate, "calories" | "proteinG"> & { grounded: boolean } {
+function groundEstimate(name: string, estimate: FoodEstimate): Pick<FoodEstimate, "calories" | "proteinG" | "carbsG" | "fatG"> & { grounded: boolean } {
   if (WHOLE_FOOD.test(name.trim())) {
     const match = matchIngredient(name);
     if (match && estimate.grams > 0) {
@@ -211,11 +214,13 @@ function groundEstimate(name: string, estimate: FoodEstimate): Pick<FoodEstimate
       return {
         calories: Math.round(match.nutrientsPer100g.energyKcal * factor),
         proteinG: Math.round(match.nutrientsPer100g.proteinG * factor * 10) / 10,
+        carbsG: Math.round(match.nutrientsPer100g.carbG * factor * 10) / 10,
+        fatG: Math.round(match.nutrientsPer100g.fatG * factor * 10) / 10,
         grounded: true,
       };
     }
   }
-  return { calories: estimate.calories, proteinG: estimate.proteinG, grounded: false };
+  return { calories: estimate.calories, proteinG: estimate.proteinG, carbsG: estimate.carbsG, fatG: estimate.fatG, grounded: false };
 }
 
 function toPlannedFood(name: string, estimates: FoodEstimates): PlannedFood {
@@ -225,10 +230,23 @@ function toPlannedFood(name: string, estimates: FoodEstimates): PlannedFood {
 
   const estimate = estimates[name.toLowerCase()];
   if (estimate) {
-    const { calories, proteinG, grounded } = groundEstimate(name, estimate);
-    return { name, unit: estimate.unit, calories, proteinG, source: grounded ? "ifct" : "estimated", rule, quantity: rule.start };
+    const { grounded, ...macros } = groundEstimate(name, estimate);
+    return { name, unit: estimate.unit, ...macros, source: grounded ? "ifct" : "estimated", rule, quantity: rule.start };
   }
-  return { name, unit: "serving", calories: 0, proteinG: 0, source: "unknown", rule, quantity: rule.start };
+  return { name, unit: "serving", calories: 0, proteinG: 0, carbsG: 0, fatG: 0, source: "unknown", rule, quantity: rule.start };
+}
+
+/** One menu item as the logging screen needs it. Macros are per single unit. */
+export function toMenuFood(name: string, estimates: FoodEstimates) {
+  const { unit, calories, proteinG, carbsG, fatG, source, rule } = toPlannedFood(name, estimates);
+  return { name, unit, calories, proteinG, carbsG, fatG, source, start: rule.start || 1, step: rule.step };
+}
+
+/** Exact IFCT numbers for a stated amount of a food, or null if IFCT doesn't cover it. */
+export function ifctPortion(name: string, quantity: number, unit?: string) {
+  if (COMPOSITE_DISH.test(name) || !findIFCTItem(name)) return null;
+  const macros = calculateFoodMacros(name, quantity, unit);
+  return { calories: macros.calories, proteinG: macros.proteinG, carbsG: macros.carbsG, fatG: macros.fatG };
 }
 
 /** Menu items IFCT can't answer, so the caller can get estimates for them. */

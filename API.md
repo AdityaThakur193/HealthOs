@@ -27,6 +27,7 @@ Routes that need a finished profile return `403` with `{ "notInitialized": true 
 | `/api/vision` | `POST` | Analyze a meal photo or text using AI detection and IFCT 2017 math |
 | `/api/diet/generate` | `POST` | Generate a weekly diet plan with audited macros |
 | `/api/mess-menu/parse` | `POST` | Parse a mess menu image or text into structured JSON |
+| `/api/mess-menu/today` | `GET` | Today's menu for one meal (`?meal=lunch`), with nutrition per unit and the user's last amounts |
 | `/api/coach` | `POST` | Generate today's coaching insight for the dashboard |
 | `/api/coach/chat` | `POST` | Conversational coach that returns a reply and an optional action |
 | `/api/review` | `GET` | Calculate the review for the last seven calendar days |
