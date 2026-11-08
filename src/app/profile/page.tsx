@@ -952,7 +952,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <p className="text-[10px] text-zinc-500 leading-relaxed">
-              Install this app directly on your device&apos;s home screen. Enjoy full-screen standalone view, offline tracking support, and direct access from your app library.
+              Install this app directly on your device&apos;s home screen. Enjoy full-screen standalone view and direct access from your app library.
             </p>
             <button
               type="button"

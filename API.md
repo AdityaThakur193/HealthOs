@@ -77,7 +77,7 @@ Returns `200 { "success": true }`. Returns `429` if a code was sent in the last 
 
 ```json
 {
-  "profile": { "_id": "6a4c73d185dcfe8a2843fb2f", "name": "Asha", "email": "user@example.com", "tdee": 2450, "targetCalories": 2200, "targetProteinG": 150 },
+  "profile": { "_id": "507f1f77bcf86cd799439011", "name": "Asha", "email": "user@example.com", "tdee": 2450, "targetCalories": 2200, "targetProteinG": 150 },
   "tdeeMode": "calibrating",
   "daysRemaining": 4,
   "avgCalories": 2100,
