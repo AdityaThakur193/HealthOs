@@ -8,12 +8,12 @@ describe("Workout Engine & Progressive Overload", () => {
     expect(sched3.map((s) => s.name)).toContain("Tuesday — Push");
 
     const sched4 = getWeekSchedule(4);
-    expect(sched4.length).toBe(5);
+    expect(sched4.length).toBe(4);
     expect(sched4.map((s) => s.name)).toContain("Tuesday — Upper A");
 
     const sched5 = getWeekSchedule(5);
-    expect(sched5.length).toBe(6); // 5 days + Sunday optional delts
-    expect(sched5.map((s) => s.name)).toContain("Thursday — Recovery");
+    expect(sched5.length).toBe(5);
+    expect(sched5.map((s) => s.name)).toContain("Thursday — Push");
 
     const sched6 = getWeekSchedule(6);
     expect(sched6.length).toBe(6);

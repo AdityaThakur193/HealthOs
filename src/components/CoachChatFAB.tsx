@@ -321,6 +321,22 @@ export default function CoachChatFAB() {
         return;
       }
 
+      // ── UPDATE ONE WORKOUT DAY ───────────────────────────────────────
+      if (action === "update_workout_day") {
+        const res = await fetch("/api/workout-plan", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedData),
+        });
+        if (res.ok) {
+          window.dispatchEvent(new Event("workoutPlanUpdated"));
+        } else {
+          const data = await res.json().catch(() => ({}));
+          setMessages((prev) => [...prev, { role: "model", content: data.error || "I couldn't update your workout plan. Please try again." }]);
+        }
+        return;
+      }
+
       // ── 9. LOG HABIT ─────────────────────────────────────────────
       if (action === "log_habit") {
         const habitTitle = String(updatedData?.habitTitle || "").trim();

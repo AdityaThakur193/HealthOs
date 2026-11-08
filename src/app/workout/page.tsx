@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { TimelineEntry } from "@/lib/timelineUtils";
 import GlassCard from "@/components/GlassCard";
 import ExerciseCard from "@/components/ExerciseCard";
+import WorkoutPlanBuilder from "@/components/WorkoutPlanBuilder";
 import CustomPopup from "@/components/CustomPopup";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
@@ -25,7 +26,20 @@ interface ExerciseState {
 
 export default function WorkoutTracker() {
   const router = useRouter();
-  const { profile, userId, loading: authLoading } = useAuthGuard();
+  const { profile, setProfile, userId, loading: authLoading } = useAuthGuard();
+  const [showBuilder, setShowBuilder] = useState(false);
+
+  const refreshProfile = useCallback(async () => {
+    const res = await fetch(`/api/profile?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.profile) setProfile(data.profile);
+  }, [setProfile]);
+
+  useEffect(() => {
+    window.addEventListener("workoutPlanUpdated", refreshProfile);
+    return () => window.removeEventListener("workoutPlanUpdated", refreshProfile);
+  }, [refreshProfile]);
   const [loading, setLoading] = useState(false);
   const [fetchingHistory, setFetchingHistory] = useState(true);
   const [exercises, setExercises] = useState<ExerciseState[]>([]);
@@ -277,6 +291,76 @@ export default function WorkoutTracker() {
     );
   }
 
+  // Shown on training and rest days, so any day can be reached from either.
+  const weekProgram = profile && (() => {
+        const frequency = profile.gymFrequency ?? 4;
+        let schedule = getWeekSchedule(frequency);
+        
+        // If DB custom plan is active, map the names dynamically
+        const customPlan = profile.customWorkoutPlan as Record<number, WorkoutPlan> | undefined;
+        if (customPlan) {
+          schedule = [0, 1, 2, 3, 4, 5, 6].map(day => ({
+            day,
+            name: customPlan[day] ? customPlan[day].name : "Rest Day"
+          })).filter(s => s.name !== "Rest Day");
+        }
+
+        const daysOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
+        const currentDay = new Date().getDay();
+        const getDayLabel = (d: number) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d];
+
+        return (
+          <GlassCard className="p-4 space-y-3 border border-white/10 relative overflow-hidden animate-in-delay-1">
+            <div className="flex justify-between items-baseline">
+              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Your Weekly Program</h3>
+              <button type="button" onClick={() => setShowBuilder(true)} className="text-[10px] text-brand-400 font-bold cursor-pointer hover:text-white transition-colors">{customPlan ? "My Plan" : `${frequency}-Day Template`} · Edit</button>
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {daysOrder.map((d) => {
+                const scheduled = schedule.find((s) => s.day === d);
+                const isToday = d === currentDay;
+                const isSelected = d === selectedDay;
+                return (
+                  <button 
+                    key={d} 
+                    type="button"
+                    onClick={() => setSelectedDay(d)}
+                    className={`p-2 rounded-xl flex flex-col items-center justify-between text-center transition-all cursor-pointer ${
+                      isSelected 
+                        ? "bg-[#8ba893]/20 border border-[#8ba893]/50 glow-green relative" 
+                        : isToday 
+                          ? "bg-cyan-500/5 border border-cyan-500/20 relative" 
+                          : "bg-white/2 border border-white/5 hover:bg-white/5"
+                    }`}
+                  >
+                    <span className={`text-[9px] font-bold ${isSelected ? "text-[#8ba893]" : isToday ? "text-cyan-400" : "text-zinc-500"}`}>
+                      {getDayLabel(d)}
+                    </span>
+                    <span className={`text-[8px] font-black uppercase tracking-tighter mt-1 block truncate w-full ${
+                      scheduled 
+                        ? "text-brand-400 font-bold" 
+                        : "text-zinc-600 font-normal"
+                    }`}>
+                      {scheduled ? (scheduled.name.includes(" — ") ? scheduled.name.split(" — ")[1] : scheduled.name).replace(" Day", "").replace(" A", "").replace(" B", "") : "Rest"}
+                    </span>
+                    {isToday && (
+                      <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </GlassCard>
+        );
+  })();
+
+  const builder = showBuilder && (
+    <WorkoutPlanBuilder onClose={() => setShowBuilder(false)} onSaved={refreshProfile} />
+  );
+
   // ── Rest Day View ──
   if (plan && plan.exercises.length === 0) {
     return (
@@ -288,6 +372,9 @@ export default function WorkoutTracker() {
           </div>
           <span className="badge-info">{plan.focus}</span>
         </div>
+
+        {weekProgram}
+        {builder}
 
         <div className="p-6 text-center animate-in-delay-1 border border-white/5 bg-white/2 rounded-tl-3xl rounded-br-3xl">
           <Compass className="w-10 h-10 text-[#8ba893] mx-auto animate-pulse mb-3" />
@@ -386,71 +473,8 @@ export default function WorkoutTracker() {
         </div>
       </GlassCard>
 
-      {/* Weekly Program Split HUD */}
-      {profile && (() => {
-        const frequency = profile.gymFrequency ?? 4;
-        let schedule = getWeekSchedule(frequency);
-        
-        // If DB custom plan is active, map the names dynamically
-        const customPlan = profile.customWorkoutPlan as Record<number, WorkoutPlan> | undefined;
-        if (customPlan) {
-          schedule = [0, 1, 2, 3, 4, 5, 6].map(day => ({
-            day,
-            name: customPlan[day] ? customPlan[day].name : "Rest Day"
-          })).filter(s => s.name !== "Rest Day");
-        }
-
-        const daysOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
-        const currentDay = new Date().getDay();
-        const getDayLabel = (d: number) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d];
-
-        return (
-          <GlassCard className="p-4 space-y-3 border border-white/10 relative overflow-hidden animate-in-delay-1">
-            <div className="flex justify-between items-baseline">
-              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Your Weekly Program</h3>
-              <span className="text-[10px] text-brand-400 font-bold">{frequency}-Day Split</span>
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {daysOrder.map((d) => {
-                const scheduled = schedule.find((s) => s.day === d);
-                const isToday = d === currentDay;
-                const isSelected = d === selectedDay;
-                return (
-                  <button 
-                    key={d} 
-                    type="button"
-                    onClick={() => setSelectedDay(d)}
-                    className={`p-2 rounded-xl flex flex-col items-center justify-between text-center transition-all cursor-pointer ${
-                      isSelected 
-                        ? "bg-[#8ba893]/20 border border-[#8ba893]/50 glow-green relative" 
-                        : isToday 
-                          ? "bg-cyan-500/5 border border-cyan-500/20 relative" 
-                          : "bg-white/2 border border-white/5 hover:bg-white/5"
-                    }`}
-                  >
-                    <span className={`text-[9px] font-bold ${isSelected ? "text-[#8ba893]" : isToday ? "text-cyan-400" : "text-zinc-500"}`}>
-                      {getDayLabel(d)}
-                    </span>
-                    <span className={`text-[8px] font-black uppercase tracking-tighter mt-1 block truncate w-full ${
-                      scheduled 
-                        ? "text-brand-400 font-bold" 
-                        : "text-zinc-600 font-normal"
-                    }`}>
-                      {scheduled ? (scheduled.name.includes(" — ") ? scheduled.name.split(" — ")[1] : scheduled.name).replace(" Day", "").replace(" A", "").replace(" B", "") : "Rest"}
-                    </span>
-                    {isToday && (
-                      <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </GlassCard>
-        );
-      })()}
+      {weekProgram}
+      {builder}
 
       {/* Dynamic Overload Guide Card */}
       <GlassCard 

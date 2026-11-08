@@ -99,19 +99,16 @@ export function getWeekSchedule(gymFrequency: number): { day: number; name: stri
       return [
         { day: 2, name: "Tuesday — Upper A" },
         { day: 3, name: "Wednesday — Lower A" },
-        { day: 4, name: "Thursday — Chest & Back" },
-        { day: 5, name: "Friday — Lower Body (Custom)" },
+        { day: 5, name: "Friday — Upper B" },
         { day: 6, name: "Saturday — Lower B" },
       ];
     case 5:
-      // Locked-in Custom 9.8/10 Split: Tuesday (Upper A), Wednesday (Lower A), Thursday (Recovery), Friday (Upper B), Saturday (Lower B), Sunday (Sunday Optional)
       return [
         { day: 2, name: "Tuesday — Upper A" },
         { day: 3, name: "Wednesday — Lower A" },
-        { day: 4, name: "Thursday — Recovery" },
-        { day: 5, name: "Friday — Upper B" },
-        { day: 6, name: "Saturday — Lower B" },
-        { day: 0, name: "Sunday — Optional Delts" },
+        { day: 4, name: "Thursday — Push" },
+        { day: 5, name: "Friday — Pull" },
+        { day: 6, name: "Saturday — Legs" },
       ];
     case 6:
       return [
@@ -122,13 +119,8 @@ export function getWeekSchedule(gymFrequency: number): { day: number; name: stri
         { day: 6, name: "Saturday — Pull B" },
         { day: 0, name: "Sunday — Legs B" },
       ];
-    default: // fallback to 4 days
-      return [
-        { day: 2, name: "Tuesday — Upper A" },
-        { day: 3, name: "Wednesday — Lower A" },
-        { day: 5, name: "Friday — Upper B" },
-        { day: 6, name: "Saturday — Lower B" },
-      ];
+    default:
+      return getWeekSchedule(4);
   }
 }
 
@@ -209,7 +201,8 @@ export function getTodaysWorkout(
   const exerciseSpecs: { id: string; sets: number; reps: string; rest: number }[] = [];
 
   // ── 3-Day Lifting Program (Push, Pull, Legs) with custom posture and joint guidelines ──
-  if (frequency === 3) {
+  // The 5-day split combines the Upper/Lower A days with Push, Pull and Legs.
+  if (frequency === 3 || (frequency === 5 && /Push|Pull|Legs/.test(name))) {
     if (name.includes("Push")) {
       focus = "Chest, Shoulders & Triceps (Shoulder Friendly)";
       duration = 50;
@@ -246,7 +239,7 @@ export function getTodaysWorkout(
     }
   }
   // ── 4-Day Lifting Program (Upper A, Lower A, Upper B, Lower B) ──
-  else if (frequency === 4) {
+  else if (frequency === 4 || frequency === 5) {
     if (name.includes("Upper A")) {
       focus = "Upper Body Horizontal Power & Arms";
       duration = 55;
@@ -257,17 +250,6 @@ export function getTodaysWorkout(
         { id: "cable_lateral_raise", sets: 3, reps: "12-15", rest: 60 },
         { id: "rope_pushdown", sets: 3, reps: "10-12", rest: 60 },
         { id: "bayesian_curl", sets: 3, reps: "10-12", rest: 60 }
-      );
-    } else if (name.includes("Chest & Back")) {
-      focus = "Chest & Back";
-      duration = 60;
-      exerciseSpecs.push(
-        { id: "bench_press", sets: 3, reps: "5-8", rest: 120 },
-        { id: "incline_db_press", sets: 3, reps: "8-12", rest: 90 },
-        { id: "high_to_low_cable_fly", sets: 2, reps: "10-15", rest: 90 },
-        { id: "neutral_grip_pulldown", sets: 3, reps: "8-12", rest: 90 },
-        { id: "seated_cable_row", sets: 3, reps: "8-12", rest: 90 },
-        { id: "single_arm_cable_row", sets: 2, reps: "10-15", rest: 90 }
       );
     } else if (name.includes("Lower A")) {
       focus = "Lower Body Quad Strength, Hamstrings & Core";
@@ -280,17 +262,16 @@ export function getTodaysWorkout(
         { id: "standing_calf_raise", sets: 3, reps: "12-15", rest: 60 },
         { id: "cable_crunch", sets: 3, reps: "12-15", rest: 60 }
       );
-    } else if (name.includes("Lower Body (Custom)")) {
-      focus = "Quads, Hamstrings, Glutes, Calves & Core";
-      duration = 60;
+    } else if (name.includes("Upper B")) {
+      focus = "Upper Body Vertical Pull, 3D Shoulders & Arms";
+      duration = 55;
       exerciseSpecs.push(
-        { id: "hack_squat", sets: 3, reps: "6-10", rest: 150 },
-        { id: "romanian_deadlift", sets: 3, reps: "8-10", rest: 150 },
-        { id: "leg_press", sets: 2, reps: "10-15", rest: 120 },
-        { id: "seated_leg_curl", sets: 3, reps: "10-15", rest: 90 },
-        { id: "leg_extension", sets: 2, reps: "12-15", rest: 75 },
-        { id: "standing_calf_raise", sets: 3, reps: "10-15", rest: 75 },
-        { id: "cable_crunch", sets: 2, reps: "8-15", rest: 60 }
+        { id: "neutral_grip_pulldown", sets: 3, reps: "8-10", rest: 90 },
+        { id: "seated_db_shoulder_press", sets: 3, reps: "8-10", rest: 90 },
+        { id: "cable_chest_fly", sets: 3, reps: "12-15", rest: 75 },
+        { id: "face_pull", sets: 3, reps: "15", rest: 60 },
+        { id: "preacher_curl", sets: 3, reps: "10-12", rest: 60 },
+        { id: "overhead_cable_extension", sets: 3, reps: "10-12", rest: 60 }
       );
     } else if (name.includes("Lower B")) {
       focus = "Lower Body Posterior Chain, Glutes & Obliques";
@@ -302,83 +283,6 @@ export function getTodaysWorkout(
         { id: "seated_calf_raise", sets: 3, reps: "15-20", rest: 60 },
         { id: "hanging_knee_raise", sets: 3, reps: "12-15", rest: 60 },
         { id: "cable_woodchopper", sets: 3, reps: "12/side", rest: 45 }
-      );
-    }
-  }
-  // ── Custom 9.8/10 5-Day Hypertrophy Program ──
-  else if (frequency === 5) {
-    if (name.includes("Upper A")) {
-      focus = "Horizontal Push & Pull (Chest/Back Compounds)";
-      duration = 55;
-      exerciseSpecs.push(
-        { id: "bench_press", sets: 3, reps: "5-8", rest: 180 },
-        { id: "incline_db_press", sets: 3, reps: "8-10", rest: 90 },
-        { id: "chest_supported_row", sets: 3, reps: "8-10", rest: 90 },
-        { id: "seated_cable_row", sets: 2, reps: "10-12", rest: 90 },
-        { id: "cable_lateral_raise", sets: 4, reps: "12-15", rest: 90 },
-        { id: "rope_pushdown", sets: 3, reps: "10-12", rest: 90 },
-        { id: "bayesian_curl", sets: 3, reps: "10-12", rest: 60 },
-        { id: "cable_crunch", sets: 3, reps: "12-15", rest: 60 }
-      );
-    } else if (name.includes("Lower A")) {
-      focus = "Quad-Dominant Lower Body Strength & Hypertrophy";
-      duration = 60;
-      exerciseSpecs.push(
-        { id: "hack_squat", sets: 3, reps: "6-8", rest: 180 },
-        { id: "leg_press", sets: 3, reps: "10-12", rest: 120 },
-        { id: "romanian_deadlift", sets: 3, reps: "8-10", rest: 180 },
-        { id: "seated_leg_curl", sets: 3, reps: "10-12", rest: 90 },
-        { id: "leg_extension", sets: 2, reps: "12-15", rest: 90 },
-        { id: "standing_calf_raise", sets: 4, reps: "12-15", rest: 60 },
-        { id: "hanging_knee_raise", sets: 3, reps: "12-15", rest: 60 }
-      );
-    } else if (name.includes("Recovery")) {
-      focus = "Active Recovery, Cardio & Core Stability";
-      duration = 45;
-      exerciseSpecs.push(
-        { id: "zone_2_cardio", sets: 1, reps: "40 min", rest: 0 },
-        { id: "mobility_routine", sets: 1, reps: "15 min", rest: 0 },
-        { id: "dead_bug", sets: 3, reps: "12", rest: 45 },
-        { id: "bird_dog", sets: 3, reps: "12", rest: 45 },
-        { id: "plank", sets: 3, reps: "60 sec", rest: 45 }
-      );
-    } else if (name.includes("Upper B")) {
-      focus = "Vertical Push & Pull (Lats/Rear Delts Hypertrophy)";
-      duration = 55;
-      exerciseSpecs.push(
-        { id: "neutral_grip_pulldown", sets: 3, reps: "8-10", rest: 90 },
-        { id: "single_arm_cable_row", sets: 3, reps: "10-12", rest: 90 },
-        { id: "straight_arm_pulldown", sets: 2, reps: "12-15", rest: 90 },
-        { id: "machine_chest_press", sets: 3, reps: "8-10", rest: 120 },
-        { id: "pec_deck_fly", sets: 2, reps: "12-15", rest: 90 },
-        { id: "reverse_pec_deck", sets: 3, reps: "15", rest: 60 },
-        { id: "face_pull", sets: 3, reps: "15", rest: 90 },
-        { id: "preacher_curl", sets: 3, reps: "10-12", rest: 60 },
-        { id: "overhead_cable_extension", sets: 3, reps: "10-12", rest: 90 }
-      );
-    } else if (name.includes("Lower B")) {
-      focus = "Posterior Chain Leg Volume & Direct Arm Work";
-      duration = 60;
-      exerciseSpecs.push(
-        { id: "front_squat", sets: 3, reps: "8-10", rest: 180 },
-        { id: "bulgarian_split_squat", sets: 3, reps: "10", rest: 90 },
-        { id: "lying_leg_curl", sets: 3, reps: "10-12", rest: 90 },
-        { id: "hip_thrust", sets: 3, reps: "10", rest: 90 },
-        { id: "seated_calf_raise", sets: 4, reps: "15-20", rest: 60 },
-        { id: "incline_db_curl", sets: 3, reps: "10-12", rest: 60 },
-        { id: "hammer_curl", sets: 3, reps: "12", rest: 60 },
-        { id: "single_arm_cross_body_ext", sets: 3, reps: "12", rest: 60 },
-        { id: "overhead_cable_extension", sets: 2, reps: "15", rest: 60 },
-        { id: "ab_wheel", sets: 3, reps: "10", rest: 45 }
-      );
-    } else if (name.includes("Sunday") || name.includes("Delts")) {
-      focus = "Optional Delts & Cardio Conditioning";
-      duration = 45;
-      exerciseSpecs.push(
-        { id: "cable_lateral_raise", sets: 4, reps: "15-20", rest: 60 },
-        { id: "lean_away_lateral_raise", sets: 3, reps: "12-15", rest: 60 },
-        { id: "reverse_pec_deck", sets: 3, reps: "15", rest: 60 },
-        { id: "incline_walk", sets: 1, reps: "20-30 min", rest: 0 }
       );
     }
   }
@@ -464,4 +368,152 @@ export function getTodaysWorkout(
     targetDurationMin: duration,
     exercises,
   };
+}
+
+/* ─────────────────────────────────────────────
+ * Weekly plans: templates and user edits
+ * ───────────────────────────────────────────── */
+
+export type WeekPlan = Record<string, WorkoutPlan>;
+export type LibraryExercise = Omit<Exercise, "targetSets" | "targetReps" | "restSeconds">;
+
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const EQUIPMENT: Exercise["equipment"][] = ["barbell", "dumbbell", "cable", "bodyweight", "machine"];
+const MAX_EXERCISES_PER_DAY = 15;
+
+const REST_DAY: WorkoutPlan = { name: "Rest Day", focus: "Recovery & Mobility", targetDurationMin: 20, exercises: [] };
+
+export function getExerciseLibrary(): LibraryExercise[] {
+  return Object.values(EXERCISE_LIBRARY);
+}
+
+/** The default week for a number of training days. */
+export function buildTemplateWeek(gymFrequency?: number): WeekPlan {
+  return Object.fromEntries(ALL_DAYS.map((day) => [day, getTodaysWorkout({ gymFrequency }, day)]));
+}
+
+/** The plan the user follows now: their own where they have one, else the template. */
+export function getCurrentWeek(profile: Parameters<typeof getTodaysWorkout>[0]): WeekPlan {
+  return Object.fromEntries(ALL_DAYS.map((day) => [day, getTodaysWorkout(profile, day)]));
+}
+
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 50);
+}
+
+function cleanText(value: unknown, maxLength: number): string {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function sanitizeExercise(raw: Partial<Exercise> | null): Exercise | string {
+  const name = cleanText(raw?.name, 80);
+  if (!name) return "Every exercise needs a name.";
+
+  const targetSets = Math.round(Number(raw?.targetSets));
+  if (!(targetSets >= 1 && targetSets <= 10)) return `${name}: sets must be between 1 and 10.`;
+
+  const targetReps = cleanText(raw?.targetReps, 20);
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9 /.-]*$/.test(targetReps)) return `${name}: enter reps like 8-12.`;
+
+  const rest = Number(raw?.restSeconds);
+  const id = typeof raw?.id === "string" && /^[a-z0-9_]{1,60}$/.test(raw.id) ? raw.id : `custom_${slugify(name)}`;
+  const library = EXERCISE_LIBRARY[id];
+  const youtubeId = typeof raw?.youtubeId === "string" && /^[\w-]+(\?t=\d+)?$/.test(raw.youtubeId) ? raw.youtubeId : library?.youtubeId;
+
+  return {
+    id,
+    name,
+    muscle: cleanText(raw?.muscle, 30) || library?.muscle || "other",
+    equipment: EQUIPMENT.includes(raw?.equipment as Exercise["equipment"]) ? (raw?.equipment as Exercise["equipment"]) : library?.equipment ?? "bodyweight",
+    targetSets,
+    targetReps,
+    restSeconds: rest >= 0 && rest <= 600 ? Math.round(rest) : 90,
+    ...(youtubeId ? { youtubeId } : {}),
+  };
+}
+
+function estimateMinutes(exercises: Exercise[]): number {
+  const seconds = exercises.reduce((total, exercise) => total + exercise.targetSets * (exercise.restSeconds + 45), 0);
+  return Math.max(10, Math.min(240, Math.round(seconds / 60)));
+}
+
+function sanitizeDay(raw: Partial<WorkoutPlan> | null): WorkoutPlan | string {
+  if (!Array.isArray(raw?.exercises)) return "Each day needs a list of exercises.";
+  if (raw.exercises.length === 0) return REST_DAY;
+  if (raw.exercises.length > MAX_EXERCISES_PER_DAY) return `A day can have at most ${MAX_EXERCISES_PER_DAY} exercises.`;
+
+  const exercises: Exercise[] = [];
+  for (const candidate of raw.exercises) {
+    const exercise = sanitizeExercise(candidate);
+    if (typeof exercise === "string") return exercise;
+    if (!exercises.some((existing) => existing.id === exercise.id)) exercises.push(exercise);
+  }
+
+  const name = cleanText(raw.name, 40);
+  if (!name || name === REST_DAY.name) return "Give this training day a name.";
+
+  const minutes = Number(raw.targetDurationMin);
+  return {
+    name,
+    focus: cleanText(raw.focus, 80) || [...new Set(exercises.map((exercise) => exercise.muscle))].slice(0, 4).join(", "),
+    targetDurationMin: minutes >= 10 && minutes <= 240 ? Math.round(minutes) : estimateMinutes(exercises),
+    exercises,
+  };
+}
+
+/** Validates a full week. Returns the clean plan, or a message saying what's wrong. */
+export function sanitizeWeekPlan(raw: unknown): WeekPlan | string {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return "That workout plan isn't valid.";
+
+  const plan: WeekPlan = {};
+  for (const day of ALL_DAYS) {
+    const result = sanitizeDay((raw as Record<string, Partial<WorkoutPlan>>)[day] ?? null);
+    if (typeof result === "string") return result;
+    plan[day] = result;
+  }
+  return plan;
+}
+
+function findLibraryExercise(name: string): LibraryExercise | undefined {
+  const normalize = (text: string) => text.toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const wanted = normalize(name);
+  const library = getExerciseLibrary();
+  return (
+    library.find((exercise) => normalize(exercise.name) === wanted || exercise.id === wanted.replace(/ /g, "_")) ??
+    library.find((exercise) => normalize(exercise.name).includes(wanted) || wanted.includes(normalize(exercise.name)))
+  );
+}
+
+export interface WorkoutDayEdit {
+  day?: unknown;
+  rest?: unknown;
+  name?: unknown;
+  add?: { name?: unknown; sets?: unknown; reps?: unknown }[];
+  remove?: unknown[];
+}
+
+/** Applies one day's change, such as the coach adding an exercise, to a week. */
+export function applyWorkoutDayEdit(week: WeekPlan, edit: WorkoutDayEdit): WeekPlan | string {
+  const day = DAY_NAMES.indexOf(String(edit.day).toLowerCase());
+  if (day === -1) return "Tell me which day to change.";
+  if (edit.rest === true) return { ...week, [day]: REST_DAY };
+
+  const current = week[day] ?? REST_DAY;
+  const removals = (edit.remove ?? []).map((item) => String(item).toLowerCase());
+  const kept = current.exercises.filter(
+    (exercise) => !removals.some((item) => exercise.name.toLowerCase().includes(item) || item.includes(exercise.name.toLowerCase()))
+  );
+
+  const added = (edit.add ?? []).map((item) => {
+    const name = cleanText(item.name, 80);
+    const library = findLibraryExercise(name);
+    return { ...library, name: library?.name ?? name, id: library?.id, targetSets: item.sets ?? 3, targetReps: item.reps ?? "8-12", restSeconds: 90 };
+  }) as Partial<Exercise>[];
+
+  const result = sanitizeDay({
+    name: cleanText(edit.name, 40) || (current.name === REST_DAY.name ? "Workout" : current.name),
+    exercises: [...kept, ...added] as Exercise[],
+  });
+  return typeof result === "string" ? result : { ...week, [day]: result };
 }

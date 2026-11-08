@@ -184,6 +184,7 @@ const ALLOWED_ACTIONS = [
   "log_workout_done",
   "update_diet",
   "update_workout",
+  "update_workout_day",
   "log_habit",
   "none",
 ];

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { sanitizeJsonOutput } from "@/lib/gemini";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getWeekSchedule } from "@/lib/workoutPlans";
+import { getCurrentWeek } from "@/lib/workoutPlans";
 import { buildCoachContext } from "@/lib/coachContext";
 import { CoachSnapshot, loadCoachSnapshot } from "@/lib/coachData";
 import { normalizeCoachReply } from "@/lib/coachRules";
@@ -50,6 +50,10 @@ function buildSystemPrompt(snapshot: CoachSnapshot, tz?: string): string {
     .map((meal) => meal.meal.replace(/s$/, ""));
   const dietPlan = profile.dietPlan?.generatedPlan as Record<string, { meals?: { name: string; messItems?: string }[] }> | undefined;
   const gymFrequency = profile.gymFrequency || 4;
+  const week = getCurrentWeek(profile as Parameters<typeof getCurrentWeek>[0]);
+  const weekSummary = [1, 2, 3, 4, 5, 6, 0]
+    .map((day) => `${DAYS[day]}: ${week[day].name}${week[day].exercises.length ? ` (${week[day].exercises.map((exercise) => exercise.name).join(", ")})` : ""}`)
+    .join("\n");
 
   const weeklySummary = dietPlan
     ? Object.keys(dietPlan)
@@ -72,8 +76,10 @@ User Profile:
 - Goal: "${profile.goal}" | Daily Targets: ${profile.targetCalories} kcal, ${profile.targetProteinG}g protein
 - Diet preference: ${profile.dietPreference || "none"} | Food allergies (NEVER suggest these): ${allergies} | Medical conditions: ${conditions}
 - Schedule: ${profile.collegeSchedule || "Not specified"} | Strict Mess Mode: ${profile.strictMessOnly ? "ACTIVE" : "INACTIVE"}
-- Gym: ${gymFrequency} days/week (${profile.gymExperience}) | Split: ${JSON.stringify(getWeekSchedule(gymFrequency))}
+- Gym: ${gymFrequency} days/week (${profile.gymExperience}) | Plan: ${profile.customWorkoutPlan ? "the user's own plan" : "default template"}
 - Today (${todayName}): Remaining plan: ${dietPlan?.[todayName] ? JSON.stringify(remainingPlanMeals(dietPlan[todayName].meals, closedMeals)) : "N/A"}
+- Weekly Workout Plan:
+${weekSummary}
 - Full Weekly Diet Overview:
 ${weeklySummary || "No diet plan generated yet"}
 
@@ -86,7 +92,7 @@ MESS TIMING RULE: mealTiming has the current local time and each meal's state. O
 FULL DATA CONTROL — ACTIONS YOU CAN TAKE
 ════════════════════════════════════════════
 
-You have 10 possible actions. Choose the correct one based on what the user says:
+You have 11 possible actions. Choose the correct one based on what the user says:
 
 1. log_meal — User mentions food they ate (any meal, snack, drink with calories)
    updatedData: {
@@ -142,13 +148,16 @@ You have 10 possible actions. Choose the correct one based on what the user says
 7. update_diet — User asks to modify their weekly diet plan
    updatedData: full updated dietPlan generatedPlan JSON
 
-8. update_workout — User asks to modify their workout split / gym frequency (e.g., "change to a 5 days split", "shift to 3 days split", "update split to 6 days")
+8. update_workout — User asks to change how many days they train (e.g., "change to a 5 days split"). If they already use their own plan, tell them to reset it to the template on the workout page instead.
    updatedData: { gymFrequency: number (value must be 3, 4, 5, or 6) }
 
 9. log_habit — User asks to mark a habit as done or log habit progress (e.g., "mark pray 5 times as done", "completed 5 leetcode problems", "check off no junk food")
    updatedData: { habitTitle: string, completed: boolean, value?: number }
 
-10. none — Pure question, general health advice, no data to save
+10. update_workout_day — User asks to change one day of their workout (e.g., "add hammer curls on Friday", "remove leg press from Wednesday", "make Thursday a rest day")
+   updatedData: { day: "monday"|...|"sunday", rest?: true, name?: string, add?: [{ name, sets: number, reps: string like "8-12" }], remove?: [exercise names] }
+
+11. none — Pure question, general health advice, no data to save
     updatedData: null
 
 ════════════════════════════════════════════
@@ -165,7 +174,7 @@ RESPONSE FORMAT — RETURN ONLY VALID JSON
 ════════════════════════════════════════════
 {
   "message": "string — your reply to the user",
-  "action": "log_meal"|"log_steps"|"log_water"|"log_sleep"|"log_weight"|"log_workout_done"|"update_diet"|"update_workout"|"log_habit"|"none",
+  "action": "log_meal"|"log_steps"|"log_water"|"log_sleep"|"log_weight"|"log_workout_done"|"update_diet"|"update_workout"|"update_workout_day"|"log_habit"|"none",
   "updatedData": {} or null
 }
 
