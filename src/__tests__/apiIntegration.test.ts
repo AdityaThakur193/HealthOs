@@ -212,6 +212,17 @@ describe("Habits", () => {
     expect(await TimelineEvent.countDocuments({ userId: alice.id, type: "habit" })).toBe(0);
   });
 
+  it("counts logged water towards the hydration habit", async () => {
+    const alice = await createUser("alice@example.com");
+    await timelinePOST(call("/api/timeline", "POST", alice.cookie, { type: "water", payload: { amountL: 2 } }));
+    await timelinePOST(call("/api/timeline", "POST", alice.cookie, { type: "water", payload: { amountL: 1.5 } }));
+
+    const { habits } = await (await habitsGET(call("/api/habits", "GET", alice.cookie))).json();
+    const hydration = habits.find((habit: { id: string }) => habit.id === "habit_hydration");
+    expect(hydration.completedToday).toBe(true);
+    expect(hydration.todayValue).toBe(3.5);
+  });
+
   it("deletes a habit along with its history", async () => {
     const alice = await createUser("alice@example.com");
     await habitsGET(call("/api/habits", "GET", alice.cookie));

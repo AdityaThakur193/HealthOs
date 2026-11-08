@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       targetCalories = profile.customCalories && profile.customCalories > 0 ? profile.customCalories : targetCalories;
       targetProteinG = profile.customProtein && profile.customProtein > 0 ? profile.customProtein : targetProteinG;
     } else if (tdeeResult.status === "adaptive") {
-      targetCalories = goalCalorieTarget(tdeeResult.calculatedTdee, profile.goal, profile.gender);
+      targetCalories = goalCalorieTarget(tdeeResult.calculatedTdee, profile.goal, profile.gender, profile.age);
     }
 
     const variants = savedVariants(profile.dietPlan);

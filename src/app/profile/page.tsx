@@ -3,16 +3,17 @@
 import { useState, useEffect, useCallback } from "react";
 import GlassCard from "@/components/GlassCard";
 import { 
-  User, Calendar, Soup, Sparkles, Upload, AlertTriangle, Clock, Save, Loader2
+  User, Calendar, Soup, Sparkles, Upload, Save, Loader2
 } from "lucide-react";
+import Link from "next/link";
 import CustomPopup from "@/components/CustomPopup";
+import MessHoursEditor from "@/components/MessHoursEditor";
 import ReminderSettings from "@/components/ReminderSettings";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 import type { TimelineEntry } from "@/lib/timelineUtils";
-import type { DietMeal, DietPlan } from "@/lib/dietEngine";
-import { DEFAULT_MESS_TIMINGS, MEAL_NAMES, MessTimings, resolveMessTimings } from "@/lib/mealWindows";
+import { DEFAULT_MESS_TIMINGS, MessTimings, resolveMessTimings } from "@/lib/mealWindows";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -21,8 +22,8 @@ type InstallPromptEvent = Event & {
 
 export default function ProfilePage() {
   
-  // Tab control: 'specs' | 'calendar' | 'mess' | 'diet'
-  const [activeTab, setActiveTab] = useState<"specs" | "calendar" | "mess" | "diet">("specs");
+  // Tab control: 'specs' | 'calendar' | 'mess'
+  const [activeTab, setActiveTab] = useState<"specs" | "calendar" | "mess">("specs");
 
   const { profile, setProfile, userId, loading: authLoading } = useAuthGuard();
   const [loading, setLoading] = useState(true);
@@ -115,10 +116,6 @@ export default function ProfilePage() {
   const [menuActiveDay, setMenuActiveDay] = useState<string>("monday");
   const [showSuccessMenu, setShowSuccessMenu] = useState(false);
 
-  // Diet Plan States
-  const [dietPlan, setDietPlan] = useState<DietPlan | null>(null);
-  const [generatingDiet, setGeneratingDiet] = useState(false);
-  const [dietActiveDay, setDietActiveDay] = useState<string>("monday");
 
   // Calendar Event Manager States
   const [events, setEvents] = useState<TimelineEntry[]>([]);
@@ -126,7 +123,6 @@ export default function ProfilePage() {
   const [eventTitle, setEventTitle] = useState("");
   const [messTimings, setMessTimings] = useState<MessTimings>(DEFAULT_MESS_TIMINGS);
   const [savingHours, setSavingHours] = useState(false);
-  const [swappingMeal, setSwappingMeal] = useState<string | null>(null);
   const [eventType, setEventType] = useState<"exam" | "travel" | "sick" | "holiday">("exam");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -142,9 +138,6 @@ export default function ProfilePage() {
     if (profile.messMenu) {
       setRawMenuInput(profile.messMenu.rawText || "");
       setParsedMenu(profile.messMenu.parsedMenu || null);
-    }
-    if (profile.dietPlan) {
-      setDietPlan(profile.dietPlan.generatedPlan || null);
     }
 
     // Initialize specs form
@@ -168,85 +161,6 @@ export default function ProfilePage() {
     setUseCustomMacros(profile.useCustomMacros || false);
     setCustomDietPreferences(profile.customDietPreferences || "");
   }, [profile]);
-
-  const renderFoodList = (text: string, isAdditions: boolean = false) => {
-    if (!text) {
-      return (
-        <span className="text-xs text-zinc-500 italic block py-1 text-left">None suggested</span>
-      );
-    }
-
-    const cleanText = text.trim();
-    if (
-      cleanText.toLowerCase() === "none" || 
-      cleanText.toLowerCase() === "none (strict mess only)" ||
-      cleanText.toLowerCase().includes("none (strict mess only)")
-    ) {
-      return (
-        <div className="flex items-center gap-1.5 py-1 text-zinc-500">
-          <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
-          <span className="text-[11px] font-semibold">None (Strict Mess Only)</span>
-        </div>
-      );
-    }
-
-    // Split items by line
-    const items = cleanText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-
-    return (
-      <div className="space-y-1.5 py-0.5">
-        {items.map((line, idx) => {
-          // Clean bullet symbols
-          const cleanLine = line.replace(/^[•\-\*\s]+/, "");
-          
-          // Match Parentheses: Name (Portion - Macros)
-          const parenMatch = cleanLine.match(/^([^(]+)\(([^)]+)\)$/);
-          if (parenMatch) {
-            const name = parenMatch[1].trim();
-            const details = parenMatch[2].trim();
-            
-            // Split details by '-'
-            const parts = details.split("-").map(p => p.trim());
-            const portion = parts[0] || "";
-            const macros = parts[1] || "";
-
-            return (
-              <div key={idx} className="flex items-start justify-between py-1 border-b border-white/5 last:border-b-0 last:pb-0 gap-2">
-                <div className="text-left min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-1 h-1 rounded-full flex-shrink-0 ${isAdditions ? "bg-[#8ba893]" : "bg-[#c87a53]"}`} />
-                    <span className="text-[11px] font-semibold text-zinc-100 truncate">{name}</span>
-                  </div>
-                  {portion && (
-                    <span className="text-[9px] text-zinc-500 pl-2.5 block truncate leading-tight">{portion}</span>
-                  )}
-                </div>
-                {macros && (
-                  <div className="flex-shrink-0 flex items-center">
-                    <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded-md border ${
-                      isAdditions 
-                        ? "bg-[#8ba893]/10 border-[#8ba893]/20 text-[#8ba893]" 
-                        : "bg-white/5 border-white/10 text-zinc-300"
-                    }`}>
-                      {macros}
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          }
-
-          // Fallback if formatting doesn't match
-          return (
-            <div key={idx} className="flex items-start gap-1.5 py-1 text-left border-b border-white/5 last:border-b-0 last:pb-0">
-              <span className={`w-1 h-1 rounded-full mt-1.5 flex-shrink-0 ${isAdditions ? "bg-[#8ba893]" : "bg-[#c87a53]"}`} />
-              <span className="text-[11px] text-zinc-300 font-medium leading-relaxed">{cleanLine}</span>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
 
   const loadCalendarEvents = useCallback(async () => {
     if (!userId) return;
@@ -520,13 +434,6 @@ export default function ProfilePage() {
     }
   };
 
-  const updateMealHour = (kind: keyof MessTimings, meal: (typeof MEAL_NAMES)[number], edge: "start" | "end", value: string) => {
-    setMessTimings((current) => ({
-      ...current,
-      [kind]: { ...current[kind], [meal]: { ...current[kind][meal], [edge]: value } },
-    }));
-  };
-
   const handleSaveMessHours = async () => {
     if (!profile) return;
 
@@ -560,57 +467,6 @@ export default function ProfilePage() {
       showCustomAlert("Connection Error", "Error saving mess hours.", "error");
     } finally {
       setSavingHours(false);
-    }
-  };
-
-  const handleSwapMeal = async (mealName: string) => {
-    setSwappingMeal(mealName);
-    try {
-      const res = await fetch("/api/diet/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ strictMessOnly, swap: { day: dietActiveDay, meal: mealName } }),
-      });
-      const data = await res.json();
-      if (res.ok && data.dietPlan) {
-        setDietPlan(data.dietPlan);
-      } else {
-        showCustomAlert("Swap Failed", data.error || "Could not change this meal.", "error");
-      }
-    } catch (err) {
-      console.error(err);
-      showCustomAlert("Connection Error", "Error changing this meal.", "error");
-    } finally {
-      setSwappingMeal(null);
-    }
-  };
-
-  const handleGenerateDietPlan = async () => {
-    setGeneratingDiet(true);
-    try {
-      const res = await fetch("/api/diet/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ strictMessOnly }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.dietPlan) {
-          setDietPlan(data.dietPlan);
-          showCustomAlert("Plan Ready", "Your diet plan has been built from your mess menu.", "success");
-        } else {
-          showCustomAlert("Configuration Needed", "Could not generate diet plan. Please check if your mess menu is uploaded.", "warning");
-        }
-      } else {
-        const errData = await res.json();
-        showCustomAlert("Generation Failed", errData.error || "Failed to generate diet plan.", "error");
-      }
-    } catch (err) {
-      console.error(err);
-      showCustomAlert("Connection Error", "Error generating diet plan.", "error");
-    } finally {
-      setGeneratingDiet(false);
     }
   };
 
@@ -691,14 +547,9 @@ export default function ProfilePage() {
         >
           <Soup className="w-3.5 h-3.5" /> Mess Menu
         </button>
-        <button
-          onClick={() => setActiveTab("diet")}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-            activeTab === "diet" ? "bg-[#8ba893] text-[#0c0f0d] shadow-md" : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5" /> AI Diet
-        </button>
+        <Link href="/diet" className="flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-zinc-400 hover:text-white">
+          <Sparkles className="w-3.5 h-3.5" /> Diet Plan
+        </Link>
       </div>
 
       {/* Single Question Indicator */}
@@ -709,9 +560,7 @@ export default function ProfilePage() {
             ? '"Who am I today?"' 
             : activeTab === "calendar" 
               ? '"What events affect my plan?"' 
-              : activeTab === "mess" 
-                ? '"What is the mess serving today?"' 
-                : '"What, when, and how should I eat?"'}
+              : '"What is the mess serving today?"'}
         </h2>
       </div>
 
@@ -1161,28 +1010,7 @@ export default function ProfilePage() {
               Your coach only suggests meals that are still open. For a one-off holiday, add it in the Schedule tab.
             </p>
 
-            {(["regular", "holiday"] as const).map((kind) => (
-              <div key={kind} className="space-y-2">
-                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
-                  {kind === "regular" ? "Monday to Saturday" : "Sundays & Holidays"}
-                </p>
-                {MEAL_NAMES.map((meal) => (
-                  <div key={meal} className="grid grid-cols-[72px_1fr_1fr] gap-2 items-center">
-                    <span className="text-xs text-zinc-300 capitalize">{meal}</span>
-                    {(["start", "end"] as const).map((edge) => (
-                      <input
-                        key={edge}
-                        type="time"
-                        aria-label={`${kind} ${meal} ${edge === "start" ? "opens" : "closes"}`}
-                        value={messTimings[kind][meal][edge]}
-                        onChange={(e) => updateMealHour(kind, meal, edge, e.target.value)}
-                        className="input-glass text-xs h-10 px-2 bg-zinc-950 text-white border border-white/10 rounded-xl w-full"
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            ))}
+            <MessHoursEditor value={messTimings} onChange={setMessTimings} />
 
             <button
               onClick={handleSaveMessHours}
@@ -1355,228 +1183,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Tab 4: AI Custom Diet Planner */}
-      {activeTab === "diet" && (
-        <div className="space-y-5 animate-in-delay-1">
-          {!parsedMenu ? (
-            <GlassCard className="p-6 text-center space-y-4 border border-red-500/10 bg-red-950/5">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto">
-                <AlertTriangle className="w-6 h-6 text-red-400" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-white">Hostel Mess Menu Required</h3>
-                <p className="text-xs text-zinc-500 leading-relaxed max-w-sm mx-auto">
-                  Before we can construct your custom diet plan, we need your hostel&apos;s mess menu. Please go to the **Mess Menu** tab first to paste or upload it.
-                </p>
-              </div>
-            </GlassCard>
-          ) : (
-            <div className="space-y-5">
-              {/* Generator Card */}
-              <GlassCard className="p-5 space-y-4 border border-white/10 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[#8ba893]/5 blur-[50px] rounded-full -z-10" />
-                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center justify-between">
-                  <span>Custom AI Diet Configurator</span>
-                  <span className="text-[9px] text-[#c87a53] font-mono">Pillar 2 & 4</span>
-                </h3>
-
-                <div className="text-zinc-400 text-xs leading-relaxed space-y-2 bg-white/2 p-3.5 rounded-xl border border-white/5">
-                  <p className="font-semibold text-white flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-[#8ba893]" /> Built From Your Mess Menu
-                  </p>
-                  <p className="text-[10px] text-zinc-500 leading-normal">
-                    This engine designs a tailored diet chart combining your biometric stats, target macros, and college schedule with what is actually served in your hostel.
-                  </p>
-                  <ul className="text-[9px] text-zinc-500 list-disc pl-4 space-y-0.5">
-                    <li>Portions stay realistic, so you won&apos;t be told to eat 9 rotis to hit a number.</li>
-                    <li>Nutrition comes from IFCT 2017. Anything else is marked as estimated.</li>
-                    <li>If the mess can&apos;t reach your target on a given day, the plan says so.</li>
-                  </ul>
-                </div>
-
-                <button
-                  onClick={handleGenerateDietPlan}
-                  disabled={generatingDiet}
-                  className="w-full py-3 rounded-xl bg-[#8ba893] hover:bg-[#8ba893]/90 text-[#0c0f0d] text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {generatingDiet ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Generating Diet Chart...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" /> {dietPlan ? "Rebuild Diet Plan" : "Build My Diet Plan"}
-                    </>
-                  )}
-                </button>
-              </GlassCard>
-
-              {/* Diet Plan Timeline */}
-              {dietPlan && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-[#8ba893]" /> Your Weekly Diet Schedule
-                    </h3>
-                  </div>
-
-                  {/* Day tabs */}
-                  <div className="flex gap-1 overflow-x-auto pb-1.5 scrollbar-thin">
-                    {Object.keys(dietPlan).map((day) => (
-                      <button
-                        key={day}
-                        onClick={() => setDietActiveDay(day)}
-                        className={`px-3.5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider flex-shrink-0 cursor-pointer transition-all ${
-                          dietActiveDay === day
-                            ? "bg-[#8ba893] text-[#0c0f0d] shadow-sm"
-                            : "bg-white/5 text-zinc-400 hover:text-white"
-                        }`}
-                      >
-                        {day.substring(0, 3)}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Daily Totals Summary */}
-                  {dietPlan && dietPlan[dietActiveDay] && dietPlan[dietActiveDay].meals && dietPlan[dietActiveDay].meals.length > 0 && (
-                    (() => {
-                      const meals = dietPlan[dietActiveDay].meals;
-                      const plannedCal = meals.reduce((sum: number, m: DietMeal) => sum + (Number(m.calories) || 0), 0);
-                      const plannedProt = meals.reduce((sum: number, m: DietMeal) => sum + (Number(m.proteinG) || 0), 0);
-                      const targetCal = profile?.targetCalories || 2000;
-                      const targetProt = profile?.targetProteinG || 150;
-                      const calPercent = Math.min(100, Math.round((plannedCal / targetCal) * 100));
-                      const protPercent = Math.min(100, Math.round((plannedProt / targetProt) * 100));
-                      
-                      const onTarget = Math.abs(plannedCal - targetCal) <= 150 && targetProt - plannedProt <= 10;
-                      const proteinShort = Math.max(0, Math.round(targetProt - plannedProt));
-                      const dayNote = dietPlan[dietActiveDay].dailySummary?.note;
-
-                      return (
-                        <GlassCard className="p-4 border border-[#8ba893]/20 bg-[#8ba893]/5 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                              Daily Planned Totals
-                            </h4>
-                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
-                              onTarget
-                                ? "bg-green-500/10 text-green-400 border border-green-500/20" 
-                                : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
-                            }`}>
-                              {onTarget ? "On Target" : proteinShort > 10 ? `${proteinShort}g Protein Short` : "Close To Target"}
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            {/* Calories Tracker */}
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-baseline">
-                                <span className="text-[9px] text-zinc-500 font-bold uppercase">Calories</span>
-                                <span className="text-xs font-mono font-bold text-white">
-                                  {plannedCal} <span className="text-[9px] text-zinc-500">/ {targetCal} kcal</span>
-                                </span>
-                              </div>
-                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-gradient-to-r from-[#8ba893] to-green-400 transition-all duration-500"
-                                  style={{ width: `${calPercent}%` }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Protein Tracker */}
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-baseline">
-                                <span className="text-[9px] text-zinc-500 font-bold uppercase">Protein</span>
-                                <span className="text-xs font-mono font-bold text-white">
-                                  {plannedProt}g <span className="text-[9px] text-zinc-500">/ {targetProt}g</span>
-                                </span>
-                              </div>
-                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-gradient-to-r from-[#c87a53] to-orange-400 transition-all duration-500"
-                                  style={{ width: `${protPercent}%` }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                          {dayNote && <p className="text-[10px] text-zinc-400 leading-relaxed">{dayNote}</p>}
-                        </GlassCard>
-                      );
-                    })()
-                  )}
-
-                  {/* Meals list */}
-                  <div className="space-y-3">
-                    {(!dietPlan[dietActiveDay] || !dietPlan[dietActiveDay].meals || dietPlan[dietActiveDay].meals.length === 0) ? (
-                      <p className="text-xs text-zinc-500 italic text-center py-4 bg-white/2 border border-white/5 rounded-2xl">
-                        No meals configured for this day. Regenerate to populate.
-                      </p>
-                    ) : (
-                      dietPlan[dietActiveDay].meals.map((meal: DietMeal, idx: number) => (
-                        <GlassCard key={idx} className="p-4 border border-white/5 bg-white/1 relative overflow-hidden flex flex-col gap-2.5">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-[#c87a53]/2 blur-[30px] rounded-full -z-10" />
-                          
-                          {/* Meal Header */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#c87a53] px-2 py-0.5 rounded bg-[#c87a53]/10 border border-[#c87a53]/20">
-                                {meal.name}
-                              </span>
-                              <span className="text-[10px] text-zinc-400 font-bold font-mono flex items-center gap-1">
-                                <Clock className="w-3.5 h-3.5 text-zinc-500" /> {meal.time}
-                              </span>
-                            </div>
-                            
-                            {/* Macros Badge */}
-                            <div className="flex items-center gap-2 text-[10px] font-bold font-mono">
-                              <span className="text-[#8ba893]">{meal.proteinG}g P</span>
-                              <span className="text-zinc-500">•</span>
-                              <span className="text-zinc-300">{meal.calories} kcal</span>
-                            </div>
-                          </div>
-
-                          {/* Meal Choices */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                            {/* Mess Items Choice */}
-                            <div className="p-3 bg-zinc-950/40 rounded-xl border border-white/5">
-                              <span className="text-[8.5px] font-extrabold text-zinc-500 uppercase tracking-widest block mb-2 text-left">🥣 From Hostel Mess</span>
-                              {renderFoodList(meal.messItems || "")}
-                            </div>
-
-                            {/* Required Additions */}
-                            <div className="p-3 bg-[#8ba893]/3 rounded-xl border border-[#8ba893]/10">
-                              <span className="text-[8.5px] font-extrabold text-[#8ba893] uppercase tracking-widest block mb-2 text-left">➕ Custom Additions / Supplements</span>
-                              {renderFoodList(meal.additions || "", true)}
-                            </div>
-                          </div>
-
-                          {meal.additions && meal.additions.startsWith("•") && (
-                            <button
-                              onClick={() => handleSwapMeal(meal.name || "")}
-                              disabled={swappingMeal === meal.name}
-                              className="self-start text-[10px] font-semibold text-[#8ba893] hover:text-white transition-colors cursor-pointer disabled:opacity-50"
-                            >
-                              {swappingMeal === meal.name ? "Swapping..." : "Try different additions"}
-                            </button>
-                          )}
-
-                          {/* Coach Timing Reason */}
-                          {meal.timingReason && (
-                            <div className="text-[10px] text-zinc-400 bg-white/2 p-2.5 rounded-lg border-l border-[#c87a53]/60 italic leading-relaxed">
-                              &ldquo;{meal.timingReason}&rdquo;
-                            </div>
-                          )}
-                        </GlassCard>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
       {/* Premium Alert/Confirm Toast Popup */}
       <CustomPopup
         isOpen={popupState.isOpen}

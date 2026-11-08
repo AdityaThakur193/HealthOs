@@ -40,8 +40,10 @@ const GOAL_PROTEIN_PER_KG: Record<Goal, number> = {
 const MIN_SAFE_CALORIES: Record<Gender, number> = { male: 1500, female: 1200, other: 1200 };
 
 /** Applies the goal adjustment to a TDEE, with a safety floor. */
-export function goalCalorieTarget(tdee: number, goal: Goal, gender: Gender = "other"): number {
-  const target = tdee + (GOAL_CALORIE_ADJUSTMENT[goal] ?? 0);
+export function goalCalorieTarget(tdee: number, goal: Goal, gender: Gender = "other", age?: number): number {
+  // Under-18s are still growing, so calculated targets stay at maintenance.
+  const adjustment = age !== undefined && age < 18 ? 0 : GOAL_CALORIE_ADJUSTMENT[goal] ?? 0;
+  const target = tdee + adjustment;
   return Math.round(Math.max(target, MIN_SAFE_CALORIES[gender] ?? 1200));
 }
 
@@ -101,7 +103,7 @@ export function calculateHealthTargets(data: HealthTargetInput) {
   const bmi = data.weightKg / (heightM * heightM);
   const referenceWeight = bmi > 25 ? data.targetWeightKg || 22 * heightM * heightM : data.weightKg;
 
-  let targetCalories = goalCalorieTarget(tdee, data.goal, data.gender);
+  let targetCalories = goalCalorieTarget(tdee, data.goal, data.gender, data.age);
   let targetProteinG = referenceWeight * GOAL_PROTEIN_PER_KG[data.goal];
 
   if (data.useCustomMacros) {

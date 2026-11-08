@@ -11,8 +11,9 @@ import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { getTodaysWorkout } from "@/lib/workoutPlans";
 import { dayKey } from "@/lib/dateUtils";
 import { aggregateDailyEvents, TimelineEntry, TimelinePayload } from "@/lib/timelineUtils";
-import type { CoachRecommendation } from "@/lib/gemini";
-import { Flame, Dumbbell, Droplet, Footprints, Moon, Sparkles, Scale, GraduationCap, Compass, Calendar, Zap, Activity, Camera, Beef, X } from "lucide-react";
+import type { CoachContext, CoachRecommendation } from "@/lib/gemini";
+import { nextMealPrompt } from "@/lib/mealWindows";
+import { Soup, Flame, Dumbbell, Droplet, Footprints, Moon, Sparkles, Scale, GraduationCap, Compass, Calendar, Zap, Activity, Camera, Beef, X } from "lucide-react";
 
 interface TodayState {
   calories: number;
@@ -45,6 +46,8 @@ export default function Dashboard() {
     burnedToday: 0,
   });
   const [coachData, setCoachData] = useState<CoachRecommendation | null>(null);
+  const [coachContext, setCoachContext] = useState<CoachContext | null>(null);
+  const [showMoreStats, setShowMoreStats] = useState(false);
   const [coachLoading, setCoachLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
@@ -195,6 +198,7 @@ export default function Dashboard() {
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data && data.recommendation) setCoachData(data.recommendation);
+          if (data && data.context) setCoachContext(data.context);
         })
         .catch((err) => console.error("Non-blocking Coach AI fetch error:", err))
         .finally(() => setCoachLoading(false));
@@ -380,13 +384,9 @@ export default function Dashboard() {
   }
 
   // Resolve today's scheduled workout name dynamically
-  const todaysWorkout = profile
-    ? getTodaysWorkout({
-        gymFrequency: profile.gymFrequency,
-        gymExperience: profile.gymExperience,
-        goal: profile.goal,
-      })
-    : null;
+  const todaysWorkout = profile ? getTodaysWorkout(profile) : null;
+
+  const nextMeal = coachContext?.mealTiming ? nextMealPrompt(coachContext.mealTiming, coachContext.todayMessMenu) : null;
 
   let workoutLabel = todaysWorkout
     ? todaysWorkout.name === "Rest Day"
@@ -531,6 +531,26 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* What matters right now */}
+      {nextMeal && (
+        <div className="p-4 rounded-2xl border border-brand-500/30 bg-brand-500/10 flex items-center justify-between gap-3 animate-in-delay-1">
+          <div className="min-w-0 text-left">
+            <h2 className="text-sm font-bold text-white">{nextMeal.title}</h2>
+            {nextMeal.detail && <p className="text-[11px] text-zinc-400 mt-0.5 truncate">{nextMeal.detail}</p>}
+            {todaysWorkout && todaysWorkout.exercises.length > 0 && !today.workoutDone && !activeEvent && (
+              <button type="button" onClick={() => router.push("/workout")} className="text-[11px] text-brand-400 mt-1 cursor-pointer">
+                {workoutLabel} today →
+              </button>
+            )}
+          </div>
+          {nextMeal.action && (
+            <button type="button" onClick={() => router.push("/meal")} className="btn-primary px-3 py-2 text-xs font-bold flex-shrink-0">
+              {nextMeal.action}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Glanceable Status Pill & 1-Tap Quick Action Bar */}
       <div className="space-y-3 animate-in-delay-1">
         <div className="flex items-center justify-between px-1">
@@ -550,14 +570,22 @@ export default function Dashboard() {
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/diet")}
+            className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-500/40 hover:bg-white/10 transition-all flex flex-col items-center justify-center gap-1 group cursor-pointer"
+          >
+            <Soup className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[10px] font-bold text-white">Diet Plan</span>
+          </button>
           <button
             type="button"
             onClick={() => router.push("/meal")}
             className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-brand-500/40 hover:bg-white/10 transition-all flex flex-col items-center justify-center gap-1 group cursor-pointer"
           >
             <Camera className="w-4 h-4 text-brand-400 group-hover:scale-110 transition-transform" />
-            <span className="text-[10px] font-bold text-white">Scan Meal</span>
+            <span className="text-[10px] font-bold text-white">Log Meal</span>
           </button>
           <button
             type="button"
@@ -565,7 +593,7 @@ export default function Dashboard() {
             className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-500/40 hover:bg-white/10 transition-all flex flex-col items-center justify-center gap-1 group cursor-pointer"
           >
             <Dumbbell className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
-            <span className="text-[10px] font-bold text-white">Workout HUD</span>
+            <span className="text-[10px] font-bold text-white">Workout</span>
           </button>
           <button
             type="button"
@@ -573,7 +601,7 @@ export default function Dashboard() {
             className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/40 hover:bg-white/10 transition-all flex flex-col items-center justify-center gap-1 group cursor-pointer"
           >
             <Droplet className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
-            <span className="text-[10px] font-bold text-white">+250ml Water</span>
+            <span className="text-[10px] font-bold text-white">+250ml</span>
           </button>
         </div>
       </div>
@@ -625,7 +653,7 @@ export default function Dashboard() {
         {/* Protein Card (col-span-1) */}
         <GlassCard 
           onClick={() => router.push("/meal")}
-          className="p-5 flex flex-col justify-between min-h-[130px] border border-white/5 bg-white/2 hover:border-[#8ba893]/20 transition-all rounded-2xl col-span-1 group"
+          className="p-5 flex flex-col justify-between min-h-[130px] border border-white/5 bg-white/2 hover:border-[#8ba893]/20 transition-all rounded-2xl col-span-2 md:col-span-1 group"
         >
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-1.5">
@@ -651,6 +679,8 @@ export default function Dashboard() {
           </div>
         </GlassCard>
 
+        {showMoreStats && (
+          <>
         {/* Steps Card (col-span-1) */}
         <GlassCard 
           onClick={() => {
@@ -758,7 +788,17 @@ export default function Dashboard() {
             </button>
           </div>
         </GlassCard>
+          </>
+        )}
       </div>
+
+      <button
+        type="button"
+        onClick={() => setShowMoreStats((shown) => !shown)}
+        className="w-full text-[11px] font-semibold text-zinc-500 hover:text-white transition-colors cursor-pointer -mt-3"
+      >
+        {showMoreStats ? "Show less" : "Show steps, sleep and water"}
+      </button>
 
       {/* Coach Card (Bespoke Editorial Pull-Quote Block) */}
       <div className="animate-in-delay-2">
