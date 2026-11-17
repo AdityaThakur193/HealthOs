@@ -544,6 +544,7 @@ export default function MealCapture() {
         >
           {imagePreview && (
             <div className="relative w-44 h-44 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+              {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview of the photo just taken */}
               <img src={imagePreview} className="w-full h-full object-cover opacity-60" alt="Scanned food" />
               {/* Scan sweep animation */}
               <div

@@ -390,6 +390,7 @@ export default function CoachChatFAB() {
         }}
       >
         <div className="absolute inset-0 bg-[#8ba893]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- tiny local SVG avatar; next/image would not optimise it */}
         <img 
           src={COACH_AVATAR_URL} 
           alt="Coach Avatar"
@@ -413,6 +414,7 @@ export default function CoachChatFAB() {
           <div className="p-4 bg-white/3 border-b border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element -- tiny local SVG avatar; next/image would not optimise it */}
                 <img 
                   src={COACH_AVATAR_URL} 
                   alt="Coach Avatar"
@@ -443,6 +445,7 @@ export default function CoachChatFAB() {
                 className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 {msg.role === "model" && (
+                  // eslint-disable-next-line @next/next/no-img-element -- tiny local SVG avatar; next/image would not optimise it
                   <img 
                     src={COACH_AVATAR_URL} 
                     alt="Coach Avatar"
@@ -464,6 +467,7 @@ export default function CoachChatFAB() {
             
             {sending && (
               <div className="flex gap-2.5 justify-start">
+                {/* eslint-disable-next-line @next/next/no-img-element -- tiny local SVG avatar; next/image would not optimise it */}
                 <img 
                   src={COACH_AVATAR_URL} 
                   alt="Coach Avatar"

@@ -29,6 +29,7 @@ export default function SessionWatcher() {
 
       if (response.status === 401 && isAppApi && window.location.pathname !== "/login") {
         clearClientSession();
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- a full reload clears all in-memory state after the session ends
         window.location.assign("/login");
       }
       return response;
