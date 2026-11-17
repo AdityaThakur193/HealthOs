@@ -1,29 +1,20 @@
 # Security Policy 🛡️
 
-The Health OS maintainers take system security, data privacy, and vulnerability management seriously. We are committed to protecting user health data and ensuring our open-source software adheres to elite security standards.
+This repository is an early open-source version of Health OS and is **no longer actively developed**. It does not receive security updates. If you run it yourself, you are responsible for keeping it and its dependencies up to date.
 
 ---
 
 ## 📋 Supported Versions
 
-We provide security updates and patches for the following versions:
-
 | Version | Supported |
 | :--- | :--- |
-| `1.0.x` | ✅ Supported |
-| `< 1.0.0` | ❌ End of Life |
+| Any version in this repository | ❌ Not maintained |
 
 ---
 
 ## 🚨 Reporting a Vulnerability
 
-If you discover a security vulnerability in **Health OS**, please **DO NOT** create a public GitHub issue. Instead, report it privately following our Responsible Disclosure policy.
-
-### Disclosure Process
-1. Email your vulnerability report to **`adityath2305@gmail.com`**.
-2. Include a detailed description of the vulnerability, proof-of-concept steps, and potential impact.
-3. Our team will acknowledge receipt of your report within **24 hours** and provide an estimated fix timeline.
-4. Once a fix is validated and released, we will publicly credit your contribution (unless you request anonymity).
+Please **don't** create a public GitHub issue for a security problem. Email **`adityath2305@gmail.com`** with a description, steps to reproduce, and the likely impact. Reports are read, but because this repository is no longer maintained, a fix may not be published here.
 
 ---
 

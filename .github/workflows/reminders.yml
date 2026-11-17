@@ -1,10 +1,13 @@
 name: Meal Reminders
 
-# Checks every 15 minutes which users are due a reminder. GitHub may run this
-# a few minutes late, so reminders start an hour before a meal closes.
+# Calls the reminder endpoint, which checks which users are due a reminder.
+# This repository is no longer maintained, so the job only runs manually here.
+# To send reminders automatically in your fork, add this under "on:":
+#   schedule:
+#     - cron: "*/15 * * * *"
+# GitHub may run a schedule a few minutes late, so reminders start an hour
+# before a meal closes.
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       send_test:

@@ -1,230 +1,179 @@
 <div align="center">
 
-# 🟢 Health OS
+<img src="public/logo-192.png" alt="Health OS logo" width="96" height="96" />
 
-### *The World's Most Intelligent Personal Health Operating System*
+# Health OS
 
-> **Project status: no longer actively developed.** This repository is an early open-source version of HealthOS, kept public for reference and learning. It is not maintained, and new features and fixes are not published here. Issues and pull requests may not get a response. The code here stays under the AGPLv3 licence.
+**A health and fitness tracker built for hostel students in India.**
+Log meals, workouts, weight, sleep and habits, and let the app adjust your targets from your real data.
 
-[![CI Build](https://github.com/AdityaThakur193/HealthOs/actions/workflows/ci.yml/badge.svg)](https://github.com/AdityaThakur193/HealthOs/actions/workflows/ci.yml)
-[![Next.js 16](https://img.shields.io/badge/Next.js-16.4.5-black?logo=next.js&logoColor=white)](https://nextjs.org/)
-[![TypeScript 5](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vitest Passed](https://img.shields.io/badge/Vitest-212%20Tests%20Passed-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
-[![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Mongoose%208-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v3.4-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![CI](https://github.com/AdityaThakur193/HealthOs/actions/workflows/ci.yml/badge.svg)](https://github.com/AdityaThakur193/HealthOs/actions/workflows/ci.yml)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose%208-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Tests](https://img.shields.io/badge/tests-368%20passing-6E9F18?logo=vitest&logoColor=white)](src/__tests__)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
-<p align="center">
-  Reversing the health tracking paradigm from a manual logging diary into an <b>automated, adaptive decision engine</b>.
-</p>
-
-[Explore Features](#-core-architectural-pillars) • [System Overview](#-system-architecture-overview) • [Architecture Specs](ARCHITECTURE.md) • [API Documentation](API.md) • [Getting Started](#-quickstart--setup) • [Contributing](CONTRIBUTING.md)
+[Features](#features) · [Screenshots](#screenshots) · [Getting started](#getting-started) · [Project layout](#project-layout) · [Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md)
 
 </div>
 
+> [!NOTE]
+> **This project is no longer actively developed.** This repository is an early open-source version of Health OS, kept public for reference and learning. New features and fixes are not published here, and issues and pull requests may not get a response. The code stays under the AGPLv3 licence, so you are free to fork it.
+
 ---
 
-## 🚀 System Architecture Overview
+## Features
 
-Health OS decouples raw data collection from decision intelligence. All user actions (meal captures, workout completions, weight check-ins, sleep logs, habit check-ins) write to a unified, immutable **Health Timeline**. Downstream analytics engines process this timeline to adapt metabolic expenditure, fine-tune workout progressive overload, and audit nutritional intake.
+| Feature | What it does |
+| :--- | :--- |
+| **Adaptive calorie target** | Estimates your real daily energy use (TDEE) from 14 days of weigh-ins and logged calories, instead of relying only on a formula. Starts once there are at least 3 weigh-ins and 7 logged days, and stays within safe limits. |
+| **Meal photos with real nutrition data** | AI identifies the dishes and counts in a photo. Calories and macros come from the **ICMR-NIN IFCT 2017** Indian food tables, not from the AI. You adjust portions (katori, pieces, scoops) before saving. |
+| **Mess menu logging** | Pick what you took from today's mess menu and confirm the amounts. Nothing is saved until you confirm. |
+| **Mess-based diet plan** | Builds a day of meals from what your mess actually serves, with realistic portions, and says plainly when a target can't be reached. AI estimates are used only for dishes IFCT doesn't cover, and are labelled. |
+| **Workout plans with progression** | Templates for 3 to 6 training days a week that you can edit. Suggests adding weight once every top set reaches the top of the rep range. |
+| **AI coach** | A chat coach that can log meals, water, sleep, steps, weight and habits from plain language. It knows mess hours and never suggests a meal that has closed. |
+| **Habits and weekly review** | Streaks and completion rates for daily habits, plus a Sunday review with specific actions for next week. |
+| **Meal reminders** | Optional push notification in the last hour before a meal closes, only if that meal isn't logged yet. |
+| **Secure by default** | Email one-time-code login, signed HTTP-only sessions, and every read and write scoped to the signed-in user. See [SECURITY.md](SECURITY.md). |
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Home dashboard with calorie, protein, steps, sleep and water rings" width="58%" />
+  &nbsp;
+  <img src="docs/screenshots/log-entry.png" alt="Log entry sheet for workouts, meals, steps, sleep and weight" width="38%" />
+</p>
+
+## How it works
+
+Every action (a meal, a workout set, a weigh-in, a habit check-in) is saved as an event on one **health timeline**. The calculation engines read that timeline to update your targets.
 
 ```mermaid
 graph TD
-    %% User Action Layer
-    User([👤 User Lives Life]) -->|Vision Capture| VisionAPI["/api/vision"]
-    User -->|Weight Check-in| TimelineAPI["/api/timeline"]
-    User -->|Workout Set| WorkoutEngine["Workout Engine"]
-    User -->|Habit Checkin| HabitsAPI["/api/habits"]
+    User([User]) -->|Meal photo| Vision["/api/vision"]
+    User -->|Weigh-in| Timeline["/api/timeline"]
+    User -->|Workout set| Workout["Workout engine"]
+    User -->|Habit check-in| Habits["/api/habits"]
 
-    %% Vision Pipeline
-    VisionAPI -->|1. Candidate Detection| GeminiVision["Gemini 2.5 Flash"]
-    VisionAPI -->|2. Deterministic Macro Lookup| IFCTDB[("ICMR-NIN IFCT 2017 DB")]
-    IFCTDB -->|3. Accurate Portion Math| QuantityUI["Interactive Quantity Sliders"]
+    Vision -->|1. Detect dishes| Gemini["Gemini vision"]
+    Vision -->|2. Look up nutrition| IFCT[("IFCT 2017 food data")]
+    IFCT -->|3. Adjust portions| Confirm["User confirms amounts"]
 
-    %% Timeline & Database Layer
-    QuantityUI -->|Save Event| HealthTimeline[("Chronological Health Timeline")]
-    TimelineAPI -->|Save Weight| HealthTimeline
-    WorkoutEngine -->|Save Exercise Log| HealthTimeline
-    HabitsAPI -->|Save Habit Event| HealthTimeline
-    HealthTimeline -->|Mongoose Serverless Pool| MongoDB[("MongoDB Atlas")]
+    Confirm --> HT[("Health timeline")]
+    Timeline --> HT
+    Workout --> HT
+    Habits --> HT
+    HT --> Mongo[("MongoDB")]
 
-    %% Adaptive Decision Engine
-    HealthTimeline -->|14-Day Linear Regression| AdaptiveTDEE["Adaptive TDEE Engine"]
-    AdaptiveTDEE -->|Recalibrate Calories| ProfileState["UserProfile State"]
-    ProfileState -->|Grounded MPS Prompt| DietEngine["Grounded Diet Generator"]
-    DietEngine -->|Deterministic Math Audit| HUDDashboard["Premium Glassmorphic HUD"]
+    HT -->|14-day regression| TDEE["Adaptive TDEE"]
+    TDEE --> Profile["Calorie and protein targets"]
+    Profile --> Diet["Diet planner"]
+    Profile --> Dashboard["Dashboard"]
 ```
 
----
+More detail, including the maths behind each engine, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Every API route is documented in [docs/API.md](docs/API.md).
 
-## ⚡ Core Architectural Pillars
+## Tech stack
 
-### 1. 14-Day Adaptive TDEE Expenditure Engine (MacroFactor Paradigm)
-- **Problem**: Static BMR formulas (Harris-Benedict, Mifflin-St Jeor) ignore metabolic adaptation, NEAT variance, and sodium water retention.
-- **Engine Solution** (`src/lib/tdee.ts`): Computes a 14-day rolling window linear regression of daily weight change vs average caloric intake.
-- **Activation**: Starts once the window holds at least 3 weigh-in days and 7 calorie-logged days.
-- **Math Integrity**: Keeps the result within ±200 kcal of the BMR-and-activity baseline to absorb water weight swings, inside safety limits of `[1,200 kcal, 4,500 kcal]`. Today's unfinished log is excluded.
+- **App:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Framer Motion
+- **Data:** MongoDB with Mongoose 8
+- **AI:** Google Gemini for meal photos, Groq for the coach and text meal analysis
+- **Email and notifications:** Resend for login codes, Web Push for reminders
+- **Testing:** Vitest, Testing Library, and an in-memory MongoDB for API integration tests
 
-### 2. 4-Stage Perfect Vision & ICMR-NIN IFCT 2017 Portion Engine
-- **Problem**: Standard LLM vision APIs output text token-by-token and hallucinate macro math (e.g. claiming thin mess dal has 20g protein).
-- **Engine Solution** (`src/lib/ifctData.ts` & `src/lib/gemini.ts`):
-  1. **Visual Contract**: AI vision detects dish names and unit counts without guessing raw calories.
-  2. **IFCT 2017 Database**: Post-processes dish detections against official **ICMR-NIN IFCT 2017** benchmarks (Rotis, Thin Mess Dal, Rice, Curd, Paneer, Whey, Eggs).
-  3. **Interactive Quantity Sliders**: Replaces vague `Small/Medium/Large` buttons with real-time `-` / `+` portion controls (`1 Katori`, `2 Pieces`, `1 Scoop`).
-  4. **Zero-Hallucination Policy**: A food that isn't in the database gets 0 macros and is flagged, so the user can enter the values instead of trusting a guess.
+## Getting started
 
-### 3. Mess-Based Diet Planner with Realistic Portions
-- **Engine Solution** (`src/lib/dietPlanner.ts` & `/api/diet/generate`):
-  - Splits the weekly mess menu into individual foods and takes nutrition from **ICMR-NIN IFCT 2017**. AI estimates are used only for dishes IFCT doesn't cover, and are labelled as estimated.
-  - Code chooses every portion within limits a person would really eat, across a 25% / 30% / 15% / 30% meal split.
-  - Adds protein sources (`vegetarian`, `vegan`, `eggetarian`, `non_veg`) only when the mess falls short, and respects allergies and strict mess mode.
-  - States plainly when the mess can't reach a target on a given day.
+**You need:** Node.js 20.9 or newer, and a MongoDB database (Atlas or local).
 
-### 4. Evidence-Based Gym Engine & Progressive Overload
-- **Engine Solution** (`src/lib/workoutPlans.ts`):
-  - Provides templates for 3-day, 4-day, 5-day, and 6-day splits, which users can change day by day or through the coach.
-  - Implements double progression logic: suggests a weight increase (+2.5kg, or +2.0kg for dumbbell and lateral work) once every top set reaches the top of the rep range.
-  - Curated YouTube exercise video timestamp links embedded directly into exercise cards.
-
-### 5. Autonomous AI Coach Assistant & Real-Time Data Control
-- **Engine Solution** (`src/components/CoachChatFAB.tsx` & `/api/coach/chat`):
-  - Action-first agent capable of parsing natural language to directly log meals, steps, water, sleep, weight, and habits.
-  - Interacts directly with the chronological MongoDB health timeline database.
-
-### 6. Habit Tracker & Daily Discipline Engine
-- **Engine Solution** (`src/lib/habitEngine.ts` & `/api/habits`):
-  - Tracks daily health habits (hydration, sleep targets, prayer/meditation, physical activity).
-  - Calculates active streaks (🔥) and completion percentages using EWMA exponential habit scoring.
-  - Fully integrated with Coach AI so users can check off habits via natural-language chat.
-
----
-
-## 📦 Quickstart & Setup
-
-### Prerequisites
-- **Node.js**: v20.9.0 or higher
-- **npm**: v10.0.0 or higher
-- **MongoDB**: Atlas instance or local MongoDB server
-
-### 1. Clone & Install
 ```bash
 git clone https://github.com/AdityaThakur193/HealthOs.git
 cd HealthOs
 npm install
 ```
 
-### 2. Environment Configuration
-Create a `.env.local` file in the root directory (refer to `.env.local.example`):
+Copy `.env.local.example` to `.env.local` and fill it in. The example file explains each value. The minimum for local development is:
 
 ```env
 MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/healthos
-GEMINI_API_KEY=your_gemini_api_key_here
-GROQ_API_KEY=your_groq_api_key_here
-
-# Required in production, at least 32 characters: openssl rand -base64 48
-AUTH_SECRET=
-# Required in production. In development the login code is printed in the server console.
-RESEND_API_KEY=
-EMAIL_FROM=HealthOS <onboarding@resend.dev>
+GEMINI_API_KEY=your_gemini_api_key
+GROQ_API_KEY=your_groq_api_key
 ```
 
-### 3. Run Development Server
+In development, the login code is printed in the server console, so `RESEND_API_KEY` can stay empty. Production also needs `AUTH_SECRET` (at least 32 characters) and `RESEND_API_KEY`.
+
+Then start the app and open [http://localhost:3000](http://localhost:3000):
+
 ```bash
 npm run dev
 ```
-Navigate to [http://localhost:3000](http://localhost:3000).
 
-### 4. Run Automated Test Suite
+### Checks
+
 ```bash
-# Run TypeScript Strict Validation
-npm run type-check
-
-# Run ESLint
-npm run lint
-
-# Run Vitest Test Suite
-npm test
+npm run lint         # ESLint
+npm run type-check   # TypeScript
+npm test             # Vitest (368 tests in 27 files)
+npm run build        # Production build
 ```
 
-### 5. Build for Production
-```bash
-npm run build
-npm run start
-```
+### Meal reminders
 
----
+Reminders are sent by `POST /api/cron/reminders`, which needs `CRON_SECRET` and VAPID web push keys. The workflow [.github/workflows/reminders.yml](.github/workflows/reminders.yml) can call it, given an `APP_URL` repository variable and a `CRON_SECRET` secret. In this repository it only runs manually; add a `schedule` trigger in your fork to run it every 15 minutes.
 
-## 📂 Repository Layout Map
+## Project layout
 
 ```
 HealthOs/
-├── .github/
-│   ├── workflows/
-│   │   └── ci.yml                # GitHub Actions CI Workflow (Lint, Type-Check, Test, Build)
-│   ├── PULL_REQUEST_TEMPLATE.md  # Standard Pull Request Submission Template
-│   └── ISSUE_TEMPLATE/           # Bug Report & Feature Request Issue Templates
-├── public/                       # Static Assets & PWA Manifest
 ├── src/
-│   ├── app/                      # Next.js 16 App Router Pages & REST API Routes
-│   │   ├── api/                  # Serverless API Endpoints (/vision, /diet, /timeline, /habits, etc.)
-│   │   ├── meal/                 # AI Vision Meal Capture Page
-│   │   ├── workout/              # Progressive Overload Workout HUD Page
-│   │   ├── habits/               # Habit Tracker & Streak Dashboard Page
-│   │   ├── diet/                 # Mess-Based Diet Plan Page
-│   │   ├── review/               # Sunday Weekly Review Page
-│   │   └── page.tsx              # Main Glassmorphic Dashboard HUD
-│   ├── components/               # Reusable Glassmorphic UI Components
-│   ├── hooks/                    # Custom React Hooks (useConfirmDialog, useAuthGuard, etc.)
-│   ├── lib/                      # Core Engineering Algorithms
-│   │   ├── tdee.ts               # 14-Day Adaptive TDEE Expenditure Engine
-│   │   ├── ifctData.ts           # ICMR-NIN IFCT 2017 Indian Food Database
-│   │   ├── dietEngine.ts         # Grounded AI Diet Allocation & Math Audit Engine
-│   │   ├── workoutPlans.ts       # Workout Split & Progressive Overload Engine
-│   │   ├── habitEngine.ts         # Habit Tracker & Streak Analytics Engine
-│   │   ├── gemini.ts             # Gemini 2.5 Flash Vision Integration
-│   │   ├── auth/                 # Signed Sessions & One-Time Login Codes
-│   │   └── mongodb.ts            # Serverless Mongoose Connection Pool Cache
-│   └── __tests__/                # Vitest Unit, Integration & Component Tests
-├── ARCHITECTURE.md               # Technical Deep-Dive & Mermaid Flow Diagrams
-├── API.md                        # Complete REST API Specifications
-├── CONTRIBUTING.md               # Developer Contribution & Branch/Commit Standards
-├── SECURITY.md                   # Vulnerability Reporting SLA & Security Specs
-├── CHANGELOG.md                  # Release Version History
-├── LICENSE                       # Official AGPLv3 License
-└── package.json                  # Dependencies & npm Scripts
+│   ├── app/                 # Pages (App Router) and API routes
+│   │   ├── api/             # auth, coach, cron, diet, habits, mess-menu, profile,
+│   │   │                    # reminders, review, timeline, vision, workout-plan
+│   │   ├── page.tsx         # Home dashboard
+│   │   ├── meal/            # Meal photo and mess menu logging
+│   │   ├── diet/            # Diet plan
+│   │   ├── workout/         # Workout plan and logging
+│   │   ├── habits/          # Habit tracker
+│   │   ├── journey/         # Weight trend and progress
+│   │   ├── review/          # Weekly review
+│   │   ├── profile/         # Settings, mess hours, reminders
+│   │   ├── onboarding/      # First-run setup
+│   │   └── login/           # Email code sign-in
+│   ├── components/          # UI components
+│   ├── hooks/               # React hooks
+│   ├── lib/                 # Engines and shared logic
+│   │   ├── tdee.ts          # Adaptive TDEE
+│   │   ├── ifctData.ts      # IFCT 2017 food data and lookup
+│   │   ├── dietPlanner.ts   # Mess-based diet planner
+│   │   ├── workoutPlans.ts  # Workout templates and progression
+│   │   ├── habitEngine.ts   # Habit streaks and scores
+│   │   ├── coach*.ts        # Coach actions, context and rules
+│   │   ├── reminders.ts     # Meal reminder logic
+│   │   ├── auth/            # Sessions and login codes
+│   │   └── db/              # Mongoose models
+│   ├── data/                # Generated IFCT dataset
+│   └── __tests__/           # Unit, component and API integration tests
+├── public/                  # Icons, PWA manifest, service worker
+├── scripts/                 # Data build scripts
+└── docs/                    # Architecture, API reference, screenshots
 ```
 
----
+## Known limitations
 
-## 🧪 Automated Testing & Quality Audit
+- **No offline logging.** The app can be installed to the home screen, but needs a connection to log data.
+- **Approximate AI rate limits.** Limits are counted per server instance, so they are approximate on serverless hosts.
+- **Sessions can't be revoked one by one.** They last 30 days. Rotating `AUTH_SECRET` ends all of them.
 
-Health OS maintains an automated **Vitest** suite of 212 tests across 17 files. It covers the calculation engines, input validation, sessions, and login UI. Integration tests run the real API route handlers against an in-memory MongoDB to verify that users cannot reach each other's data.
+## Medical disclaimer
 
-```bash
-npm test
-```
+Health OS is an informational wellness tool, not a medical device. Its calorie targets, diet plans, meal analysis and workout plans are for education only and do not replace advice from a doctor or registered dietitian. Talk to a professional before starting a new diet or training programme, especially if you have an injury or medical condition. The author accepts no liability for harm resulting from its use.
 
----
+## Food data
 
-## 🚧 Known Limitations
+Nutrition values come from the **Indian Food Composition Tables (IFCT 2017)**, ICMR National Institute of Nutrition.
 
-- **Offline logging** is not implemented yet. The app can be installed to the home screen, but it needs a connection to log data.
-- **AI rate limits** are counted per server instance, so on serverless hosts they are approximate.
-- **Sessions** last 30 days and cannot be revoked individually. Rotating `AUTH_SECRET` ends all of them.
+## License
 
----
+Licensed under the [GNU Affero General Public License v3.0](LICENSE), with an attribution requirement under section 7(b): forks and hosted versions must keep the original credits to **Aditya Thakur** and share their source under AGPLv3.
 
-## ⚠️ Medical & Nutritional Disclaimer
-
-**Health OS is an informational and educational wellness tracking tool, not a medical device.**
-The information generated by this application—including TDEE calculations, dietary recommendations, AI meal analysis, and workout plans—is strictly for educational purposes. It does not diagnose, treat, cure, or prevent any disease, nor does it replace professional medical advice.
-
-Always consult a qualified physician or registered dietitian before beginning any new diet, fitness program, or modifying your nutritional intake, especially if you have pre-existing injuries or medical conditions. The creators and contributors of this software assume no liability for personal injury, health complications, or damages resulting from its use.
-
----
-
-## 📄 License & Attribution
-
-Distributed under the **GNU Affero General Public License v3.0 (AGPLv3)** with mandatory author attribution. Anyone modifying, distributing, or hosting this software must preserve original credits acknowledging **Aditya Thakur** as the original author and keep derivative works 100% open-source under AGPLv3. See [`LICENSE`](LICENSE) for details.
-
-Designed & Built with ❤️ by [Aditya Thakur](https://github.com/AdityaThakur193).
+Built by [Aditya Thakur](https://github.com/AdityaThakur193).
