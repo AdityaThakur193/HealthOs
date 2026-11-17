@@ -4,6 +4,8 @@
 
 ### *The World's Most Intelligent Personal Health Operating System*
 
+> **Project status: no longer actively developed.** This repository is an early open-source version of HealthOS, kept public for reference and learning. It is not maintained, and new features and fixes are not published here. Issues and pull requests may not get a response. The code here stays under the AGPLv3 licence.
+
 [![CI Build](https://github.com/AdityaThakur193/HealthOs/actions/workflows/ci.yml/badge.svg)](https://github.com/AdityaThakur193/HealthOs/actions/workflows/ci.yml)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16.4.5-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript 5](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
