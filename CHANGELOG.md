@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.1.0] - 2026-11-17
+
+The final release in this repository. Development has stopped here; the code stays available under AGPLv3.
 
 ### Added
 - The reminder job now reports why it skipped or failed, and can send a test notification on demand.
